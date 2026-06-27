@@ -6,6 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { ProfileType } from "@/lib/types";
+import { apiCall } from "@/lib/_core/api";
 
 function validateCPF(cpf: string): boolean {
   cpf = cpf.replace(/[^\d]+/g, "");
@@ -63,17 +64,6 @@ export default function AuthScreen() {
       formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
     }
     setCpf(formatted);
-
-    // Auto-fill names matching mock valid CPFs for test ease
-    if (limited.length === 11 && validateCPF(limited)) {
-      const mockNames: Record<string, string> = {
-        "12345678909": "Renan Morais",
-        "11122233344": "Ana Silva",
-        "55566677788": "Carlos Santos",
-      };
-      const resolvedName = mockNames[limited] || "Cliente CPF Valido";
-      setName(resolvedName);
-    }
   };
 
   const handlePhoneChange = (val: string) => {
@@ -202,7 +192,13 @@ export default function AuthScreen() {
           {mode === "register" && (
             <>
               <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
-              <Input label="Nome completo" value={name} onChangeText={setName} placeholder="Nome do titular do CPF" />
+              <Input
+                label="Nome completo"
+                value={name}
+                onChangeText={setName}
+                placeholder="Nome do titular do CPF"
+                editable={validateCPF(cpf.replace(/\D/g, ""))}
+              />
               <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
             </>
           )}
@@ -265,6 +261,7 @@ function Segment({ label, active, onPress }: { label: string; active: boolean; o
 
 function Input({
   label,
+  editable = true,
   ...props
 }: {
   label: string;
@@ -273,18 +270,20 @@ function Input({
   placeholder?: string;
   keyboardType?: "default" | "email-address" | "number-pad" | "phone-pad";
   secureTextEntry?: boolean;
+  editable?: boolean;
 }) {
   const colors = useColors();
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 6, opacity: editable ? 1 : 0.5 }}>
       <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>{label}</Text>
       <TextInput
         {...props}
+        editable={editable}
         autoCapitalize="none"
         placeholderTextColor={colors.muted}
         returnKeyType="done"
         style={{
-          backgroundColor: colors.surface,
+          backgroundColor: editable ? colors.surface : colors.background,
           borderWidth: 1,
           borderColor: colors.border,
           borderRadius: 12,

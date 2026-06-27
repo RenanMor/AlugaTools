@@ -161,4 +161,51 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+function backendValidateCPF(cpf: string): boolean {
+  cpf = cpf.replace(/[^\d]+/g, "");
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  let sum = 0;
+  let remainder;
+
+  for (let i = 1; i <= 9; i++) {
+    sum = sum + parseInt(cpf.substring(i - 1, i)) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum = sum + parseInt(cpf.substring(i - 1, i)) * (12 - i);
+  }
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf.substring(10, 11))) return false;
+
+  return true;
+}
+
+const firstNames = ["Renan", "Ana", "Carlos", "Maria", "João", "Juliana", "Marcos", "Patrícia", "Lucas", "Sandra"];
+const lastNames = ["Morais", "Silva", "Santos", "Souza", "Oliveira", "Pereira", "Lima", "Costa", "Rodrigues", "Almeida"];
+
+router.get("/cpf-lookup/:cpf", async (req: Request, res: Response) => {
+  const { cpf } = req.params;
+  const cleanCpf = cpf.replace(/\D/g, "");
+
+  if (!backendValidateCPF(cleanCpf)) {
+    return res.status(400).json({ error: "CPF inválido" });
+  }
+
+  const sum = cleanCpf.split("").reduce((acc, digit) => acc + parseInt(digit, 10), 0);
+  const firstName = firstNames[sum % firstNames.length];
+  const lastName = lastNames[(sum * 7) % lastNames.length];
+  const name = `${firstName} ${lastName}`;
+
+  res.json({ name });
+});
+
 export default router;

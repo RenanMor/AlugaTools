@@ -30,8 +30,8 @@ export const API_BASE_URL = env.apiBaseUrl;
  * URL pattern: https://PORT-sandboxid.region.domain
  */
 export function getApiBaseUrl(): string {
-  // If API_BASE_URL is set, use it
-  if (API_BASE_URL) {
+  // If API_BASE_URL is set and starts with http, use it
+  if (API_BASE_URL && API_BASE_URL.startsWith("http")) {
     return API_BASE_URL.replace(/\/$/, "");
   }
 
@@ -47,13 +47,17 @@ export function getApiBaseUrl(): string {
     if (apiHostname !== hostname) {
       return `${protocol}//${apiHostname}`;
     }
+    // Deployed production web app fallback
+    return "https://alugatools-api.onrender.com";
   }
 
-  // Native simulators / emulators fallback
+  // Native simulators / emulators fallback (or physical device default)
   if (ReactNative.Platform.OS === "android") {
+    // If we're on a real device, it won't connect to 10.0.2.2, but for emulator it's fine.
+    // For safety, you should always define the env var for physical devices.
     return "http://10.0.2.2:4000";
   }
-  return "http://localhost:4000";
+  return "https://alugatools-api.onrender.com";
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";
