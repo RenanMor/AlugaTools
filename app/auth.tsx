@@ -190,10 +190,31 @@ export default function AuthScreen() {
           return;
         }
       } else {
-        if (!email.trim()) {
-          alert("E-mail é obrigatório");
-          setLoading(false);
-          return;
+        // Mode: Login
+        if (profile === "company") {
+          const cleanCnpj = cnpj.replace(/\D/g, "");
+          if (!cleanCnpj) {
+            alert("CNPJ é obrigatório para empresas");
+            setLoading(false);
+            return;
+          }
+          if (!validateCNPJ(cleanCnpj)) {
+            alert("CNPJ inválido");
+            setLoading(false);
+            return;
+          }
+        } else {
+          const cleanCpf = cpf.replace(/\D/g, "");
+          if (!cleanCpf) {
+            alert("CPF é obrigatório para clientes");
+            setLoading(false);
+            return;
+          }
+          if (!validateCPF(cleanCpf)) {
+            alert("CPF inválido");
+            setLoading(false);
+            return;
+          }
         }
         if (!password) {
           alert("Senha é obrigatória");
@@ -252,7 +273,7 @@ export default function AuthScreen() {
         </View>
 
         <View style={{ gap: 14, marginTop: 22 }}>
-          {mode === "register" && (
+          {mode === "register" ? (
             <>
               {profile === "customer" ? (
                 <>
@@ -278,9 +299,17 @@ export default function AuthScreen() {
                 </>
               )}
               <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
+              <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@exemplo.com" keyboardType="email-address" />
+            </>
+          ) : (
+            <>
+              {profile === "customer" ? (
+                <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
+              ) : (
+                <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
+              )}
             </>
           )}
-          <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@exemplo.com" keyboardType="email-address" />
           <Input label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
           {mode === "register" && (
             <Input label="Confirmar Senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••••" secureTextEntry />

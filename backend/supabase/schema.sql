@@ -33,6 +33,7 @@ create table if not exists public.tools (
   image text,
   price_per_day numeric(10,2) not null default 0,
   available boolean not null default true,
+  quantity integer not null default 1,
   created_at timestamptz not null default now()
 );
 

@@ -171,7 +171,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         response = await apiCall<{ token: string; user: SessionUser }>("/api/auth/signin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password: password || "123456" }),
+          body: JSON.stringify({
+            email,
+            password: password || "123456",
+            cpf: cpf ? cpf.replace(/\D/g, "") : undefined,
+            cnpj: cnpj ? cnpj.replace(/\D/g, "") : undefined,
+            profile,
+          }),
         });
       }
 

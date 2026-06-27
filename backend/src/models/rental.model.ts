@@ -19,6 +19,23 @@ export interface Rental {
 
 export const RentalModel = {
   async create(rental: Omit<Rental, "id" | "created_at" | "rating" | "tool" | "company" | "customer">): Promise<Rental> {
+    // 1. Decrement tool quantity in database
+    const { data: toolData, error: toolFetchError } = await supabaseAdmin
+      .from("tools")
+      .select("quantity, available")
+      .eq("id", rental.tool_id)
+      .single();
+
+    if (!toolFetchError && toolData) {
+      const newQuantity = Math.max(0, (toolData.quantity || 1) - 1);
+      const isAvailable = newQuantity > 0;
+      await supabaseAdmin
+        .from("tools")
+        .update({ quantity: newQuantity, available: isAvailable })
+        .eq("id", rental.tool_id);
+    }
+
+    // 2. Create the rental record
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .insert({ ...rental, rating: null })

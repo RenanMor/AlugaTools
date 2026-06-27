@@ -22,6 +22,7 @@ export interface Tool {
   image: string;
   pricePerDay: number;
   available: boolean;
+  quantity: number;
 }
 
 export interface Company {

@@ -111,20 +111,59 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
 
 router.post("/signin", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const { email, cpf, cnpj, password, profile } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "E-mail e senha são obrigatórios" });
+    if (!password) {
+      return res.status(400).json({ error: "Senha é obrigatória" });
+    }
+
+    let targetEmail = email;
+
+    if (cpf || cnpj) {
+      const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
+      const query = supabaseAdmin.from("users").select("email, profile");
+      if (cpf) {
+        query.eq("cpf", cleanDoc);
+      } else {
+        query.eq("cnpj", cleanDoc);
+      }
+
+      const { data: dbUser, error: queryError } = await query.single();
+      if (queryError || !dbUser) {
+        return res.status(401).json({ error: `${cpf ? "CPF" : "CNPJ"} não cadastrado` });
+      }
+
+      if (profile && dbUser.profile !== profile) {
+        return res.status(403).json({
+          error: `Este perfil pertence a uma ${dbUser.profile === "company" ? "empresa" : "conta de cliente"}. Por favor, faça login na aba correspondente.`
+        });
+      }
+
+      targetEmail = dbUser.email;
+    } else if (email) {
+      const { data: dbUser } = await supabaseAdmin
+        .from("users")
+        .select("profile")
+        .eq("email", email)
+        .single();
+
+      if (dbUser && profile && dbUser.profile !== profile) {
+        return res.status(403).json({
+          error: `Este perfil pertence a uma ${dbUser.profile === "company" ? "empresa" : "conta de cliente"}. Por favor, faça login na aba correspondente.`
+        });
+      }
+    } else {
+      return res.status(400).json({ error: "CPF, CNPJ ou E-mail é obrigatório" });
     }
 
     // 1. Sign in with Supabase Auth
     const { data: sessionData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
-      email,
+      email: targetEmail,
       password,
     });
 
     if (authError || !sessionData.session) {
-      return res.status(400).json({ error: "Credenciais inválidas" });
+      return res.status(401).json({ error: "Senha incorreta ou credenciais inválidas" });
     }
 
     // 2. Fetch public user profile
@@ -213,6 +252,47 @@ router.get("/cpf-lookup/:cpf", async (req: Request, res: Response) => {
   const name = `${firstName} ${lastName}`;
 
   res.json({ name });
+});
+
+router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId;
+    const { data: dbUser, error: dbError } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (dbError || !dbUser) {
+      return res.status(404).json({ error: "Perfil de usuário não encontrado" });
+    }
+
+    let companyId: string | undefined;
+    if (dbUser.profile === "company") {
+      const { data: companyData } = await supabaseAdmin
+        .from("companies")
+        .select("id")
+        .eq("owner_id", dbUser.id)
+        .single();
+      
+      if (companyData) {
+        companyId = companyData.id;
+      }
+    }
+
+    res.json({
+      user: {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        profile: dbUser.profile,
+        role: dbUser.role || "user",
+        companyId,
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

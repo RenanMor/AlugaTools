@@ -205,7 +205,9 @@ function ToolManageRow({ tool, onEdit, onDelete }: { tool: Tool; onEdit: () => v
       <Image source={{ uri: tool.image }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: colors.border }} />
       <View style={{ flex: 1 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{tool.name}</Text>
-        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>R$ {tool.pricePerDay}/dia</Text>
+        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+          R$ {tool.pricePerDay}/dia · Qtd: {tool.quantity ?? 1}
+        </Text>
       </View>
       <Pressable onPress={onEdit} style={({ pressed }) => [{ padding: 8, opacity: pressed ? 0.6 : 1 }]}>
         <IconSymbol name="pencil" size={20} color={colors.muted} />
@@ -235,6 +237,7 @@ function ToolFormModal({
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [image, setImage] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [categoryId, setCategoryId] = useState(CATEGORIES[0].id);
 
   useMemo(() => {
@@ -244,10 +247,12 @@ function ToolFormModal({
       setPrice(tool ? String(tool.pricePerDay) : "");
       setImage(tool?.image ?? "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400&q=80");
       setCategoryId(tool?.categoryId ?? CATEGORIES[0].id);
+      setQuantity(tool ? String(tool.quantity ?? 1) : "1");
     }
   }, [visible, tool]);
 
   const save = () => {
+    const parsedQty = Number(quantity) || 1;
     const base = {
       companyId,
       name: name.trim() || "Nova ferramenta",
@@ -255,7 +260,8 @@ function ToolFormModal({
       categoryId,
       image,
       pricePerDay: Number(price) || 0,
-      available: true,
+      quantity: parsedQty,
+      available: parsedQty > 0,
     };
     if (tool) onSave({ ...base, id: tool.id });
     else onSave(base);
@@ -272,7 +278,16 @@ function ToolFormModal({
 
             <Field label="Nome" value={name} onChangeText={setName} placeholder="Ex: Furadeira 750W" />
             <Field label="Descrição" value={description} onChangeText={setDescription} placeholder="Detalhes da ferramenta" multiline />
-            <Field label="Preço por dia (R$)" value={price} onChangeText={setPrice} placeholder="35" keyboardType="numeric" />
+            
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Field label="Preço por dia (R$)" value={price} onChangeText={setPrice} placeholder="35" keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Quantidade" value={quantity} onChangeText={setQuantity} placeholder="1" keyboardType="numeric" />
+              </View>
+            </View>
+
             <Field label="URL da imagem" value={image} onChangeText={setImage} placeholder="https://..." />
 
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 8 }}>Categoria</Text>
@@ -309,7 +324,7 @@ function ToolFormModal({
                 onPress={save}
                 style={({ pressed }) => [{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
               >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Salvar</Text>
+                <Text style={{ color: "#fff", fontWeight: "700" }}>{tool ? "Salvar" : "Adicionar"}</Text>
               </Pressable>
             </View>
           </ScrollView>

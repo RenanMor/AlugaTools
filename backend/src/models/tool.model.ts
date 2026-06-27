@@ -9,6 +9,7 @@ export interface Tool {
   image: string;
   price_per_day: number;
   available: boolean;
+  quantity: number;
 }
 
 export const ToolModel = {
