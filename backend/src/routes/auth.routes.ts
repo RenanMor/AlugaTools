@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { supabaseAdmin } from "../config/supabase";
+import { verifySupabaseToken } from "../middlewares/auth.middleware";
 
 const router = Router();
 
