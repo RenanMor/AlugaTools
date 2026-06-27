@@ -35,18 +35,25 @@ export function getApiBaseUrl(): string {
     return API_BASE_URL.replace(/\/$/, "");
   }
 
-  // On web, derive from current hostname by replacing port 8081 with 3000
+  // On web, derive from current hostname
   if (ReactNative.Platform.OS === "web" && typeof window !== "undefined" && window.location) {
     const { protocol, hostname } = window.location;
-    // Pattern: 8081-sandboxid.region.domain -> 3000-sandboxid.region.domain
-    const apiHostname = hostname.replace(/^8081-/, "3000-");
+    // Localhost development
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${hostname}:4000`;
+    }
+    // Sandbox environments (pattern: 8081-sandboxid... -> 4000-sandboxid...)
+    const apiHostname = hostname.replace(/^8081-/, "4000-");
     if (apiHostname !== hostname) {
       return `${protocol}//${apiHostname}`;
     }
   }
 
-  // Fallback to empty (will use relative URL)
-  return "";
+  // Native simulators / emulators fallback
+  if (ReactNative.Platform.OS === "android") {
+    return "http://10.0.2.2:4000";
+  }
+  return "http://localhost:4000";
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";
