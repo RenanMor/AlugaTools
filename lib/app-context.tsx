@@ -1,7 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { COMPANIES as SEED_COMPANIES, TOOLS as SEED_TOOLS } from "./data";
 import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool } from "./types";
+import * as Auth from "./_core/auth";
+import { apiCall } from "./_core/api";
+import {
+  getFeaturedCompanies,
+  getAllTools,
+  getMyRentals,
+  getRentalsByCompany,
+  createRental,
+  updateRentalStatus,
+  rateRental,
+  createTool,
+  updateTool,
+  deleteTool
+} from "./api";
 
 interface AppState {
   companies: Company[];
@@ -13,9 +26,9 @@ interface AppState {
   removeFromCart: (toolId: string) => void;
   updateCartDays: (toolId: string, days: number) => void;
   clearCart: () => void;
-  login: (email: string, name: string, profile: ProfileType) => void;
+  login: (email: string, name: string, profile: ProfileType, password?: string, isRegister?: boolean) => Promise<void>;
   logout: () => void;
-  checkout: () => void;
+  checkout: () => Promise<void>;
   rateRental: (rentalId: string, rating: number) => void;
   setRentalStatus: (rentalId: string, status: RentalStatus) => void;
   addTool: (tool: Omit<Tool, "id">) => void;
@@ -26,48 +39,81 @@ interface AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
-const STORAGE_KEY = "@renttools_state_v1";
+const STORAGE_KEY = "@renttools_state_v2";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [companies, setCompanies] = useState<Company[]>(SEED_COMPANIES);
-  const [tools, setTools] = useState<Tool[]>(SEED_TOOLS);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [tools, setTools] = useState<Tool[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
+  // 1. Hydrate cart and user session from storage on load
   useEffect(() => {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed.tools) setTools(parsed.tools);
           if (parsed.cart) setCart(parsed.cart);
-          if (parsed.rentals) setRentals(parsed.rentals);
           if (parsed.user) setUser(parsed.user);
         }
-      } catch {}
+      } catch (err) {
+        console.error("Erro ao hidratar estado local:", err);
+      }
       setHydrated(true);
     })();
   }, []);
 
+  // 2. Persist cart and user session to storage
   useEffect(() => {
     if (!hydrated) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ tools, cart, rentals, user })).catch(() => {});
-  }, [tools, cart, rentals, user, hydrated]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ cart, user })).catch(() => {});
+  }, [cart, user, hydrated]);
 
-  const recalcCompanyRating = useCallback((list: Rental[], companyId: string) => {
-    const rated = list.filter((r) => r.companyId === companyId && typeof r.rating === "number");
-    if (rated.length === 0) return;
-    const avg = rated.reduce((sum, r) => sum + (r.rating ?? 0), 0) / rated.length;
-    setCompanies((prev) =>
-      prev.map((c) =>
-        c.id === companyId ? { ...c, rating: Math.round(avg * 10) / 10, ratingCount: c.ratingCount + 1 } : c,
-      ),
-    );
+  // 3. Load catalog (companies & tools) from API on mount
+  const loadCatalog = useCallback(async () => {
+    try {
+      const [comps, tls] = await Promise.all([
+        getFeaturedCompanies(),
+        getAllTools()
+      ]);
+      setCompanies(comps);
+      setTools(tls);
+    } catch (err) {
+      console.error("Erro ao carregar dados do catálogo:", err);
+    }
   }, []);
 
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
+
+  // 4. Load rentals list whenever user state changes
+  const loadRentals = useCallback(async () => {
+    if (!user) {
+      setRentals([]);
+      return;
+    }
+    try {
+      let list: Rental[] = [];
+      if (user.profile === "company" && user.companyId) {
+        list = await getRentalsByCompany(user.companyId);
+      } else {
+        list = await getMyRentals();
+      }
+      setRentals(list);
+    } catch (err) {
+      console.error("Erro ao carregar aluguéis:", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadRentals();
+  }, [loadRentals]);
+
+  // Cart operations
   const addToCart = useCallback((tool: Tool, companyName: string) => {
     setCart((prev) => {
       if (prev.some((i) => i.tool.id === tool.id)) return prev;
@@ -85,68 +131,142 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => setCart([]), []);
 
-  const login = useCallback((email: string, name: string, profile: ProfileType) => {
-    setUser({
-      id: "u_" + Date.now(),
-      email,
-      name,
-      profile,
-      companyId: profile === "company" ? "co1" : undefined,
-    });
+  // Authentication operations
+  const login = useCallback(async (
+    email: string,
+    name: string,
+    profile: ProfileType,
+    password?: string,
+    isRegister?: boolean
+  ) => {
+    try {
+      let response: any;
+      if (isRegister) {
+        response = await apiCall<{ token: string; user: SessionUser }>("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: password || "123456", name, profile }),
+        });
+      } else {
+        response = await apiCall<{ token: string; user: SessionUser }>("/api/auth/signin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: password || "123456" }),
+        });
+      }
+
+      if (response.token) {
+        await Auth.setSessionToken(response.token);
+      }
+      setUser(response.user);
+    } catch (err) {
+      console.error("Erro de autenticação:", err);
+      throw err;
+    }
   }, []);
 
-  const logout = useCallback(() => setUser(null), []);
+  const logout = useCallback(async () => {
+    try {
+      await Auth.removeSessionToken();
+      setUser(null);
+      setRentals([]);
+    } catch (err) {
+      console.error("Erro ao deslogar:", err);
+    }
+  }, []);
 
-  const checkout = useCallback(() => {
-    setCart((currentCart) => {
-      if (currentCart.length === 0) return currentCart;
-      const now = Date.now();
-      setRentals((prev) => [
-        ...currentCart.map((item, idx) => ({
-          id: "r_" + now + "_" + idx,
-          toolId: item.tool.id,
-          toolName: item.tool.name,
-          toolImage: item.tool.image,
-          companyId: item.tool.companyId,
-          companyName: item.companyName,
-          customerName: "Cliente",
-          days: item.days,
-          totalPrice: item.tool.pricePerDay * item.days,
-          status: "pending" as RentalStatus,
-          createdAt: now,
-        })),
-        ...prev,
+  // Rental operations
+  const checkout = useCallback(async () => {
+    if (cart.length === 0 || !user) return;
+    try {
+      await Promise.all(
+        cart.map((item) =>
+          createRental({
+            toolId: item.tool.id,
+            companyId: item.tool.companyId,
+            days: item.days,
+            totalPrice: item.tool.pricePerDay * item.days,
+          })
+        )
+      );
+      clearCart();
+      
+      // Reload rentals list
+      let list: Rental[] = [];
+      if (user.profile === "company" && user.companyId) {
+        list = await getRentalsByCompany(user.companyId);
+      } else {
+        list = await getMyRentals();
+      }
+      setRentals(list);
+    } catch (err) {
+      console.error("Erro no checkout:", err);
+      throw err;
+    }
+  }, [cart, user, clearCart]);
+
+  const handleRateRental = useCallback(async (rentalId: string, rating: number) => {
+    try {
+      await rateRental(rentalId, rating);
+      
+      // Refresh rentals and company ratings
+      const [comps, rents] = await Promise.all([
+        getFeaturedCompanies(),
+        user?.profile === "company" && user.companyId ? getRentalsByCompany(user.companyId) : getMyRentals(),
       ]);
-      return [];
-    });
+      setCompanies(comps);
+      setRentals(rents);
+    } catch (err) {
+      console.error("Erro ao avaliar aluguel:", err);
+    }
+  }, [user]);
+
+  const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus) => {
+    try {
+      await updateRentalStatus(rentalId, status);
+      
+      // Refresh rentals
+      let list: Rental[] = [];
+      if (user?.profile === "company" && user.companyId) {
+        list = await getRentalsByCompany(user.companyId);
+      } else {
+        list = await getMyRentals();
+      }
+      setRentals(list);
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+    }
+  }, [user]);
+
+  // Tool management
+  const handleAddTool = useCallback(async (tool: Omit<Tool, "id">) => {
+    try {
+      await createTool(tool);
+      const tls = await getAllTools();
+      setTools(tls);
+    } catch (err) {
+      console.error("Erro ao adicionar ferramenta:", err);
+    }
   }, []);
 
-  const rateRental = useCallback(
-    (rentalId: string, rating: number) => {
-      setRentals((prev) => {
-        const updated = prev.map((r) => (r.id === rentalId ? { ...r, rating } : r));
-        const target = updated.find((r) => r.id === rentalId);
-        if (target) recalcCompanyRating(updated, target.companyId);
-        return updated;
-      });
-    },
-    [recalcCompanyRating],
-  );
-
-  const setRentalStatus = useCallback((rentalId: string, status: RentalStatus) => {
-    setRentals((prev) => prev.map((r) => (r.id === rentalId ? { ...r, status } : r)));
+  const handleUpdateTool = useCallback(async (tool: Tool) => {
+    try {
+      await updateTool(tool.id, tool);
+      const tls = await getAllTools();
+      setTools(tls);
+    } catch (err) {
+      console.error("Erro ao atualizar ferramenta:", err);
+    }
   }, []);
 
-  const addTool = useCallback((tool: Omit<Tool, "id">) => {
-    setTools((prev) => [{ ...tool, id: "t_" + Date.now() }, ...prev]);
-  }, []);
-
-  const updateTool = useCallback((tool: Tool) => {
-    setTools((prev) => prev.map((t) => (t.id === tool.id ? tool : t)));
-  }, []);
-
-  const deleteTool = useCallback((toolId: string) => {
-    setTools((prev) => prev.filter((t) => t.id !== toolId));
+  const handleDeleteTool = useCallback(async (toolId: string) => {
+    try {
+      await deleteTool(toolId);
+      const tls = await getAllTools();
+      setTools(tls);
+    } catch (err) {
+      console.error("Erro ao deletar ferramenta:", err);
+    }
   }, []);
 
   const cartTotal = useMemo(
@@ -168,11 +288,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       checkout,
-      rateRental,
-      setRentalStatus,
-      addTool,
-      updateTool,
-      deleteTool,
+      rateRental: handleRateRental,
+      setRentalStatus: handleSetRentalStatus,
+      addTool: handleAddTool,
+      updateTool: handleUpdateTool,
+      deleteTool: handleDeleteTool,
       cartTotal,
     }),
     [
@@ -188,11 +308,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       checkout,
-      rateRental,
-      setRentalStatus,
-      addTool,
-      updateTool,
-      deleteTool,
+      handleRateRental,
+      handleSetRentalStatus,
+      handleAddTool,
+      handleUpdateTool,
+      handleDeleteTool,
       cartTotal,
     ],
   );

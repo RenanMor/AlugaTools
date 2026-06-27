@@ -12,14 +12,17 @@ export interface Rental {
   status: RentalStatus;
   rating: number | null;
   created_at: string;
+  tool?: { name: string; image: string };
+  company?: { name: string };
+  customer?: { name: string };
 }
 
 export const RentalModel = {
-  async create(rental: Omit<Rental, "id" | "created_at" | "rating">): Promise<Rental> {
+  async create(rental: Omit<Rental, "id" | "created_at" | "rating" | "tool" | "company" | "customer">): Promise<Rental> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .insert({ ...rental, rating: null })
-      .select()
+      .select("*, tool:tools(name, image), company:companies(name), customer:users(name)")
       .single();
     if (error) throw new Error(error.message);
     return data as Rental;
@@ -28,7 +31,7 @@ export const RentalModel = {
   async findByCustomer(customerId: string): Promise<Rental[]> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select("*")
+      .select("*, tool:tools(name, image), company:companies(name), customer:users(name)")
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -38,7 +41,7 @@ export const RentalModel = {
   async findByCompany(companyId: string): Promise<Rental[]> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select("*")
+      .select("*, tool:tools(name, image), company:companies(name), customer:users(name)")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -50,7 +53,7 @@ export const RentalModel = {
       .from("rentals")
       .update({ status })
       .eq("id", id)
-      .select()
+      .select("*, tool:tools(name, image), company:companies(name), customer:users(name)")
       .single();
     if (error) throw new Error(error.message);
     return data as Rental;
@@ -61,7 +64,7 @@ export const RentalModel = {
       .from("rentals")
       .update({ rating })
       .eq("id", id)
-      .select()
+      .select("*, tool:tools(name, image), company:companies(name), customer:users(name)")
       .single();
     if (error) throw new Error(error.message);
     return data as Rental;

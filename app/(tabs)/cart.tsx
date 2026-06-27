@@ -11,14 +11,18 @@ export default function CartScreen() {
   const colors = useColors();
   const { cart, cartTotal, removeFromCart, updateCartDays, user, checkout } = useApp();
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!user) {
       router.push({ pathname: "/auth", params: { intent: "checkout" } });
       return;
     }
-    checkout();
-    router.push("/orders");
+    try {
+      await checkout();
+      router.push("/orders");
+    } catch (err: any) {
+      alert(err.message || "Erro ao processar o aluguel");
+    }
   };
 
   return (

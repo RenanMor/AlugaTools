@@ -17,18 +17,34 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const submit = () => {
-    const finalName = name.trim() || email.split("@")[0] || "Usuário";
-    login(email.trim() || "usuario@email.com", finalName, profile);
+  const [loading, setLoading] = useState(false);
 
-    if (params.intent === "checkout" && profile === "customer" && cart.length > 0) {
-      checkout();
+  const submit = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const finalName = name.trim() || email.split("@")[0] || "Usuário";
+      await login(
+        email.trim() || "usuario@email.com",
+        finalName,
+        profile,
+        password || "123456",
+        mode === "register"
+      );
+
+      if (params.intent === "checkout" && profile === "customer" && cart.length > 0) {
+        await checkout();
+        router.dismiss();
+        router.push("/orders");
+        return;
+      }
       router.dismiss();
-      router.push("/orders");
-      return;
+      if (profile === "company") router.push("/dashboard");
+    } catch (err: any) {
+      alert(err.message || "Erro de autenticação. Verifique suas credenciais.");
+    } finally {
+      setLoading(false);
     }
-    router.dismiss();
-    if (profile === "company") router.push("/dashboard");
   };
 
   return (
@@ -68,7 +84,7 @@ export default function AuthScreen() {
         ]}
       >
         <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-          {mode === "login" ? "Entrar" : "Criar conta e continuar"}
+          {loading ? "Carregando..." : (mode === "login" ? "Entrar" : "Criar conta e continuar")}
         </Text>
       </Pressable>
 

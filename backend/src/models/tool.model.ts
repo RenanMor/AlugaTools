@@ -12,6 +12,24 @@ export interface Tool {
 }
 
 export const ToolModel = {
+  async findAll(): Promise<Tool[]> {
+    const { data, error } = await supabaseAdmin
+      .from("tools")
+      .select("*");
+    if (error) throw new Error(error.message);
+    return data as Tool[];
+  },
+
+  async findById(id: string): Promise<Tool | null> {
+    const { data, error } = await supabaseAdmin
+      .from("tools")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) return null;
+    return data as Tool;
+  },
+
   async findByCompany(companyId: string): Promise<Tool[]> {
     const { data, error } = await supabaseAdmin
       .from("tools")
