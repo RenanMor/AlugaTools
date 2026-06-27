@@ -62,4 +62,5 @@ export interface SessionUser {
   email: string;
   profile: ProfileType;
   companyId?: string;
+  role?: string;
 }

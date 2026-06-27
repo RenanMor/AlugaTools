@@ -1,11 +1,39 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View, ScrollView } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { ProfileType } from "@/lib/types";
+
+function validateCPF(cpf: string): boolean {
+  cpf = cpf.replace(/[^\d]+/g, "");
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  let sum = 0;
+  let remainder;
+
+  for (let i = 1; i <= 9; i++) {
+    sum = sum + parseInt(cpf.substring(i - 1, i)) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum = sum + parseInt(cpf.substring(i - 1, i)) * (12 - i);
+  }
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf.substring(10, 11))) return false;
+
+  return true;
+}
 
 export default function AuthScreen() {
   const colors = useColors();
@@ -16,20 +44,120 @@ export default function AuthScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [phone, setPhone] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
+
+  const handleCpfChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 11);
+    
+    let formatted = limited;
+    if (limited.length > 9) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
+    } else if (limited.length > 6) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
+    } else if (limited.length > 3) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+    }
+    setCpf(formatted);
+
+    // Auto-fill names matching mock valid CPFs for test ease
+    if (limited.length === 11 && validateCPF(limited)) {
+      const mockNames: Record<string, string> = {
+        "12345678909": "Renan Morais",
+        "11122233344": "Ana Silva",
+        "55566677788": "Carlos Santos",
+      };
+      const resolvedName = mockNames[limited] || "Cliente CPF Valido";
+      setName(resolvedName);
+    }
+  };
+
+  const handlePhoneChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 11);
+    
+    let formatted = limited;
+    if (limited.length > 6) {
+      formatted = `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    } else if (limited.length > 2) {
+      formatted = `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    }
+    setPhone(formatted);
+  };
 
   const submit = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      const finalName = name.trim() || email.split("@")[0] || "Usuário";
+      if (mode === "register") {
+        const cleanCpf = cpf.replace(/\D/g, "");
+        if (!cleanCpf) {
+          alert("CPF é obrigatório");
+          setLoading(false);
+          return;
+        }
+        if (!validateCPF(cleanCpf)) {
+          alert("CPF inválido. Certifique-se de preencher um CPF real.");
+          setLoading(false);
+          return;
+        }
+
+        const cleanPhone = phone.replace(/\D/g, "");
+        if (!cleanPhone || cleanPhone.length < 10) {
+          alert("Telefone inválido (deve conter DDD e o número)");
+          setLoading(false);
+          return;
+        }
+
+        if (!name.trim()) {
+          alert("Nome é obrigatório e deve coincidir com o titular do CPF");
+          setLoading(false);
+          return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email.trim() || !emailRegex.test(email.trim())) {
+          alert("E-mail inválido. Digite um e-mail válido.");
+          setLoading(false);
+          return;
+        }
+
+        if (!password || password.length < 6) {
+          alert("A senha deve ter pelo menos 6 caracteres");
+          setLoading(false);
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          alert("A confirmação de senha não coincide com a senha preenchida");
+          setLoading(false);
+          return;
+        }
+      } else {
+        if (!email.trim()) {
+          alert("E-mail é obrigatório");
+          setLoading(false);
+          return;
+        }
+        if (!password) {
+          alert("Senha é obrigatória");
+          setLoading(false);
+          return;
+        }
+      }
+
       await login(
-        email.trim() || "usuario@email.com",
-        finalName,
+        email.trim(),
+        name.trim() || "Usuário",
         profile,
-        password || "123456",
-        mode === "register"
+        password,
+        mode === "register",
+        cpf,
+        phone
       );
 
       if (params.intent === "checkout" && profile === "customer" && cart.length > 0) {
@@ -53,7 +181,7 @@ export default function AuthScreen() {
         <IconSymbol name="xmark" size={24} color={colors.foreground} />
       </Pressable>
 
-      <View style={{ marginTop: 12, gap: 6 }}>
+      <View style={{ marginTop: 12, gap: 6, marginBottom: 12 }}>
         <Text style={{ fontSize: 26, fontWeight: "800", color: colors.foreground }}>
           {mode === "login" ? "Entrar" : "Criar conta"}
         </Text>
@@ -64,41 +192,50 @@ export default function AuthScreen() {
         </Text>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 8, marginTop: 22 }}>
-        <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
-        <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
+          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+        </View>
 
-      <View style={{ gap: 14, marginTop: 22 }}>
-        {mode === "register" && (
-          <Input label="Nome" value={name} onChangeText={setName} placeholder="Seu nome" />
-        )}
-        <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@exemplo.com" keyboardType="email-address" />
-        <Input label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
-      </View>
+        <View style={{ gap: 14, marginTop: 22 }}>
+          {mode === "register" && (
+            <>
+              <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
+              <Input label="Nome completo" value={name} onChangeText={setName} placeholder="Nome do titular do CPF" />
+              <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
+            </>
+          )}
+          <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@exemplo.com" keyboardType="email-address" />
+          <Input label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
+          {mode === "register" && (
+            <Input label="Confirmar Senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••••" secureTextEntry />
+          )}
+        </View>
 
-      <Pressable
-        onPress={submit}
-        style={({ pressed }) => [
-          { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 24, transform: [{ scale: pressed ? 0.98 : 1 }] },
-        ]}
-      >
-        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-          {loading ? "Carregando..." : (mode === "login" ? "Entrar" : "Criar conta e continuar")}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        onPress={() => setMode(mode === "login" ? "register" : "login")}
-        style={({ pressed }) => [{ marginTop: 18, alignItems: "center", opacity: pressed ? 0.6 : 1 }]}
-      >
-        <Text style={{ color: colors.muted, fontSize: 14 }}>
-          {mode === "login" ? "Não tem conta? " : "Já tem conta? "}
-          <Text style={{ color: colors.primary, fontWeight: "700" }}>
-            {mode === "login" ? "Cadastre-se" : "Entrar"}
+        <Pressable
+          onPress={submit}
+          style={({ pressed }) => [
+            { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 24, transform: [{ scale: pressed ? 0.98 : 1 }] },
+          ]}
+        >
+          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
+            {loading ? "Carregando..." : (mode === "login" ? "Entrar" : "Criar conta e continuar")}
           </Text>
-        </Text>
-      </Pressable>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setMode(mode === "login" ? "register" : "login")}
+          style={({ pressed }) => [{ marginTop: 18, alignItems: "center", opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Text style={{ color: colors.muted, fontSize: 14 }}>
+            {mode === "login" ? "Não tem conta? " : "Já tem conta? "}
+            <Text style={{ color: colors.primary, fontWeight: "700" }}>
+              {mode === "login" ? "Cadastre-se" : "Entrar"}
+            </Text>
+          </Text>
+        </Pressable>
+      </ScrollView>
     </ScreenContainer>
   );
 }
@@ -134,7 +271,7 @@ function Input({
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
-  keyboardType?: "default" | "email-address";
+  keyboardType?: "default" | "email-address" | "number-pad" | "phone-pad";
   secureTextEntry?: boolean;
 }) {
   const colors = useColors();

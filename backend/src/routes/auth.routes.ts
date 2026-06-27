@@ -5,10 +5,10 @@ const router = Router();
 
 router.post("/signup", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, profile } = req.body;
+    const { email, password, name, profile, cpf, phone, role } = req.body;
 
-    if (!email || !password || !name || !profile) {
-      return res.status(400).json({ error: "E-mail, senha, nome e perfil são obrigatórios" });
+    if (!email || !password || !name || !profile || !cpf || !phone) {
+      return res.status(400).json({ error: "E-mail, senha, nome, perfil, CPF e telefone são obrigatórios" });
     }
 
     // 1. Create user in Supabase Auth (confirmed immediately using admin key)
@@ -16,7 +16,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
       email,
       password,
       email_confirm: true,
-      user_metadata: { name, profile },
+      user_metadata: { name, profile, cpf, phone, role: role || "user" },
     });
 
     if (authError || !userData.user) {
@@ -31,6 +31,10 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
         name,
         email,
         profile,
+        cpf,
+        phone,
+        password,
+        role: role || "user",
       });
 
     if (dbError) {
@@ -76,6 +80,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
           name,
           email,
           profile,
+          role: role || "user",
           companyId,
         }
       });
@@ -88,6 +93,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
         name,
         email,
         profile,
+        role: role || "user",
         companyId,
       }
     });
@@ -146,6 +152,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         name: dbUser.name,
         email: dbUser.email,
         profile: dbUser.profile,
+        role: dbUser.role || "user",
         companyId,
       }
     });

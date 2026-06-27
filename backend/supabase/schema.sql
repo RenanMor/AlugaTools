@@ -3,6 +3,10 @@ create table if not exists public.users (
   name text not null,
   email text not null unique,
   profile text not null check (profile in ('customer', 'company')),
+  cpf text not null unique,
+  phone text not null,
+  password text not null,
+  role text not null default 'user' check (role in ('user', 'admin', 'owner')),
   created_at timestamptz not null default now()
 );
 

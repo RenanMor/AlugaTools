@@ -26,7 +26,15 @@ interface AppState {
   removeFromCart: (toolId: string) => void;
   updateCartDays: (toolId: string, days: number) => void;
   clearCart: () => void;
-  login: (email: string, name: string, profile: ProfileType, password?: string, isRegister?: boolean) => Promise<void>;
+  login: (
+    email: string,
+    name: string,
+    profile: ProfileType,
+    password?: string,
+    isRegister?: boolean,
+    cpf?: string,
+    phone?: string
+  ) => Promise<void>;
   logout: () => void;
   checkout: () => Promise<void>;
   rateRental: (rentalId: string, rating: number) => void;
@@ -137,7 +145,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     name: string,
     profile: ProfileType,
     password?: string,
-    isRegister?: boolean
+    isRegister?: boolean,
+    cpf?: string,
+    phone?: string
   ) => {
     try {
       let response: any;
@@ -145,7 +155,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         response = await apiCall<{ token: string; user: SessionUser }>("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password: password || "123456", name, profile }),
+          body: JSON.stringify({
+            email,
+            password: password || "123456",
+            name,
+            profile,
+            cpf: cpf ? cpf.replace(/\D/g, "") : "",
+            phone: phone ? phone.replace(/\D/g, "") : "",
+          }),
         });
       } else {
         response = await apiCall<{ token: string; user: SessionUser }>("/api/auth/signin", {
