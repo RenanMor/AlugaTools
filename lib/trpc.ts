@@ -22,7 +22,14 @@ export function createTRPCClient() {
   return trpc.createClient({
     links: [
       httpBatchLink({
-        url: `${getApiBaseUrl()}/api/trpc`,
+        url: (() => {
+          let trpcUrl = `${getApiBaseUrl()}/api/trpc`;
+          if (!trpcUrl.startsWith("http://") && !trpcUrl.startsWith("https://")) {
+            const fallbackBase = "https://alugatools-api.onrender.com";
+            trpcUrl = `${fallbackBase}${trpcUrl.startsWith("/") ? trpcUrl : "/" + trpcUrl}`;
+          }
+          return trpcUrl;
+        })(),
         // tRPC v11: transformer MUST be inside httpBatchLink, not at root
         transformer: superjson,
         async headers() {

@@ -3,7 +3,8 @@ create table if not exists public.users (
   name text not null,
   email text not null unique,
   profile text not null check (profile in ('customer', 'company')),
-  cpf text not null unique,
+  cpf text unique,
+  cnpj text unique,
   phone text not null,
   password text not null,
   role text not null default 'user' check (role in ('user', 'admin', 'owner')),
@@ -54,6 +55,9 @@ alter table public.rentals enable row level security;
 
 create policy "users_select_own" on public.users
   for select using (auth.uid() = id);
+
+create policy "users_insert_self" on public.users
+  for insert with check (true);
 
 create policy "users_update_own" on public.users
   for update using (auth.uid() = id);

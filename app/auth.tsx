@@ -6,7 +6,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { ProfileType } from "@/lib/types";
-import { apiCall } from "@/lib/_core/api";
 
 function validateCPF(cpf: string): boolean {
   cpf = cpf.replace(/[^\d]+/g, "");
@@ -36,6 +35,37 @@ function validateCPF(cpf: string): boolean {
   return true;
 }
 
+function validateCNPJ(cnpj: string): boolean {
+  cnpj = cnpj.replace(/[^\d]+/g, "");
+  if (cnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+
+  let size = cnpj.length - 2;
+  let numbers = cnpj.substring(0, size);
+  const digits = cnpj.substring(size);
+  let sum = 0;
+  let pos = size - 7;
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (result !== parseInt(digits.charAt(0))) return false;
+
+  size = size + 1;
+  numbers = cnpj.substring(0, size);
+  sum = 0;
+  pos = size - 7;
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (result !== parseInt(digits.charAt(1))) return false;
+
+  return true;
+}
+
 export default function AuthScreen() {
   const colors = useColors();
   const { login, checkout, cart } = useApp();
@@ -46,6 +76,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cpf, setCpf] = useState("");
+  const [cnpj, setCnpj] = useState("");
   const [phone, setPhone] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -66,6 +97,23 @@ export default function AuthScreen() {
     setCpf(formatted);
   };
 
+  const handleCnpjChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 14);
+    
+    let formatted = limited;
+    if (limited.length > 12) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
+    } else if (limited.length > 8) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8)}`;
+    } else if (limited.length > 5) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5)}`;
+    } else if (limited.length > 2) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2)}`;
+    }
+    setCnpj(formatted);
+  };
+
   const handlePhoneChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
     const limited = cleaned.slice(0, 11);
@@ -84,16 +132,30 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (mode === "register") {
-        const cleanCpf = cpf.replace(/\D/g, "");
-        if (!cleanCpf) {
-          alert("CPF é obrigatório");
-          setLoading(false);
-          return;
-        }
-        if (!validateCPF(cleanCpf)) {
-          alert("CPF inválido. Certifique-se de preencher um CPF real.");
-          setLoading(false);
-          return;
+        if (profile === "company") {
+          const cleanCnpj = cnpj.replace(/\D/g, "");
+          if (!cleanCnpj) {
+            alert("CNPJ é obrigatório para empresas");
+            setLoading(false);
+            return;
+          }
+          if (!validateCNPJ(cleanCnpj)) {
+            alert("CNPJ inválido. Digite um CNPJ real.");
+            setLoading(false);
+            return;
+          }
+        } else {
+          const cleanCpf = cpf.replace(/\D/g, "");
+          if (!cleanCpf) {
+            alert("CPF é obrigatório para clientes");
+            setLoading(false);
+            return;
+          }
+          if (!validateCPF(cleanCpf)) {
+            alert("CPF inválido. Digite um CPF real.");
+            setLoading(false);
+            return;
+          }
         }
 
         const cleanPhone = phone.replace(/\D/g, "");
@@ -104,7 +166,7 @@ export default function AuthScreen() {
         }
 
         if (!name.trim()) {
-          alert("Nome é obrigatório e deve coincidir com o titular do CPF");
+          alert(profile === "company" ? "Nome da empresa é obrigatório" : "Nome completo é obrigatório");
           setLoading(false);
           return;
         }
@@ -146,8 +208,9 @@ export default function AuthScreen() {
         profile,
         password,
         mode === "register",
-        cpf,
-        phone
+        profile === "customer" ? cpf : undefined,
+        phone,
+        profile === "company" ? cnpj : undefined
       );
 
       if (params.intent === "checkout" && profile === "customer" && cart.length > 0) {
@@ -191,14 +254,29 @@ export default function AuthScreen() {
         <View style={{ gap: 14, marginTop: 22 }}>
           {mode === "register" && (
             <>
-              <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
-              <Input
-                label="Nome completo"
-                value={name}
-                onChangeText={setName}
-                placeholder="Nome do titular do CPF"
-                editable={validateCPF(cpf.replace(/\D/g, ""))}
-              />
+              {profile === "customer" ? (
+                <>
+                  <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
+                  <Input
+                    label="Nome completo"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Nome do titular do CPF"
+                    editable={validateCPF(cpf.replace(/\D/g, ""))}
+                  />
+                </>
+              ) : (
+                <>
+                  <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
+                  <Input
+                    label="Nome da empresa"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Razão social ou nome fantasia"
+                    editable={validateCNPJ(cnpj.replace(/\D/g, ""))}
+                  />
+                </>
+              )}
               <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
             </>
           )}

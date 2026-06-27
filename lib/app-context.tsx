@@ -33,7 +33,8 @@ interface AppState {
     password?: string,
     isRegister?: boolean,
     cpf?: string,
-    phone?: string
+    phone?: string,
+    cnpj?: string
   ) => Promise<void>;
   logout: () => void;
   checkout: () => Promise<void>;
@@ -147,7 +148,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     password?: string,
     isRegister?: boolean,
     cpf?: string,
-    phone?: string
+    phone?: string,
+    cnpj?: string
   ) => {
     try {
       let response: any;
@@ -160,7 +162,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             password: password || "123456",
             name,
             profile,
-            cpf: cpf ? cpf.replace(/\D/g, "") : "",
+            cpf: cpf ? cpf.replace(/\D/g, "") : undefined,
+            cnpj: cnpj ? cnpj.replace(/\D/g, "") : undefined,
             phone: phone ? phone.replace(/\D/g, "") : "",
           }),
         });
