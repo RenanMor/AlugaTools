@@ -32,9 +32,12 @@ export const ToolController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log("[ToolController] create body:", req.body);
       const tool = await ToolModel.create(req.body);
+      console.log("[ToolController] create success:", tool);
       res.status(201).json({ data: tool });
     } catch (err) {
+      console.error("[ToolController] create error:", err);
       next(err);
     }
   },

@@ -270,8 +270,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await createTool(tool);
       const tls = await getAllTools();
       setTools(tls);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao adicionar ferramenta:", err);
+      alert(err.message || "Erro ao adicionar ferramenta");
     }
   }, []);
 
@@ -280,8 +281,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await updateTool(tool.id, tool);
       const tls = await getAllTools();
       setTools(tls);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao atualizar ferramenta:", err);
+      alert(err.message || "Erro ao atualizar ferramenta");
     }
   }, []);
 
@@ -290,8 +292,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await deleteTool(toolId);
       const tls = await getAllTools();
       setTools(tls);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao deletar ferramenta:", err);
+      alert(err.message || "Erro ao deletar ferramenta");
     }
   }, []);
 
