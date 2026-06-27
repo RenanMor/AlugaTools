@@ -38,7 +38,7 @@ export default function ToolScreen() {
           </Pressable>
         </View>
 
-        <Image source={{ uri: tool.image }} style={{ width: "100%", height: 260, backgroundColor: colors.border }} />
+        <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=600&q=80" }} style={{ width: "100%", height: 260, backgroundColor: colors.border }} />
 
         <View style={{ padding: 16, gap: 12 }}>
           <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>{tool.name}</Text>

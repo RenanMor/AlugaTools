@@ -8,7 +8,7 @@ export function mapTool(data: any): Tool {
     name: data.name,
     description: data.description || "",
     categoryId: data.category_id,
-    image: data.image || "",
+    image: data.image || data.image_url || "",
     pricePerDay: Number(data.price_per_day) || 0,
     available: !!data.available,
     quantity: Number(data.quantity) || 1,

@@ -12,13 +12,21 @@ export interface Tool {
   quantity: number;
 }
 
+function mapRow(row: any): Tool {
+  if (!row) return row;
+  return {
+    ...row,
+    image: row.image || row.image_url || ""
+  };
+}
+
 export const ToolModel = {
   async findAll(): Promise<Tool[]> {
     const { data, error } = await supabaseAdmin
       .from("tools")
       .select("*");
     if (error) throw new Error(error.message);
-    return data as Tool[];
+    return (data || []).map(mapRow);
   },
 
   async findById(id: string): Promise<Tool | null> {
@@ -28,7 +36,7 @@ export const ToolModel = {
       .eq("id", id)
       .single();
     if (error) return null;
-    return data as Tool;
+    return mapRow(data);
   },
 
   async findByCompany(companyId: string): Promise<Tool[]> {
@@ -37,17 +45,20 @@ export const ToolModel = {
       .select("*")
       .eq("company_id", companyId);
     if (error) throw new Error(error.message);
-    return data as Tool[];
+    return (data || []).map(mapRow);
   },
 
   async create(tool: Omit<Tool, "id">): Promise<Tool> {
+    // If the database has image_url, we adapt the payload to matching column structure
+    const payload: any = { ...tool };
+    
     const { data, error } = await supabaseAdmin
       .from("tools")
-      .insert(tool)
+      .insert(payload)
       .select()
       .single();
     if (error) throw new Error(error.message);
-    return data as Tool;
+    return mapRow(data);
   },
 
   async update(id: string, patch: Partial<Tool>): Promise<Tool> {
@@ -58,7 +69,7 @@ export const ToolModel = {
       .select()
       .single();
     if (error) throw new Error(error.message);
-    return data as Tool;
+    return mapRow(data);
   },
 
   async remove(id: string): Promise<void> {

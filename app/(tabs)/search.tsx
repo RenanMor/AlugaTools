@@ -119,7 +119,7 @@ function ToolRow({ tool, company }: { tool: Tool; company: string }) {
         },
       ]}
     >
-      <Image source={{ uri: tool.image }} style={{ width: 70, height: 70, borderRadius: 12, backgroundColor: colors.border }} />
+      <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80" }} style={{ width: 70, height: 70, borderRadius: 12, backgroundColor: colors.border }} />
       <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
           {tool.name}
