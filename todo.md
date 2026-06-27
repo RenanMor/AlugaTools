@@ -1,0 +1,21 @@
+# Project TODO
+
+- [x] Gerar logo do app e configurar branding (app.config.ts, icons)
+- [x] Configurar tema/cores (theme.config.js)
+- [x] Tipos compartilhados (Tool, Company, Rental, User, Rating)
+- [x] Dados seed locais (empresas, ferramentas, categorias)
+- [x] Context: Cart + Session/Auth lazy
+- [x] Mapear icones na icon-symbol.tsx
+- [x] Bottom tabs (Home, Busca, Carrinho, Pedidos, Perfil, Painel)
+- [x] Tela Home (busca, categorias, empresas em destaque)
+- [x] Tela Detalhe da Empresa
+- [x] Tela Detalhe da Ferramenta
+- [x] Tela Busca
+- [x] Tela Carrinho + Checkout
+- [x] Auth Sheet lazy (login/registro, escolha de perfil)
+- [x] Tela Pedidos + avaliacao por estrelas
+- [x] Dashboard Empresa (CRUD ferramentas, aceitar/recusar pedidos)
+- [x] Tela Perfil
+- [x] Backend Express MVC + Supabase client
+- [x] SQL schema + RLS policies (README)
+- [ ] Compactar projeto e entregar
