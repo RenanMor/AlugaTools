@@ -11,7 +11,8 @@ import { Rental, Tool } from "@/lib/types";
 export default function DashboardScreen() {
   const colors = useColors();
   const { user, tools, rentals, addTool, updateTool, deleteTool, setRentalStatus } = useApp();
-  const companyId = user?.companyId ?? "co1";
+  const companyId = user?.companyId;
+  const hasInvalidCompany = !companyId || companyId === "co1";
   const [tab, setTab] = useState<"tools" | "requests">("requests");
   const [editing, setEditing] = useState<Tool | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -19,13 +20,15 @@ export default function DashboardScreen() {
   const myTools = useMemo(() => tools.filter((t) => t.companyId === companyId), [tools, companyId]);
   const myRequests = useMemo(() => rentals.filter((r) => r.companyId === companyId), [rentals, companyId]);
 
-  if (!user || user.profile !== "company") {
+  if (!user || user.profile !== "company" || hasInvalidCompany) {
     return (
       <ScreenContainer className="p-4">
         <View style={{ alignItems: "center", marginTop: 100, gap: 12 }}>
           <IconSymbol name="building.2.fill" size={48} color={colors.muted} />
-          <Text style={{ color: colors.muted, textAlign: "center" }}>
-            Entre como empresa para acessar o painel.
+          <Text style={{ color: colors.muted, textAlign: "center", maxWidth: 280 }}>
+            {hasInvalidCompany && user
+              ? "Sua conta de empresa precisa ser sincronizada. Por favor, faça logout e entre novamente para ativar o painel."
+              : "Entre como empresa para acessar o painel."}
           </Text>
           <Pressable
             onPress={() => router.push("/auth")}
@@ -33,7 +36,9 @@ export default function DashboardScreen() {
               { paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
             ]}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Entrar</Text>
+            <Text style={{ color: "#fff", fontWeight: "700" }}>
+              {hasInvalidCompany && user ? "Ir para Login / Logout" : "Entrar"}
+            </Text>
           </Pressable>
         </View>
       </ScreenContainer>

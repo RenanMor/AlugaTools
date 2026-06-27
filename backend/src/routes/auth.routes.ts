@@ -189,6 +189,23 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
       
       if (companyData) {
         companyId = companyData.id;
+      } else {
+        // Self-healing: create the missing company record!
+        const { data: newCompany } = await supabaseAdmin
+          .from("companies")
+          .insert({
+            owner_id: dbUser.id,
+            name: `${dbUser.name} Locações`,
+            logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
+            description: "Locação de ferramentas",
+            category_id: "c1",
+            location: "São Paulo, SP",
+          })
+          .select()
+          .single();
+        if (newCompany) {
+          companyId = newCompany.id;
+        }
       }
     }
 
@@ -278,6 +295,23 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
       
       if (companyData) {
         companyId = companyData.id;
+      } else {
+        // Self-healing: create the missing company record!
+        const { data: newCompany } = await supabaseAdmin
+          .from("companies")
+          .insert({
+            owner_id: dbUser.id,
+            name: `${dbUser.name} Locações`,
+            logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
+            description: "Locação de ferramentas",
+            category_id: "c1",
+            location: "São Paulo, SP",
+          })
+          .select()
+          .single();
+        if (newCompany) {
+          companyId = newCompany.id;
+        }
       }
     }
 
