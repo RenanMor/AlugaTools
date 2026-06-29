@@ -44,6 +44,8 @@ interface AppState {
   updateTool: (tool: Tool) => void;
   deleteTool: (toolId: string) => void;
   cartTotal: number;
+  refreshCatalog: () => Promise<void>;
+  refreshRentals: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -201,35 +203,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Rental operations
+  const refreshCatalog = useCallback(async () => {
+    await loadCatalog();
+  }, [loadCatalog]);
+
+  const refreshRentals = useCallback(async () => {
+    await loadRentals();
+  }, [loadRentals]);
+
+  // Rental operations (Legacy context helper - actual checkout happens on the checkout screen)
   const checkout = useCallback(async () => {
     if (cart.length === 0 || !user) return;
     try {
-      await Promise.all(
-        cart.map((item) =>
-          createRental({
-            toolId: item.tool.id,
-            companyId: item.tool.companyId,
-            days: item.days,
-            totalPrice: item.tool.pricePerDay * item.days,
-          })
-        )
-      );
       clearCart();
-
-      // Reload rentals list
-      let list: Rental[] = [];
-      if (user.profile === "company" && user.companyId) {
-        list = await getRentalsByCompany(user.companyId);
-      } else {
-        list = await getMyRentals();
-      }
-      setRentals(list);
+      await Promise.all([loadCatalog(), loadRentals()]);
     } catch (err) {
       console.error("Erro no checkout:", err);
       throw err;
     }
-  }, [cart, user, clearCart]);
+  }, [cart, user, clearCart, loadCatalog, loadRentals]);
 
   const handleRateRental = useCallback(async (rentalId: string, rating: number) => {
     try {
@@ -323,6 +315,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateTool: handleUpdateTool,
       deleteTool: handleDeleteTool,
       cartTotal,
+      refreshCatalog,
+      refreshRentals,
     }),
     [
       companies,
@@ -343,6 +337,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       handleUpdateTool,
       handleDeleteTool,
       cartTotal,
+      refreshCatalog,
+      refreshRentals,
     ],
   );
 

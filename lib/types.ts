@@ -1,11 +1,13 @@
 export type ProfileType = "customer" | "company";
 
 export type RentalStatus =
+  | "awaiting_payment"
   | "pending"
   | "accepted"
   | "rejected"
   | "active"
-  | "completed";
+  | "completed"
+  | "cancelled";
 
 export interface Category {
   id: string;
@@ -55,6 +57,15 @@ export interface Rental {
   status: RentalStatus;
   createdAt: number;
   rating?: number;
+  paymentMethod?: string;
+  paymentId?: string;
+  paymentStatus?: string;
+  paymentData?: any;
+  expiresAt?: string;
+  shippingPrice?: number;
+  address?: any;
+  couponCode?: string;
+  couponDiscount?: number;
 }
 
 export interface SessionUser {

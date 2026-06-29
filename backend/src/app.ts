@@ -4,6 +4,7 @@ import cors from "cors";
 import routes from "./routes";
 import { apiRateLimiter } from "./middlewares/rateLimit.middleware";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
+import { RentalModel } from "./models/rental.model";
 
 export function createApp() {
   const app = express();
@@ -25,6 +26,13 @@ export function createApp() {
 
   app.use(notFound);
   app.use(errorHandler);
+
+  // Background task to clean up expired rentals and restore stock
+  setInterval(() => {
+    RentalModel.cancelExpired().catch((err) => {
+      console.error("[Cleanup] error in cancelExpired:", err);
+    });
+  }, 120000); // 2 minutes
 
   return app;
 }

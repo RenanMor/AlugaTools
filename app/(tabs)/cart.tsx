@@ -17,12 +17,7 @@ export default function CartScreen() {
       router.push({ pathname: "/auth", params: { intent: "checkout" } });
       return;
     }
-    try {
-      await checkout();
-      router.push("/orders");
-    } catch (err: any) {
-      alert(err.message || "Erro ao processar o aluguel");
-    }
+    router.push("/checkout");
   };
 
   return (

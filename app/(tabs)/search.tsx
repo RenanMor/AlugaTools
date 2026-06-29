@@ -130,9 +130,14 @@ function ToolRow({ tool, company }: { tool: Tool; company: string }) {
           {tool.name}
         </Text>
         <Text style={{ fontSize: 12, color: colors.muted }}>{company}</Text>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
-          R$ {tool.pricePerDay}/dia
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
+            R$ {tool.pricePerDay}/dia
+          </Text>
+          <Text style={{ fontSize: 11, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+            {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

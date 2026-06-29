@@ -56,6 +56,13 @@ export default function ToolScreen() {
             <Text style={{ fontSize: 15, color: colors.muted, fontWeight: "500" }}> /dia</Text>
           </Text>
 
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tool.quantity > 0 && tool.available ? colors.success : colors.error }} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+              {tool.quantity > 0 && tool.available ? `${tool.quantity} disponível(eis)` : "Indisponível no momento"}
+            </Text>
+          </View>
+
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
 
           <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Descrição</Text>
@@ -66,12 +73,23 @@ export default function ToolScreen() {
       <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
         <Pressable
           onPress={handleAdd}
+          disabled={tool.quantity <= 0 || !tool.available}
           style={({ pressed }) => [
-            { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: "center", transform: [{ scale: pressed ? 0.98 : 1 }] },
+            {
+              backgroundColor: tool.quantity <= 0 || !tool.available ? colors.border : colors.primary,
+              borderRadius: 14,
+              paddingVertical: 16,
+              alignItems: "center",
+              transform: [{ scale: pressed && tool.quantity > 0 && tool.available ? 0.98 : 1 }],
+            },
           ]}
         >
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-            {inCart ? "Ir para o carrinho" : "Adicionar ao carrinho"}
+          <Text style={{ color: tool.quantity <= 0 || !tool.available ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
+            {tool.quantity <= 0 || !tool.available
+              ? "Sem estoque disponível"
+              : inCart
+              ? "Ir para o carrinho"
+              : "Adicionar ao carrinho"}
           </Text>
         </Pressable>
       </View>

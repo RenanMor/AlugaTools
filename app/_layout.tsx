@@ -91,6 +91,7 @@ export default function RootLayout() {
               <Stack.Screen name="company/[id]" />
               <Stack.Screen name="tool/[id]" />
               <Stack.Screen name="auth" options={{ presentation: "modal" }} />
+              <Stack.Screen name="checkout" />
               <Stack.Screen name="oauth/callback" />
             </Stack>
           </AppProvider>

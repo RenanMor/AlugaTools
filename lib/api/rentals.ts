@@ -15,6 +15,15 @@ export function mapRental(data: any): Rental {
     status: data.status,
     createdAt: new Date(data.created_at).getTime(),
     rating: data.rating !== null ? Number(data.rating) : undefined,
+    paymentMethod: data.payment_method || undefined,
+    paymentId: data.payment_id || undefined,
+    paymentStatus: data.payment_status || undefined,
+    paymentData: data.payment_data || undefined,
+    expiresAt: data.expires_at || undefined,
+    shippingPrice: data.shipping_price !== undefined ? Number(data.shipping_price) : undefined,
+    address: data.address || undefined,
+    couponCode: data.coupon_code || undefined,
+    couponDiscount: data.coupon_discount !== undefined ? Number(data.coupon_discount) : undefined,
   };
 }
 
@@ -33,6 +42,11 @@ export async function createRental(rental: {
   companyId: string;
   days: number;
   totalPrice: number;
+  paymentMethod?: string;
+  shippingPrice?: number;
+  address?: any;
+  couponCode?: string;
+  couponDiscount?: number;
 }): Promise<Rental> {
   const response = await apiCall<{ data: any }>("/api/rentals", {
     method: "POST",
@@ -41,9 +55,40 @@ export async function createRental(rental: {
       company_id: rental.companyId,
       days: rental.days,
       total_price: rental.totalPrice,
+      payment_method: rental.paymentMethod,
+      shipping_price: rental.shippingPrice,
+      address: rental.address,
+      coupon_code: rental.couponCode,
+      coupon_discount: rental.couponDiscount,
     }),
   });
   return mapRental(response.data);
+}
+
+export async function payRental(
+  id: string,
+  paymentData: { card?: any; installments?: number }
+): Promise<{ data: Rental; payment: any }> {
+  const response = await apiCall<{ data: any; payment: any }>(`/api/rentals/${id}/pay`, {
+    method: "POST",
+    body: JSON.stringify(paymentData),
+  });
+  return {
+    data: mapRental(response.data),
+    payment: response.payment,
+  };
+}
+
+export async function cancelRental(id: string): Promise<Rental> {
+  const response = await apiCall<{ data: any }>(`/api/rentals/${id}/cancel`, {
+    method: "POST",
+  });
+  return mapRental(response.data);
+}
+
+export async function lookupCep(cep: string): Promise<any> {
+  const response = await apiCall<{ data: any }>(`/api/cep/${cep}`);
+  return response.data;
 }
 
 export async function updateRentalStatus(id: string, status: RentalStatus): Promise<Rental> {
