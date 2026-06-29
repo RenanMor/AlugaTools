@@ -207,7 +207,7 @@ function ToolManageRow({ tool, onEdit, onDelete }: { tool: Tool; onEdit: () => v
   const colors = useColors();
   return (
     <View style={{ flexDirection: "row", gap: 12, padding: 10, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
-      <Image source={{ uri: tool.image }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: colors.border }} />
+      <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80" }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: colors.border }} />
       <View style={{ flex: 1 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{tool.name}</Text>
         <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
@@ -258,12 +258,16 @@ function ToolFormModal({
 
   const save = () => {
     const parsedQty = Number(quantity) || 1;
+    let cleanImage = image.trim();
+    if (cleanImage && !/^https?:\/\//i.test(cleanImage)) {
+      cleanImage = `https://${cleanImage}`;
+    }
     const base = {
       companyId,
       name: name.trim() || "Nova ferramenta",
       description: description.trim(),
       categoryId,
-      image,
+      image: cleanImage,
       pricePerDay: Number(price) || 0,
       quantity: parsedQty,
       available: parsedQty > 0,

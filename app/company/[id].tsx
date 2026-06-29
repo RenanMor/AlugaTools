@@ -85,7 +85,7 @@ function ToolGridCard({ tool }: { tool: Tool }) {
         },
       ]}
     >
-      <Image source={{ uri: tool.image }} style={{ width: "100%", height: 110, backgroundColor: colors.border }} />
+      <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80" }} style={{ width: "100%", height: 110, backgroundColor: colors.border }} />
       <View style={{ padding: 10, gap: 3 }}>
         <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, minHeight: 34 }}>
           {tool.name}
