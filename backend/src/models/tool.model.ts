@@ -107,20 +107,27 @@ function triggerBackgroundResolution(tool: Tool) {
   if (!tool.image) return;
   const isDirectImage = /\.(png|jpe?g|gif|webp|svg)(?:\?.*)?$/i.test(tool.image);
   if (!isDirectImage && /^https?:\/\//i.test(tool.image)) {
-    resolveImageUrl(tool.image).then(async (resolved) => {
-      if (resolved && resolved !== tool.image) {
-        const columns = await getToolColumns();
-        const updateData: any = {};
-        if (columns.includes("image")) updateData.image = resolved;
-        if (columns.includes("image_url")) updateData.image_url = resolved;
-        
-        await supabaseAdmin
-          .from("tools")
-          .update(updateData)
-          .eq("id", tool.id)
-          .catch((e) => console.error("[triggerBackgroundResolution] DB Update failed:", e));
+    (async () => {
+      try {
+        const resolved = await resolveImageUrl(tool.image);
+        if (resolved && resolved !== tool.image) {
+          const columns = await getToolColumns();
+          const updateData: any = {};
+          if (columns.includes("image")) updateData.image = resolved;
+          if (columns.includes("image_url")) updateData.image_url = resolved;
+          
+          const { error } = await supabaseAdmin
+            .from("tools")
+            .update(updateData)
+            .eq("id", tool.id);
+          if (error) {
+            console.error("[triggerBackgroundResolution] DB Update failed:", error.message);
+          }
+        }
+      } catch (err: any) {
+        console.error("[triggerBackgroundResolution] Resolution failed:", err);
       }
-    }).catch((e) => console.error("[triggerBackgroundResolution] Resolution failed:", e));
+    })();
   }
 }
 
