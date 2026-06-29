@@ -122,35 +122,23 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
 
     if (cpf || cnpj) {
       const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
-      const query = supabaseAdmin.from("users").select("email, profile");
-      const formattedCpf = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-      const formattedCnpj = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
-
       console.log("[Auth] Searching for document:", cleanDoc);
 
-      // Search all possibilities sequentially
+      const { data: allUsers, error: queryError } = await supabaseAdmin
+        .from("users")
+        .select("email, profile, cpf, cnpj");
+
+      if (queryError) {
+        console.error("[Auth] Database query error:", queryError);
+      }
+
       let dbUser = null;
-
-      // 1. Unformatted CNPJ
-      let { data: d1 } = await supabaseAdmin.from("users").select("email, profile").eq("cnpj", cleanDoc).limit(1);
-      if (d1 && d1.length > 0) dbUser = d1[0];
-
-      // 2. Formatted CNPJ
-      if (!dbUser) {
-        let { data: d2 } = await supabaseAdmin.from("users").select("email, profile").eq("cnpj", formattedCnpj).limit(1);
-        if (d2 && d2.length > 0) dbUser = d2[0];
-      }
-
-      // 3. Unformatted CPF
-      if (!dbUser) {
-        let { data: d3 } = await supabaseAdmin.from("users").select("email, profile").eq("cpf", cleanDoc).limit(1);
-        if (d3 && d3.length > 0) dbUser = d3[0];
-      }
-
-      // 4. Formatted CPF
-      if (!dbUser) {
-        let { data: d4 } = await supabaseAdmin.from("users").select("email, profile").eq("cpf", formattedCpf).limit(1);
-        if (d4 && d4.length > 0) dbUser = d4[0];
+      if (allUsers) {
+        dbUser = allUsers.find(user => {
+          const dbCpfClean = user.cpf ? user.cpf.replace(/\D/g, "") : "";
+          const dbCnpjClean = user.cnpj ? user.cnpj.replace(/\D/g, "") : "";
+          return dbCpfClean === cleanDoc || dbCnpjClean === cleanDoc;
+        });
       }
 
       console.log("[Auth] Search result:", dbUser);
