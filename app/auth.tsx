@@ -198,11 +198,11 @@ export default function AuthScreen() {
           return;
         }
 
-        const isCpf = documentToLogin ? validateCPF(documentToLogin) : false;
-        const isCnpj = documentToLogin ? validateCNPJ(documentToLogin) : false;
+        const isCpf = documentToLogin ? documentToLogin.length === 11 : false;
+        const isCnpj = documentToLogin ? documentToLogin.length === 14 : false;
 
         if (documentToLogin && !isCpf && !isCnpj) {
-          alert("CPF ou CNPJ inválido");
+          alert("CPF ou CNPJ inválido. Digite 11 dígitos para CPF ou 14 para CNPJ.");
           setLoading(false);
           return;
         }
@@ -221,8 +221,8 @@ export default function AuthScreen() {
       if (mode === "login") {
         const cleanDoc = (cpf || cnpj).replace(/\D/g, "");
         if (cleanDoc) {
-          if (validateCPF(cleanDoc)) loginCpf = cleanDoc;
-          if (validateCNPJ(cleanDoc)) loginCnpj = cleanDoc;
+          if (cleanDoc.length === 11) loginCpf = cleanDoc;
+          if (cleanDoc.length === 14) loginCnpj = cleanDoc;
         }
       } else {
         loginCpf = profile === "customer" ? cpf : undefined;

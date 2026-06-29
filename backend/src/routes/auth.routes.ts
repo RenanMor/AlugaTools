@@ -144,7 +144,13 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
       console.log("[Auth] Search result:", dbUser);
 
       if (!dbUser) {
-        return res.status(401).json({ error: `${cpf ? "CPF" : "CNPJ"} não cadastrado` });
+        const dbDocsList = allUsers 
+          ? allUsers.map(u => `${u.email}: CPF=${u.cpf || "null"}, CNPJ=${u.cnpj || "null"}`).join(" | ")
+          : "Erro ao buscar do banco";
+
+        return res.status(401).json({ 
+          error: `Documento não cadastrado. Buscado: ${cleanDoc}. Banco: [${dbDocsList}]` 
+        });
       }
 
       targetEmail = dbUser.email;
