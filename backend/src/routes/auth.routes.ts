@@ -113,6 +113,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
 router.post("/signin", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, cpf, cnpj, password, profile } = req.body;
+    console.log("[Backend Auth] Incoming signin payload:", { email, cpf, cnpj, profile });
 
     if (!password) {
       return res.status(400).json({ error: "Senha é obrigatória" });

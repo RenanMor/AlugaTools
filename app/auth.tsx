@@ -82,37 +82,37 @@ export default function AuthScreen() {
 
   const [loading, setLoading] = useState(false);
 
-  const handleDocumentChange = (val: string, setDoc: (v: string) => void) => {
+  const handleCpfChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 11);
+
+    let formatted = limited;
+    if (limited.length > 9) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
+    } else if (limited.length > 6) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
+    } else if (limited.length > 3) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+    }
+    setCpf(formatted);
+  };
+
+  const handleCnpjChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
     const limited = cleaned.slice(0, 14);
 
-    if (limited.length <= 11) {
-      let formatted = limited;
-      if (limited.length > 9) {
-        formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
-      } else if (limited.length > 6) {
-        formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
-      } else if (limited.length > 3) {
-        formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
-      }
-      setDoc(formatted);
-    } else {
-      let formatted = limited;
-      if (limited.length > 12) {
-        formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
-      } else if (limited.length > 8) {
-        formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8)}`;
-      } else if (limited.length > 5) {
-        formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5)}`;
-      } else if (limited.length > 2) {
-        formatted = `${limited.slice(0, 2)}.${limited.slice(2)}`;
-      }
-      setDoc(formatted);
+    let formatted = limited;
+    if (limited.length > 12) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
+    } else if (limited.length > 8) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8)}`;
+    } else if (limited.length > 5) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5)}`;
+    } else if (limited.length > 2) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2)}`;
     }
+    setCnpj(formatted);
   };
-
-  const handleCpfChange = (val: string) => handleDocumentChange(val, setCpf);
-  const handleCnpjChange = (val: string) => handleDocumentChange(val, setCnpj);
 
   const handlePhoneChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
@@ -189,8 +189,9 @@ export default function AuthScreen() {
           setLoading(false);
           return;
         }
+      } else {
         // Mode: Login
-        let documentToLogin = (cpf || cnpj).replace(/\D/g, "");
+        const documentToLogin = (profile === "company" ? cnpj : cpf).replace(/\D/g, "");
         
         if (!documentToLogin && !email.trim()) {
           alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
@@ -198,8 +199,8 @@ export default function AuthScreen() {
           return;
         }
 
-        const isCpf = documentToLogin ? documentToLogin.length === 11 : false;
-        const isCnpj = documentToLogin ? documentToLogin.length === 14 : false;
+        const isCpf = documentToLogin.length === 11;
+        const isCnpj = documentToLogin.length === 14;
 
         if (documentToLogin && !isCpf && !isCnpj) {
           alert("CPF ou CNPJ inválido. Digite 11 dígitos para CPF ou 14 para CNPJ.");
@@ -228,6 +229,14 @@ export default function AuthScreen() {
         loginCpf = profile === "customer" ? cpf : undefined;
         loginCnpj = profile === "company" ? cnpj : undefined;
       }
+      
+      console.log("[Frontend Auth] Invoking login()", {
+        email: email.trim(),
+        profile,
+        loginCpf,
+        loginCnpj,
+        isRegister: mode === "register"
+      });
 
       const returnedUser = await login(
         email.trim(),
@@ -276,12 +285,10 @@ export default function AuthScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
-        {mode === "register" && (
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-            <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
-            <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
-          </View>
-        )}
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
+          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+        </View>
 
         <View style={{ gap: 14, marginTop: 22 }}>
           {mode === "register" ? (
@@ -314,13 +321,11 @@ export default function AuthScreen() {
             </>
           ) : (
             <>
-              <Input 
-                label="CPF ou CNPJ" 
-                value={cpf || cnpj} 
-                onChangeText={handleCpfChange} // Maps to CPF state for simplicity
-                placeholder="000.000.000-00 ou 00.000.000/0000-00" 
-                keyboardType="number-pad" 
-              />
+              {profile === "customer" ? (
+                <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
+              ) : (
+                <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
+              )}
             </>
           )}
           <Input label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
