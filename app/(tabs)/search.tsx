@@ -56,7 +56,7 @@ export default function SearchScreen() {
         />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14, alignItems: "center" }}>
         <CategoryChip label="Todas" active={!activeCat} onPress={() => setActiveCat(null)} />
         {CATEGORIES.map((c) => (
           <CategoryChip key={c.id} label={c.name} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />

@@ -300,7 +300,7 @@ function ToolFormModal({
             <Field label="URL da imagem" value={image} onChangeText={setImage} placeholder="https://..." />
 
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 8 }}>Categoria</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 20 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 20, alignItems: "center" }}>
               {CATEGORIES.map((c) => (
                 <Pressable
                   key={c.id}
