@@ -1,15 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
+import { env } from "./env";
 
-const supabaseUrl = process.env.SUPABASE_URL ?? "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAdmin = createClient(env.supabaseUrl, env.supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
 export function createUserClient(accessToken: string) {
-  const anonKey = process.env.SUPABASE_ANON_KEY ?? "";
-  return createClient(supabaseUrl, anonKey, {
+  return createClient(env.supabaseUrl, env.supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
