@@ -98,10 +98,15 @@ export default function CheckoutScreen() {
     }
   };
 
+  // Snapshot of cart and totals to allow retrying payment without losing UI state
+  const [cartSnapshot] = useState(cart);
+  const [cartTotalSnapshot] = useState(cartTotal);
+  const [createdRentals, setCreatedRentals] = useState<any[] | null>(null);
+
   // Financial Totals
   const totalAmount = useMemo(() => {
-    return Math.max(0, cartTotal + selectedShipping.price - discountAmount);
-  }, [cartTotal, selectedShipping.price, discountAmount]);
+    return Math.max(0, cartTotalSnapshot + selectedShipping.price - discountAmount);
+  }, [cartTotalSnapshot, selectedShipping.price, discountAmount]);
 
   // Submit Rent & Payment Order
   const handlePay = async () => {
@@ -126,7 +131,7 @@ export default function CheckoutScreen() {
       return;
     }
 
-    if (cart.length === 0) {
+    if (cartSnapshot.length === 0) {
       Alert.alert("Erro", "Seu carrinho está vazio.");
       return;
     }
@@ -144,32 +149,40 @@ export default function CheckoutScreen() {
         state,
       };
 
-      // 2. Create the rentals in awaiting_payment
-      const createdRentals = await Promise.all(
-        cart.map((item) =>
-          createRental({
-            toolId: item.tool.id,
-            companyId: item.tool.companyId,
-            days: item.days,
-            totalPrice: item.tool.pricePerDay * item.days + selectedShipping.price / cart.length - discountAmount / cart.length,
-            paymentMethod,
-            shippingPrice: selectedShipping.price / cart.length,
-            address,
-            couponCode: appliedCoupon || undefined,
-            couponDiscount: discountAmount / cart.length,
-          })
-        )
-      );
+      // 2. Create the rentals in awaiting_payment (only once!)
+      let rentalsToPay = createdRentals;
+      if (!rentalsToPay) {
+        rentalsToPay = await Promise.all(
+          cartSnapshot.map((item) =>
+            createRental({
+              toolId: item.tool.id,
+              companyId: item.tool.companyId,
+              days: item.days,
+              totalPrice: item.tool.pricePerDay * item.days + selectedShipping.price / cartSnapshot.length - discountAmount / cartSnapshot.length,
+              paymentMethod,
+              shippingPrice: selectedShipping.price / cartSnapshot.length,
+              address,
+              couponCode: appliedCoupon || undefined,
+              couponDiscount: discountAmount / cartSnapshot.length,
+            })
+          )
+        );
+        setCreatedRentals(rentalsToPay);
+        // Clear global cart so no duplicates are made if user backs out
+        clearCart();
+        // Refresh rentals so they appear in Orders immediately
+        await refreshRentals();
+      }
 
       // 3. Process the payments via backend proxy (which calls PagBank)
-      for (const rental of createdRentals) {
+      for (const rental of rentalsToPay) {
         let cardPayload = undefined;
         if (paymentMethod === "CREDIT_CARD" || paymentMethod === "DEBIT_CARD") {
           const expParts = cardExpiry.split("/");
           cardPayload = {
             number: cardNumber.replace(/\D/g, ""),
             exp_month: expParts[0] || "12",
-            exp_year: expParts[1] ? "20" + expParts[1] : "2027",
+            exp_year: expParts[1] ? (expParts[1].length === 2 ? "20" + expParts[1] : expParts[1]) : "2027",
             security_code: cardCvv,
             holder: { name: cardHolder },
           };
@@ -182,7 +195,7 @@ export default function CheckoutScreen() {
       }
 
       // 4. Cleanup & Complete
-      clearCart();
+      setCreatedRentals(null);
       await Promise.all([refreshCatalog(), refreshRentals()]);
 
       Alert.alert("Sucesso", "Pedido realizado! Você pode acompanhar o pagamento em Meus Pedidos.", [
@@ -193,7 +206,12 @@ export default function CheckoutScreen() {
       ]);
     } catch (error: any) {
       console.error("[Checkout] Payment process error:", error);
-      Alert.alert("Falha no Pagamento", error.message || "Não foi possível concluir o pagamento.");
+      Alert.alert(
+        "Falha no Pagamento",
+        error.message || "Não foi possível concluir o pagamento. Seu pedido foi salvo em 'Meus Pedidos', mas você precisará cancelar e refazer a compra."
+      );
+      // We still redirect to orders so they see it
+      router.replace("/orders");
     } finally {
       setIsSubmitting(false);
     }
@@ -213,7 +231,7 @@ export default function CheckoutScreen() {
           {/* 1. Resumo dos produtos */}
           <View style={{ gap: 8 }}>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Resumo das Ferramentas</Text>
-            {cart.map((item) => (
+            {cartSnapshot.map((item) => (
               <View key={item.tool.id} style={{ flexDirection: "row", gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
                 <Image source={{ uri: item.tool.image }} style={{ width: 50, height: 50, borderRadius: 8, backgroundColor: colors.border }} />
                 <View style={{ flex: 1, justifyContent: "center" }}>
@@ -617,7 +635,7 @@ export default function CheckoutScreen() {
           <View style={{ padding: 14, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <Text style={{ color: colors.muted, fontSize: 13 }}>Subtotal</Text>
-              <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "600" }}>R$ {cartTotal.toFixed(2)}</Text>
+              <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "600" }}>R$ {cartTotalSnapshot.toFixed(2)}</Text>
             </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <Text style={{ color: colors.muted, fontSize: 13 }}>Frete</Text>
