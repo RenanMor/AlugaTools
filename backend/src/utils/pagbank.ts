@@ -11,6 +11,7 @@ export interface PagBankCustomer {
     country: string;
     area: string;
     number: string;
+    type: "MOBILE" | "HOME";
   }>;
 }
 

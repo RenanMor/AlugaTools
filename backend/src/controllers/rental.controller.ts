@@ -87,6 +87,13 @@ export const RentalController = {
       }
 
       const cleanCpf = (user.cpf || "").replace(/\D/g, "");
+      if (!cleanCpf || (cleanCpf.length !== 11 && cleanCpf.length !== 14)) {
+        console.error(`[Checkout Error] Invalid CPF/CNPJ for user ${customerId}: "${cleanCpf}"`);
+        return res.status(400).json({
+          error: "O CPF/CNPJ cadastrado no seu perfil é inválido ou ausente. Por favor, atualize seu CPF/CNPJ na aba Perfil antes de finalizar.",
+        });
+      }
+
       const cleanPhone = (user.phone || "").replace(/\D/g, "");
       const phoneArea = cleanPhone.substring(0, 2) || "11";
       const phoneNumber = cleanPhone.substring(2) || "999999999";
@@ -111,12 +118,13 @@ export const RentalController = {
         customer: {
           name: user.name,
           email: user.email,
-          tax_id: cleanCpf || "00000000000",
+          tax_id: cleanCpf,
           phones: [
             {
               country: "55",
               area: phoneArea,
               number: phoneNumber,
+              type: "MOBILE",
             },
           ],
         },

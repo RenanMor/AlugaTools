@@ -531,9 +531,18 @@ export default function CheckoutScreen() {
                   <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted, marginBottom: 4 }}>Validade (MM/AA)</Text>
                   <TextInput
                     value={cardExpiry}
-                    onChangeText={setCardExpiry}
-                    placeholder="12/28"
+                    onChangeText={(text) => {
+                      const clean = text.replace(/\D/g, "").substring(0, 4);
+                      if (clean.length <= 2) {
+                        setCardExpiry(clean);
+                      } else {
+                        setCardExpiry(`${clean.substring(0, 2)}/${clean.substring(2, 4)}`);
+                      }
+                    }}
+                    placeholder="12/30"
                     placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    maxLength={5}
                     style={{
                       backgroundColor: colors.background,
                       borderWidth: 1,
@@ -568,24 +577,37 @@ export default function CheckoutScreen() {
               </View>
 
               {paymentMethod === "CREDIT_CARD" && (
-                <View>
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted, marginBottom: 4 }}>Parcelas</Text>
-                  <TextInput
-                    value={installments}
-                    onChangeText={setInstallments}
-                    placeholder="1"
-                    placeholderTextColor={colors.muted}
-                    keyboardType="numeric"
-                    style={{
-                      backgroundColor: colors.background,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      borderRadius: 8,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      color: colors.foreground,
-                    }}
-                  />
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted }}>Parcelas</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ flexGrow: 0, height: 42 }}
+                    contentContainerStyle={{ gap: 8, alignItems: "center" }}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((num) => {
+                      const isSelected = installments === num;
+                      const valPerInstallment = totalAmount / Number(num);
+                      return (
+                        <Pressable
+                          key={num}
+                          onPress={() => setInstallments(num)}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            backgroundColor: isSelected ? colors.primary : colors.background,
+                            borderWidth: 1,
+                            borderColor: isSelected ? colors.primary : colors.border,
+                          }}
+                        >
+                          <Text style={{ color: isSelected ? "#fff" : colors.foreground, fontSize: 12, fontWeight: "700" }}>
+                            {num}x (R$ {valPerInstallment.toFixed(2)})
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
                 </View>
               )}
             </View>
