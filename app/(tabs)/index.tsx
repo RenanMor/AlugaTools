@@ -51,7 +51,12 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
                 Categorias
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, alignItems: "center" }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ flexGrow: 0 }}
+                contentContainerStyle={{ gap: 12, alignItems: "center" }}
+              >
                 {CATEGORIES.map((cat) => (
                   <Pressable
                     key={cat.id}
