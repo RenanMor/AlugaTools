@@ -190,12 +190,7 @@ export default function AuthScreen() {
           return;
         }
         // Mode: Login
-        let documentToLogin = "";
-        if (profile === "company") {
-          documentToLogin = cnpj.replace(/\D/g, "");
-        } else {
-          documentToLogin = cpf.replace(/\D/g, "");
-        }
+        let documentToLogin = (cpf || cnpj).replace(/\D/g, "");
         
         if (!documentToLogin && !email.trim()) {
           alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
@@ -224,7 +219,7 @@ export default function AuthScreen() {
       let loginCnpj: string | undefined;
       
       if (mode === "login") {
-        const cleanDoc = profile === "company" ? cnpj.replace(/\D/g, "") : cpf.replace(/\D/g, "");
+        const cleanDoc = (cpf || cnpj).replace(/\D/g, "");
         if (cleanDoc) {
           if (validateCPF(cleanDoc)) loginCpf = cleanDoc;
           if (validateCNPJ(cleanDoc)) loginCnpj = cleanDoc;
@@ -281,10 +276,12 @@ export default function AuthScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
-          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
-        </View>
+        {mode === "register" && (
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+            <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
+            <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+          </View>
+        )}
 
         <View style={{ gap: 14, marginTop: 22 }}>
           {mode === "register" ? (
@@ -317,11 +314,13 @@ export default function AuthScreen() {
             </>
           ) : (
             <>
-              {profile === "customer" ? (
-                <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
-              ) : (
-                <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
-              )}
+              <Input 
+                label="CPF ou CNPJ" 
+                value={cpf || cnpj} 
+                onChangeText={handleCpfChange} // Maps to CPF state for simplicity
+                placeholder="000.000.000-00 ou 00.000.000/0000-00" 
+                keyboardType="number-pad" 
+              />
             </>
           )}
           <Input label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
