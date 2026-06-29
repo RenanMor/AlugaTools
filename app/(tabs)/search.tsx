@@ -18,7 +18,7 @@ export default function SearchScreen() {
   const results = useMemo(() => {
     return tools.filter((t) => {
       const matchQuery = query.trim() === "" || t.name.toLowerCase().includes(query.toLowerCase());
-      const matchCat = !activeCat || t.categoryId === activeCat;
+      const matchCat = !activeCat || (t.categoryId && t.categoryId.split(",").map((c) => c.trim()).includes(activeCat));
       return matchQuery && matchCat;
     });
   }, [tools, query, activeCat]);

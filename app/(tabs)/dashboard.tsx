@@ -243,7 +243,7 @@ function ToolFormModal({
   const [price, setPrice] = useState("");
   const [image, setImage] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [categoryId, setCategoryId] = useState(CATEGORIES[0].id);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   useMemo(() => {
     if (visible) {
@@ -251,7 +251,11 @@ function ToolFormModal({
       setDescription(tool?.description ?? "");
       setPrice(tool ? String(tool.pricePerDay) : "");
       setImage(tool?.image ?? "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400&q=80");
-      setCategoryId(tool?.categoryId ?? CATEGORIES[0].id);
+      if (tool?.categoryId) {
+        setSelectedCategories(tool.categoryId.split(",").map(c => c.trim()).filter(Boolean));
+      } else {
+        setSelectedCategories([CATEGORIES[0].id]);
+      }
       setQuantity(tool ? String(tool.quantity ?? 1) : "1");
     }
   }, [visible, tool]);
@@ -266,7 +270,7 @@ function ToolFormModal({
       companyId,
       name: name.trim() || "Nova ferramenta",
       description: description.trim(),
-      categoryId,
+      categoryId: selectedCategories.join(","),
       image: cleanImage,
       pricePerDay: Number(price) || 0,
       quantity: parsedQty,
@@ -299,32 +303,68 @@ function ToolFormModal({
 
             <Field label="URL da imagem" value={image} onChangeText={setImage} placeholder="https://..." />
 
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 8 }}>Categoria</Text>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 8 }}>Categorias (selecione várias se desejar)</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={{ flexGrow: 0, height: 38, marginBottom: 16 }}
               contentContainerStyle={{ gap: 8, alignItems: "center" }}
             >
-              {CATEGORIES.map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => setCategoryId(c.id)}
-                  style={({ pressed }) => [
-                    {
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 18,
-                      backgroundColor: categoryId === c.id ? colors.primary : colors.surface,
-                      borderWidth: 1,
-                      borderColor: categoryId === c.id ? colors.primary : colors.border,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: categoryId === c.id ? "#fff" : colors.foreground, fontSize: 13, fontWeight: "600" }}>{c.name}</Text>
-                </Pressable>
-              ))}
+              <Pressable
+                onPress={() => {
+                  const allSelected = selectedCategories.length === CATEGORIES.length;
+                  if (allSelected) {
+                    setSelectedCategories([CATEGORIES[0].id]);
+                  } else {
+                    setSelectedCategories(CATEGORIES.map((c) => c.id));
+                  }
+                }}
+                style={({ pressed }) => [
+                  {
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 18,
+                    backgroundColor: selectedCategories.length === CATEGORIES.length ? colors.primary : colors.surface,
+                    borderWidth: 1,
+                    borderColor: selectedCategories.length === CATEGORIES.length ? colors.primary : colors.border,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <Text style={{ color: selectedCategories.length === CATEGORIES.length ? "#fff" : colors.foreground, fontSize: 13, fontWeight: "600" }}>Todas</Text>
+              </Pressable>
+
+              {CATEGORIES.map((c) => {
+                const isSelected = selectedCategories.includes(c.id);
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => {
+                      setSelectedCategories((prev) => {
+                        if (isSelected) {
+                          if (prev.length <= 1) return prev;
+                          return prev.filter((id) => id !== c.id);
+                        } else {
+                          return [...prev, c.id];
+                        }
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 18,
+                        backgroundColor: isSelected ? colors.primary : colors.surface,
+                        borderWidth: 1,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: isSelected ? "#fff" : colors.foreground, fontSize: 13, fontWeight: "600" }}>{c.name}</Text>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
 
             <View style={{ flexDirection: "row", gap: 10 }}>
