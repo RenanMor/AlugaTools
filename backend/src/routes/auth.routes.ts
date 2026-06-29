@@ -38,8 +38,8 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
         name,
         email,
         profile,
-        cpf: cpf || null,
-        cnpj: cnpj || null,
+        cpf: cpf ? cpf.replace(/\D/g, "") : null,
+        cnpj: cnpj ? cnpj.replace(/\D/g, "") : null,
         phone,
         password,
         role: role || "user",
@@ -123,13 +123,16 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
     if (cpf || cnpj) {
       const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
       const query = supabaseAdmin.from("users").select("email, profile");
+      let filterQuery = query;
       if (cpf) {
-        query.eq("cpf", cleanDoc);
+        const formatted = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+        filterQuery = query.or(`cpf.eq.${cleanDoc},cpf.eq.${formatted}`);
       } else {
-        query.eq("cnpj", cleanDoc);
+        const formatted = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+        filterQuery = query.or(`cnpj.eq.${cleanDoc},cnpj.eq.${formatted}`);
       }
 
-      const { data: dbUser, error: queryError } = await query.single();
+      const { data: dbUser, error: queryError } = await filterQuery.single();
       if (queryError || !dbUser) {
         return res.status(401).json({ error: `${cpf ? "CPF" : "CNPJ"} não cadastrado` });
       }
