@@ -123,31 +123,37 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
     if (cpf || cnpj) {
       const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
       const query = supabaseAdmin.from("users").select("email, profile");
-      let formatted = "";
-      let column = cpf ? "cpf" : "cnpj";
+      const formattedCpf = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+      const formattedCnpj = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
 
-      if (cpf) {
-        formatted = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-      } else {
-        formatted = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
-      }
+      console.log("[Auth] Searching for document:", cleanDoc);
 
-      // Query the unformatted document first
-      let { data: dbUser, error: queryError } = await supabaseAdmin
-        .from("users")
-        .select("email, profile")
-        .eq(column, cleanDoc)
-        .single();
+      // Search all possibilities sequentially
+      let dbUser = null;
 
-      // If not found, try the formatted document
+      // 1. Unformatted CNPJ
+      let { data: d1 } = await supabaseAdmin.from("users").select("email, profile").eq("cnpj", cleanDoc).limit(1);
+      if (d1 && d1.length > 0) dbUser = d1[0];
+
+      // 2. Formatted CNPJ
       if (!dbUser) {
-        const { data: dbUserFormatted, error: queryError2 } = await supabaseAdmin
-          .from("users")
-          .select("email, profile")
-          .eq(column, formatted)
-          .single();
-        dbUser = dbUserFormatted;
+        let { data: d2 } = await supabaseAdmin.from("users").select("email, profile").eq("cnpj", formattedCnpj).limit(1);
+        if (d2 && d2.length > 0) dbUser = d2[0];
       }
+
+      // 3. Unformatted CPF
+      if (!dbUser) {
+        let { data: d3 } = await supabaseAdmin.from("users").select("email, profile").eq("cpf", cleanDoc).limit(1);
+        if (d3 && d3.length > 0) dbUser = d3[0];
+      }
+
+      // 4. Formatted CPF
+      if (!dbUser) {
+        let { data: d4 } = await supabaseAdmin.from("users").select("email, profile").eq("cpf", formattedCpf).limit(1);
+        if (d4 && d4.length > 0) dbUser = d4[0];
+      }
+
+      console.log("[Auth] Search result:", dbUser);
 
       if (!dbUser) {
         return res.status(401).json({ error: `${cpf ? "CPF" : "CNPJ"} não cadastrado` });
