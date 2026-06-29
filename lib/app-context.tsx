@@ -187,6 +187,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await Auth.setSessionToken(response.token);
       }
       setUser(response.user);
+      return response.user;
     } catch (err) {
       console.error("Erro de autenticação:", err);
       throw err;

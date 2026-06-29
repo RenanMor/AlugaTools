@@ -137,12 +137,6 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         return res.status(401).json({ error: `${cpf ? "CPF" : "CNPJ"} não cadastrado` });
       }
 
-      if (profile && dbUser.profile !== profile) {
-        return res.status(403).json({
-          error: `Este perfil pertence a uma ${dbUser.profile === "company" ? "empresa" : "conta de cliente"}. Por favor, faça login na aba correspondente.`
-        });
-      }
-
       targetEmail = dbUser.email;
     } else if (email) {
       const { data: dbUser } = await supabaseAdmin
@@ -150,12 +144,6 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         .select("profile")
         .eq("email", email)
         .single();
-
-      if (dbUser && profile && dbUser.profile !== profile) {
-        return res.status(403).json({
-          error: `Este perfil pertence a uma ${dbUser.profile === "company" ? "empresa" : "conta de cliente"}. Por favor, faça login na aba correspondente.`
-        });
-      }
     } else {
       return res.status(400).json({ error: "CPF, CNPJ ou E-mail é obrigatório" });
     }

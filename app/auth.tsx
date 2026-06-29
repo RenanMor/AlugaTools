@@ -82,37 +82,37 @@ export default function AuthScreen() {
 
   const [loading, setLoading] = useState(false);
 
-  const handleCpfChange = (val: string) => {
-    const cleaned = val.replace(/\D/g, "");
-    const limited = cleaned.slice(0, 11);
-
-    let formatted = limited;
-    if (limited.length > 9) {
-      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
-    } else if (limited.length > 6) {
-      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
-    } else if (limited.length > 3) {
-      formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
-    }
-    setCpf(formatted);
-  };
-
-  const handleCnpjChange = (val: string) => {
+  const handleDocumentChange = (val: string, setDoc: (v: string) => void) => {
     const cleaned = val.replace(/\D/g, "");
     const limited = cleaned.slice(0, 14);
 
-    let formatted = limited;
-    if (limited.length > 12) {
-      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
-    } else if (limited.length > 8) {
-      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8)}`;
-    } else if (limited.length > 5) {
-      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5)}`;
-    } else if (limited.length > 2) {
-      formatted = `${limited.slice(0, 2)}.${limited.slice(2)}`;
+    if (limited.length <= 11) {
+      let formatted = limited;
+      if (limited.length > 9) {
+        formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
+      } else if (limited.length > 6) {
+        formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
+      } else if (limited.length > 3) {
+        formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+      }
+      setDoc(formatted);
+    } else {
+      let formatted = limited;
+      if (limited.length > 12) {
+        formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
+      } else if (limited.length > 8) {
+        formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8)}`;
+      } else if (limited.length > 5) {
+        formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5)}`;
+      } else if (limited.length > 2) {
+        formatted = `${limited.slice(0, 2)}.${limited.slice(2)}`;
+      }
+      setDoc(formatted);
     }
-    setCnpj(formatted);
   };
+
+  const handleCpfChange = (val: string) => handleDocumentChange(val, setCpf);
+  const handleCnpjChange = (val: string) => handleDocumentChange(val, setCnpj);
 
   const handlePhoneChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
@@ -189,33 +189,29 @@ export default function AuthScreen() {
           setLoading(false);
           return;
         }
-      } else {
         // Mode: Login
+        let documentToLogin = "";
         if (profile === "company") {
-          const cleanCnpj = cnpj.replace(/\D/g, "");
-          if (!cleanCnpj) {
-            alert("CNPJ é obrigatório para empresas");
-            setLoading(false);
-            return;
-          }
-          if (!validateCNPJ(cleanCnpj)) {
-            alert("CNPJ inválido");
-            setLoading(false);
-            return;
-          }
+          documentToLogin = cnpj.replace(/\D/g, "");
         } else {
-          const cleanCpf = cpf.replace(/\D/g, "");
-          if (!cleanCpf) {
-            alert("CPF é obrigatório para clientes");
-            setLoading(false);
-            return;
-          }
-          if (!validateCPF(cleanCpf)) {
-            alert("CPF inválido");
-            setLoading(false);
-            return;
-          }
+          documentToLogin = cpf.replace(/\D/g, "");
         }
+        
+        if (!documentToLogin && !email.trim()) {
+          alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
+          setLoading(false);
+          return;
+        }
+
+        const isCpf = documentToLogin ? validateCPF(documentToLogin) : false;
+        const isCnpj = documentToLogin ? validateCNPJ(documentToLogin) : false;
+
+        if (documentToLogin && !isCpf && !isCnpj) {
+          alert("CPF ou CNPJ inválido");
+          setLoading(false);
+          return;
+        }
+
         if (!password) {
           alert("Senha é obrigatória");
           setLoading(false);
@@ -223,25 +219,43 @@ export default function AuthScreen() {
         }
       }
 
-      await login(
+      // If they used a document, figure out which one it is
+      let loginCpf: string | undefined;
+      let loginCnpj: string | undefined;
+      
+      if (mode === "login") {
+        const cleanDoc = profile === "company" ? cnpj.replace(/\D/g, "") : cpf.replace(/\D/g, "");
+        if (cleanDoc) {
+          if (validateCPF(cleanDoc)) loginCpf = cleanDoc;
+          if (validateCNPJ(cleanDoc)) loginCnpj = cleanDoc;
+        }
+      } else {
+        loginCpf = profile === "customer" ? cpf : undefined;
+        loginCnpj = profile === "company" ? cnpj : undefined;
+      }
+
+      const returnedUser = await login(
         email.trim(),
         name.trim() || "Usuário",
-        profile,
+        profile, // Not heavily enforced on the backend for login now
         password,
         mode === "register",
-        profile === "customer" ? cpf : undefined,
+        loginCpf,
         phone,
-        profile === "company" ? cnpj : undefined
+        loginCnpj
       );
 
-      if (params.intent === "checkout" && profile === "customer" && cart.length > 0) {
+      // Use the returned user's actual profile!
+      const actualProfile = returnedUser?.profile || profile;
+
+      if (params.intent === "checkout" && actualProfile === "customer" && cart.length > 0) {
         await checkout();
         router.dismiss();
         router.push("/orders");
         return;
       }
       router.dismiss();
-      if (profile === "company") router.push("/dashboard");
+      if (actualProfile === "company") router.push("/dashboard");
     } catch (err: any) {
       alert(err.message || "Erro de autenticação. Verifique suas credenciais.");
     } finally {
