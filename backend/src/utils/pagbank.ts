@@ -49,6 +49,7 @@ export interface CreateOrderInput {
   customer: PagBankCustomer;
   items: PagBankItem[];
   shippingAddress?: PagBankAddress;
+  notificationUrls?: string[];
 }
 
 export interface PayOrderPixInput {
@@ -94,15 +95,18 @@ const pagbankApi = axios.create({
 // ---------- Create Order (without payment) ----------
 
 export async function createPagBankOrder(input: CreateOrderInput) {
-  const payload = {
+  const payload: any = {
     reference_id: input.referenceId,
     customer: input.customer,
     items: input.items,
     shipping: input.shippingAddress
       ? { address: input.shippingAddress }
       : undefined,
-    notification_urls: [],
   };
+
+  if (input.notificationUrls && input.notificationUrls.length > 0) {
+    payload.notification_urls = input.notificationUrls;
+  }
 
   try {
     const response = await pagbankApi.post("/orders", payload);

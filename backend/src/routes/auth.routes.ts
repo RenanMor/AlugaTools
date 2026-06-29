@@ -126,10 +126,10 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
       let filterQuery = query;
       if (cpf) {
         const formatted = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-        filterQuery = query.or(`cpf.eq."${cleanDoc}",cpf.eq."${formatted}"`);
+        filterQuery = query.in("cpf", [cleanDoc, formatted]);
       } else {
         const formatted = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
-        filterQuery = query.or(`cnpj.eq."${cleanDoc}",cnpj.eq."${formatted}"`);
+        filterQuery = query.in("cnpj", [cleanDoc, formatted]);
       }
 
       const { data: dbUser, error: queryError } = await filterQuery.single();

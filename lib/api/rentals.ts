@@ -32,6 +32,11 @@ export async function getMyRentals(): Promise<Rental[]> {
   return (response.data || []).map(mapRental);
 }
 
+export async function getRentalById(id: string): Promise<Rental> {
+  const response = await apiCall<{ data: any }>(`/api/rentals/${id}`);
+  return mapRental(response.data);
+}
+
 export async function getRentalsByCompany(companyId: string): Promise<Rental[]> {
   const response = await apiCall<{ data: any[] }>(`/api/rentals/company/${companyId}`);
   return (response.data || []).map(mapRental);
