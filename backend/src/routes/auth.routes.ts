@@ -123,17 +123,33 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
     if (cpf || cnpj) {
       const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
       const query = supabaseAdmin.from("users").select("email, profile");
-      let filterQuery = query;
+      let formatted = "";
+      let column = cpf ? "cpf" : "cnpj";
+
       if (cpf) {
-        const formatted = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-        filterQuery = query.in("cpf", [cleanDoc, formatted]);
+        formatted = cleanDoc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
       } else {
-        const formatted = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
-        filterQuery = query.in("cnpj", [cleanDoc, formatted]);
+        formatted = cleanDoc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
       }
 
-      const { data: dbUser, error: queryError } = await filterQuery.single();
-      if (queryError || !dbUser) {
+      // Query the unformatted document first
+      let { data: dbUser, error: queryError } = await supabaseAdmin
+        .from("users")
+        .select("email, profile")
+        .eq(column, cleanDoc)
+        .single();
+
+      // If not found, try the formatted document
+      if (!dbUser) {
+        const { data: dbUserFormatted, error: queryError2 } = await supabaseAdmin
+          .from("users")
+          .select("email, profile")
+          .eq(column, formatted)
+          .single();
+        dbUser = dbUserFormatted;
+      }
+
+      if (!dbUser) {
         return res.status(401).json({ error: `${cpf ? "CPF" : "CNPJ"} não cadastrado` });
       }
 
