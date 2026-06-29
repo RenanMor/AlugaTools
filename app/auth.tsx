@@ -85,7 +85,7 @@ export default function AuthScreen() {
   const handleCpfChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
     const limited = cleaned.slice(0, 11);
-    
+
     let formatted = limited;
     if (limited.length > 9) {
       formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
@@ -100,7 +100,7 @@ export default function AuthScreen() {
   const handleCnpjChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
     const limited = cleaned.slice(0, 14);
-    
+
     let formatted = limited;
     if (limited.length > 12) {
       formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
@@ -117,7 +117,7 @@ export default function AuthScreen() {
   const handlePhoneChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
     const limited = cleaned.slice(0, 11);
-    
+
     let formatted = limited;
     if (limited.length > 6) {
       formatted = `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
@@ -262,7 +262,7 @@ export default function AuthScreen() {
         <Text style={{ fontSize: 14, color: colors.muted }}>
           {params.intent === "checkout"
             ? "Entre para finalizar seu aluguel"
-            : "Acesse sua conta RentTools"}
+            : "Acesse sua conta AlugaTools"}
         </Text>
       </View>
 

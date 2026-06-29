@@ -1,6 +1,6 @@
-# RentTools API (Backend)
+# AlugaTools API (Backend)
 
-API backend em **Node.js + Express + TypeScript**, seguindo o padrão **MVC**, para o marketplace de aluguel de ferramentas **RentTools**. Utiliza **Supabase** (PostgreSQL + Auth) como banco de dados e autenticação, com integração de pagamentos via **PagBank**.
+API backend em **Node.js + Express + TypeScript**, seguindo o padrão **MVC**, para o marketplace de aluguel de ferramentas **AlugaTools**. Utiliza **Supabase** (PostgreSQL + Auth) como banco de dados e autenticação, com integração de pagamentos via **PagBank**.
 
 ## Arquitetura (MVC)
 

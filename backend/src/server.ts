@@ -4,5 +4,5 @@ import { env } from "./config/env";
 const app = createApp();
 
 app.listen(env.port, () => {
-  console.log(`RentTools API running on port ${env.port}`);
+  console.log(`AlugaTools API running on port ${env.port}`);
 });

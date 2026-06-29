@@ -1,7 +1,7 @@
 {
-  "name": "renttools-api",
+  "name": "AlugaTools-api",
   "version": "1.0.0",
-  "description": "API backend MVC para o marketplace RentTools (aluguel de ferramentas)",
+  "description": "API backend MVC para o marketplace AlugaTools (aluguel de ferramentas)",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {

@@ -22,7 +22,7 @@ export default function HomeScreen() {
           <View style={{ gap: 18, marginBottom: 8 }}>
             <View>
               <Text style={{ fontSize: 26, fontWeight: "800", color: colors.foreground }}>
-                RentTools
+                AlugaTools
               </Text>
               <Text style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>
                 Alugue ferramentas perto de você

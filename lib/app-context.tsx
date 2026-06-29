@@ -48,7 +48,7 @@ interface AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
-const STORAGE_KEY = "@renttools_state_v2";
+const STORAGE_KEY = "@AlugaTools_state_v2";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -78,7 +78,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 2. Persist cart and user session to storage
   useEffect(() => {
     if (!hydrated) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ cart, user })).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ cart, user })).catch(() => { });
   }, [cart, user, hydrated]);
 
   // 3. Load catalog (companies & tools) from API on mount
@@ -216,7 +216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         )
       );
       clearCart();
-      
+
       // Reload rentals list
       let list: Rental[] = [];
       if (user.profile === "company" && user.companyId) {
@@ -234,7 +234,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const handleRateRental = useCallback(async (rentalId: string, rating: number) => {
     try {
       await rateRental(rentalId, rating);
-      
+
       // Refresh rentals and company ratings
       const [comps, rents] = await Promise.all([
         getFeaturedCompanies(),
@@ -250,7 +250,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus) => {
     try {
       await updateRentalStatus(rentalId, status);
-      
+
       // Refresh rentals
       let list: Rental[] = [];
       if (user?.profile === "company" && user.companyId) {
