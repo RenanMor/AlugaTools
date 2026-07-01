@@ -220,10 +220,11 @@ export default function AuthScreen() {
       let loginCnpj: string | undefined;
       
       if (mode === "login") {
-        const cleanDoc = (cpf || cnpj).replace(/\D/g, "");
+        const rawDoc = profile === "company" ? cnpj : cpf;
+        const cleanDoc = rawDoc.replace(/\D/g, "");
         if (cleanDoc) {
-          if (cleanDoc.length === 11) loginCpf = cleanDoc;
-          if (cleanDoc.length === 14) loginCnpj = cleanDoc;
+          if (profile === "company") loginCnpj = cleanDoc;
+          else loginCpf = cleanDoc;
         }
       } else {
         loginCpf = profile === "customer" ? cpf : undefined;
@@ -286,8 +287,8 @@ export default function AuthScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
-          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => { setProfile("customer"); setCnpj(""); }} />
+          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => { setProfile("company"); setCpf(""); }} />
         </View>
 
         <View style={{ gap: 14, marginTop: 22 }}>
