@@ -287,8 +287,8 @@ export default function AuthScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => { setProfile("customer"); setCnpj(""); }} />
-          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => { setProfile("company"); setCpf(""); }} />
+          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
+          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
         </View>
 
         <View style={{ gap: 14, marginTop: 22 }}>

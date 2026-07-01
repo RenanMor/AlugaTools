@@ -125,32 +125,34 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
       const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
       console.log("[Auth] Searching for document:", cleanDoc);
 
-      const { data: allUsers, error: queryError } = await supabaseAdmin
-        .from("users")
-        .select("email, profile, cpf, cnpj");
+      // Query direta pelo campo — evita varredura total da tabela (sujeita a RLS)
+      let dbUser: { email: string; profile: string } | null = null;
 
-      if (queryError) {
-        console.error("[Auth] Database query error:", queryError);
+      if (cpf) {
+        const { data, error } = await supabaseAdmin
+          .from("users")
+          .select("email, profile")
+          .eq("cpf", cleanDoc)
+          .maybeSingle();
+        if (error) console.error("[Auth] CPF query error:", error);
+        dbUser = data;
       }
 
-      let dbUser = null;
-      if (allUsers) {
-        dbUser = allUsers.find(user => {
-          const dbCpfClean = user.cpf ? user.cpf.replace(/\D/g, "") : "";
-          const dbCnpjClean = user.cnpj ? user.cnpj.replace(/\D/g, "") : "";
-          return dbCpfClean === cleanDoc || dbCnpjClean === cleanDoc;
-        });
+      if (!dbUser && cnpj) {
+        const { data, error } = await supabaseAdmin
+          .from("users")
+          .select("email, profile")
+          .eq("cnpj", cleanDoc)
+          .maybeSingle();
+        if (error) console.error("[Auth] CNPJ query error:", error);
+        dbUser = data;
       }
 
       console.log("[Auth] Search result:", dbUser);
 
       if (!dbUser) {
-        const dbDocsList = allUsers 
-          ? allUsers.map(u => `${u.email}: CPF=${u.cpf || "null"}, CNPJ=${u.cnpj || "null"}`).join(" | ")
-          : "Erro ao buscar do banco";
-
         return res.status(401).json({ 
-          error: `Documento não cadastrado. Buscado: ${cleanDoc}. Banco: [${dbDocsList}]` 
+          error: "Documento não encontrado. Verifique o CPF/CNPJ digitado." 
         });
       }
 
