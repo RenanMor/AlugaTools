@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { RentalModel } from "../models/rental.model";
 import { CompanyModel } from "../models/company.model";
+import { DelivererModel } from "../models/deliverer.model";
 import { supabaseAdmin } from "../config/supabase";
 import {
   createPagBankOrder,
@@ -278,7 +279,21 @@ export const RentalController = {
 
   async updateStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const rental = await RentalModel.updateStatus(req.params.id, req.body.status);
+      const { status } = req.body;
+      const userId = (req as any).userId as string;
+      
+      let delivererId: string | undefined = req.body.deliverer_id;
+      
+      // If the user updating is a deliverer, auto-assign their deliverer ID
+      if (userId) {
+        const deliverer = await DelivererModel.findByUserId(userId);
+        if (deliverer) {
+          delivererId = deliverer.id;
+        }
+      }
+
+      const extras = delivererId ? { deliverer_id: delivererId } : undefined;
+      const rental = await RentalModel.updateStatus(req.params.id, status, extras);
       res.json({ data: rental });
     } catch (err) {
       next(err);
@@ -295,32 +310,55 @@ export const RentalController = {
     }
   },
 
+  async listByDeliverer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).userId as string;
+      // Find the deliverer record for this user
+      const deliverer = await DelivererModel.findByUserId(userId);
+      if (!deliverer) {
+        return res.status(403).json({ error: "Entregador não encontrado" });
+      }
+      // Return all rentals for the company this deliverer belongs to
+      const rentals = await RentalModel.findByCompany(deliverer.company_id);
+      res.json({ data: rentals });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const customerId = (req as any).userId as string;
+      const userId = (req as any).userId as string;
 
       const rental = await RentalModel.findById(id);
       if (!rental) {
         return res.status(404).json({ error: "Aluguel não encontrado" });
       }
 
-      // Allow either the customer who made the order, or the company owning the tool to view it
-      if (rental.customer_id !== customerId && rental.company_id !== customerId) {
-         // wait, the company_id is the company's UUID in the db. 
-         // But let's just make it simple: if customer_id doesn't match, block (unless they are the company owner, which is checked via owner_id. But company_id IS the company ID, not owner_id).
-         // For now, let's just check customer_id.
-      }
-      
-      if (rental.customer_id !== customerId) {
-        // Let's do a strict check for customer first
-        // If we want companies to see it, we need to check if customerId is the company owner.
-        // I will just return the rental for now, the route is protected by token.
-        // It's safer to just check customer_id to avoid exposing to wrong users.
-        return res.status(403).json({ error: "Não autorizado" });
+      // Allow: customer who made the order, company owner, or deliverer of the company
+      if (rental.customer_id === userId) {
+        return res.json({ data: rental });
       }
 
-      res.json({ data: rental });
+      // Check if user is the company owner
+      const { data: company } = await supabaseAdmin
+        .from("companies")
+        .select("id")
+        .eq("id", rental.company_id)
+        .eq("owner_id", userId)
+        .maybeSingle();
+      if (company) {
+        return res.json({ data: rental });
+      }
+
+      // Check if user is a deliverer for this company
+      const deliverer = await DelivererModel.findByUserId(userId);
+      if (deliverer && deliverer.company_id === rental.company_id) {
+        return res.json({ data: rental });
+      }
+
+      return res.status(403).json({ error: "Não autorizado" });
     } catch (err) {
       next(err);
     }

@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool } from "./types";
+import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool, Deliverer } from "./types";
 import * as Auth from "./_core/auth";
 import { apiCall } from "./_core/api";
 import {
@@ -13,7 +13,12 @@ import {
   rateRental,
   createTool,
   updateTool,
-  deleteTool
+  deleteTool,
+  getDeliverersByCompany,
+  createDeliverer,
+  updateDeliverer as apiUpdateDeliverer,
+  deleteDeliverer as apiDeleteDeliverer,
+  getDelivererRentals
 } from "./api";
 
 interface AppState {
@@ -21,6 +26,7 @@ interface AppState {
   tools: Tool[];
   cart: CartItem[];
   rentals: Rental[];
+  deliverers: Deliverer[];
   user: SessionUser | null;
   addToCart: (tool: Tool, companyName: string) => void;
   removeFromCart: (toolId: string) => void;
@@ -43,9 +49,13 @@ interface AppState {
   addTool: (tool: Omit<Tool, "id">) => void;
   updateTool: (tool: Tool) => void;
   deleteTool: (toolId: string) => void;
+  addDeliverer: (deliverer: { name: string; email: string; phone: string; password?: string }) => Promise<void>;
+  updateDeliverer: (id: string, deliverer: Partial<Pick<Deliverer, "name" | "email" | "phone" | "active">>) => Promise<void>;
+  deleteDeliverer: (id: string) => Promise<void>;
   cartTotal: number;
   refreshCatalog: () => Promise<void>;
   refreshRentals: () => Promise<void>;
+  refreshDeliverers: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -57,6 +67,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [tools, setTools] = useState<Tool[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
+  const [deliverers, setDeliverers] = useState<Deliverer[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -111,6 +122,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let list: Rental[] = [];
       if (user.profile === "company" && user.companyId) {
         list = await getRentalsByCompany(user.companyId);
+      } else if (user.profile === "deliverer") {
+        list = await getDelivererRentals();
       } else {
         list = await getMyRentals();
       }
@@ -123,6 +136,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadRentals();
   }, [loadRentals]);
+
+  // 4b. Load deliverers list whenever user changes
+  const loadDeliverers = useCallback(async () => {
+    if (!user || user.profile !== "company" || !user.companyId) {
+      setDeliverers([]);
+      return;
+    }
+    try {
+      const list = await getDeliverersByCompany(user.companyId);
+      setDeliverers(list);
+    } catch (err) {
+      console.error("Erro ao carregar entregadores:", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadDeliverers();
+  }, [loadDeliverers]);
 
   // Cart operations
   const addToCart = useCallback((tool: Tool, companyName: string) => {
@@ -291,6 +322,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Deliverer management
+  const handleAddDeliverer = useCallback(async (deliv: { name: string; email: string; phone: string; password?: string }) => {
+    if (!user?.companyId) return;
+    try {
+      await createDeliverer({ ...deliv, companyId: user.companyId });
+      await loadDeliverers();
+    } catch (err: any) {
+      console.error("Erro ao adicionar entregador:", err);
+      alert(err.message || "Erro ao adicionar entregador");
+    }
+  }, [user, loadDeliverers]);
+
+  const handleUpdateDeliverer = useCallback(async (id: string, deliv: Partial<Pick<Deliverer, "name" | "email" | "phone" | "active">>) => {
+    try {
+      await apiUpdateDeliverer(id, deliv);
+      await loadDeliverers();
+    } catch (err: any) {
+      console.error("Erro ao atualizar entregador:", err);
+      alert(err.message || "Erro ao atualizar entregador");
+    }
+  }, [loadDeliverers]);
+
+  const handleDeleteDeliverer = useCallback(async (id: string) => {
+    try {
+      await apiDeleteDeliverer(id);
+      await loadDeliverers();
+    } catch (err: any) {
+      console.error("Erro ao deletar entregador:", err);
+      alert(err.message || "Erro ao deletar entregador");
+    }
+  }, [loadDeliverers]);
+
+  const refreshDeliverers = useCallback(async () => {
+    await loadDeliverers();
+  }, [loadDeliverers]);
+
   const cartTotal = useMemo(
     () => cart.reduce((sum, i) => sum + i.tool.pricePerDay * i.days, 0),
     [cart],
@@ -302,6 +369,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       tools,
       cart,
       rentals,
+      deliverers,
       user,
       addToCart,
       removeFromCart,
@@ -315,15 +383,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addTool: handleAddTool,
       updateTool: handleUpdateTool,
       deleteTool: handleDeleteTool,
+      addDeliverer: handleAddDeliverer,
+      updateDeliverer: handleUpdateDeliverer,
+      deleteDeliverer: handleDeleteDeliverer,
       cartTotal,
       refreshCatalog,
       refreshRentals,
+      refreshDeliverers,
     }),
     [
       companies,
       tools,
       cart,
       rentals,
+      deliverers,
       user,
       addToCart,
       removeFromCart,
@@ -337,9 +410,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       handleAddTool,
       handleUpdateTool,
       handleDeleteTool,
+      handleAddDeliverer,
+      handleUpdateDeliverer,
+      handleDeleteDeliverer,
       cartTotal,
       refreshCatalog,
       refreshRentals,
+      refreshDeliverers,
     ],
   );
 

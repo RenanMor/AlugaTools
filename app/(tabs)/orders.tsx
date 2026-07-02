@@ -1,30 +1,27 @@
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import {
-  ActivityIndicator,
-  Alert,
   FlatList,
   Image,
-  Linking,
   Pressable,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Rental, RentalStatus } from "@/lib/types";
-import { cancelRental } from "@/lib/api/rentals";
+import { RentalTimer } from "@/components/rental-timer";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
-  pending: "Aguardando empresa",
+  pending: "Aguardando entrega",
   accepted: "Aceito",
   rejected: "Recusado",
-  active: "Em andamento",
+  delivering: "Em rota de entrega",
+  delivered: "Entregue (Em uso)",
+  active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
 };
@@ -34,6 +31,8 @@ const STATUS_COLOR: Record<RentalStatus, string> = {
   pending: "#F59E0B",
   accepted: "#3B82F6",
   rejected: "#EF4444",
+  delivering: "#F97316",
+  delivered: "#22C55E",
   active: "#22C55E",
   completed: "#64748B",
   cancelled: "#6B7280",
@@ -41,12 +40,13 @@ const STATUS_COLOR: Record<RentalStatus, string> = {
 
 export default function OrdersScreen() {
   const colors = useColors();
-  const { rentals, user, rateRental, setRentalStatus } = useApp();
+  const { rentals, user } = useApp();
+  const isDeliverer = user?.profile === "deliverer";
 
   return (
     <ScreenContainer className="p-4">
       <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 16 }}>
-        Meus pedidos
+        {isDeliverer ? "Entregas da Empresa" : "Meus pedidos"}
       </Text>
 
       {!user ? (
@@ -70,7 +70,9 @@ export default function OrdersScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           ListEmptyComponent={
             <Text style={{ color: colors.muted, textAlign: "center", marginTop: 60 }}>
-              Você ainda não fez nenhum aluguel.
+              {isDeliverer
+                ? "Nenhum pedido ou entrega registrada para esta empresa."
+                : "Você ainda não fez nenhum aluguel."}
             </Text>
           }
           renderItem={({ item }) => (
@@ -95,37 +97,45 @@ function OrderCard({ rental }: { rental: Rental }) {
           backgroundColor: colors.surface,
           borderWidth: 1,
           borderColor: colors.border,
-          flexDirection: "row",
           gap: 12,
-          opacity: pressed ? 0.7 : 1,
+          opacity: pressed ? 0.85 : 1,
         }
       ]}
     >
-      <Image source={{ uri: rental.toolImage }} style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: colors.border }} />
-      <View style={{ flex: 1, gap: 4, justifyContent: "center" }}>
-        <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-          {rental.toolName}
-        </Text>
-        <Text style={{ fontSize: 13, color: colors.muted }}>{rental.companyName}</Text>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
-          R$ {rental.totalPrice.toFixed(2)}
-        </Text>
-      </View>
-      <View style={{ justifyContent: "center", alignItems: "flex-end" }}>
-        <View
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 20,
-            backgroundColor: STATUS_COLOR[rental.status] + "22",
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "700", color: STATUS_COLOR[rental.status] }}>
-            {STATUS_LABEL[rental.status]}
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <Image source={{ uri: rental.toolImage }} style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: colors.border }} />
+        <View style={{ flex: 1, gap: 4, justifyContent: "center" }}>
+          <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+            {rental.toolName}
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>{rental.companyName}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
+            R$ {rental.totalPrice.toFixed(2)}
           </Text>
         </View>
-        <IconSymbol name="chevron.right" size={20} color={colors.muted} style={{ marginTop: 8 }} />
+        <View style={{ justifyContent: "center", alignItems: "flex-end" }}>
+          <View
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: (STATUS_COLOR[rental.status] || colors.muted) + "22",
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: "700", color: STATUS_COLOR[rental.status] || colors.muted }}>
+              {STATUS_LABEL[rental.status] || rental.status}
+            </Text>
+          </View>
+          <IconSymbol name="chevron.right" size={20} color={colors.muted} style={{ marginTop: 8 }} />
+        </View>
       </View>
+
+      {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active") && (
+        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Tempo de Uso Restante:</Text>
+          <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
+        </View>
+      )}
     </Pressable>
   );
 }

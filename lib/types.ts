@@ -1,10 +1,12 @@
-export type ProfileType = "customer" | "company";
+export type ProfileType = "customer" | "company" | "deliverer";
 
 export type RentalStatus =
   | "awaiting_payment"
   | "pending"
   | "accepted"
   | "rejected"
+  | "delivering"
+  | "delivered"
   | "active"
   | "completed"
   | "cancelled";
@@ -44,6 +46,17 @@ export interface CartItem {
   days: number;
 }
 
+export interface Deliverer {
+  id: string;
+  companyId: string;
+  userId?: string;
+  name: string;
+  email: string;
+  phone: string;
+  active: boolean;
+  createdAt?: number;
+}
+
 export interface Rental {
   id: string;
   toolId: string;
@@ -66,6 +79,8 @@ export interface Rental {
   address?: any;
   couponCode?: string;
   couponDiscount?: number;
+  delivererId?: string;
+  deliveredAt?: number;
 }
 
 export interface SessionUser {
@@ -74,5 +89,6 @@ export interface SessionUser {
   email: string;
   profile: ProfileType;
   companyId?: string;
+  delivererCompanyId?: string;
   role?: string;
 }

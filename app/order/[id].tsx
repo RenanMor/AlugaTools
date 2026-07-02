@@ -19,13 +19,16 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Rental, RentalStatus } from "@/lib/types";
 import { cancelRental, getRentalById } from "@/lib/api/rentals";
+import { RentalTimer } from "@/components/rental-timer";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
-  pending: "Aguardando empresa",
+  pending: "Aguardando entrega",
   accepted: "Aceito",
   rejected: "Recusado",
-  active: "Em andamento",
+  delivering: "Em rota de entrega",
+  delivered: "Entregue (Em uso)",
+  active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
 };
@@ -35,6 +38,8 @@ const STATUS_COLOR: Record<RentalStatus, string> = {
   pending: "#F59E0B",
   accepted: "#3B82F6",
   rejected: "#EF4444",
+  delivering: "#F97316",
+  delivered: "#22C55E",
   active: "#22C55E",
   completed: "#64748B",
   cancelled: "#6B7280",
@@ -43,12 +48,15 @@ const STATUS_COLOR: Record<RentalStatus, string> = {
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
-  const { refreshRentals, refreshCatalog, rateRental, setRentalStatus } = useApp();
+  const { refreshRentals, refreshCatalog, rateRental, setRentalStatus, user } = useApp();
   
   const [rental, setRental] = useState<Rental | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  const isDeliverer = user?.profile === "deliverer";
 
   const fetchOrder = async () => {
     try {
@@ -144,6 +152,19 @@ export default function OrderDetailsScreen() {
     return { barcode, bookletUrl };
   }, [rental]);
 
+  const handleUpdateStatus = async (status: RentalStatus) => {
+    if (isStatusLoading) return;
+    setIsStatusLoading(true);
+    try {
+      await setRentalStatus(rental!.id, status);
+      await fetchOrder();
+    } catch (err: any) {
+      Alert.alert("Erro", err.message || "Não foi possível atualizar o status.");
+    } finally {
+      setIsStatusLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <ScreenContainer>
@@ -177,6 +198,14 @@ export default function OrderDetailsScreen() {
             Realizado em: {new Date(rental.createdAt).toLocaleString("pt-BR")}
           </Text>
         </View>
+
+        {/* Timer de uso do aluguel */}
+        {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active") && (
+          <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8, alignItems: "center" }}>
+            <Text style={{ fontSize: 14, color: colors.muted, fontWeight: "700" }}>Tempo de Uso Restante</Text>
+            <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
+          </View>
+        )}
 
         {/* Pagamento Pendente - Instruções */}
         {rental.status === "awaiting_payment" && (
@@ -303,21 +332,48 @@ export default function OrderDetailsScreen() {
         </View>
 
         {/* Ações pós-pagamento */}
-        {rental.status === "active" && (
-          <Pressable
-            onPress={async () => {
-              await setRentalStatus(rental.id, "completed");
-              await fetchOrder();
-            }}
-            style={({ pressed }) => [
-              { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
-            ]}
-          >
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Marcar como concluído</Text>
-          </Pressable>
+        {isStatusLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <>
+            {/* Deliverer Actions */}
+            {isDeliverer && rental.status === "pending" && (
+              <Pressable
+                onPress={() => handleUpdateStatus("delivering")}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Iniciar Entrega</Text>
+              </Pressable>
+            )}
+
+            {isDeliverer && rental.status === "delivering" && (
+              <Pressable
+                onPress={() => handleUpdateStatus("delivered")}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Finalizar Entrega</Text>
+              </Pressable>
+            )}
+
+            {/* Customer/Company Actions */}
+            {!isDeliverer && (rental.status === "delivered" || rental.status === "active") && (
+              <Pressable
+                onPress={() => handleUpdateStatus("completed")}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Marcar como concluído</Text>
+              </Pressable>
+            )}
+          </>
         )}
 
-        {rental.status === "completed" && (
+        {rental.status === "completed" && !isDeliverer && (
           <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10, alignItems: "center" }}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
               {rental.rating ? "Sua avaliação" : "Avalie este serviço"}

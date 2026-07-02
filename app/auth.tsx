@@ -132,6 +132,12 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (mode === "register") {
+        if (profile === "deliverer") {
+          alert("Cadastro de entregador deve ser realizado pela empresa parceira.");
+          setLoading(false);
+          return;
+        }
+
         if (profile === "company") {
           const cleanCnpj = cnpj.replace(/\D/g, "");
           if (!cleanCnpj) {
@@ -191,21 +197,29 @@ export default function AuthScreen() {
         }
       } else {
         // Mode: Login
-        const documentToLogin = (profile === "company" ? cnpj : cpf).replace(/\D/g, "");
-        
-        if (!documentToLogin && !email.trim()) {
-          alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
-          setLoading(false);
-          return;
-        }
+        if (profile === "deliverer") {
+          if (!email.trim()) {
+            alert("E-mail é obrigatório para entrar");
+            setLoading(false);
+            return;
+          }
+        } else {
+          const documentToLogin = (profile === "company" ? cnpj : cpf).replace(/\D/g, "");
+          
+          if (!documentToLogin && !email.trim()) {
+            alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
+            setLoading(false);
+            return;
+          }
 
-        const isCpf = documentToLogin.length === 11;
-        const isCnpj = documentToLogin.length === 14;
+          const isCpf = documentToLogin.length === 11;
+          const isCnpj = documentToLogin.length === 14;
 
-        if (documentToLogin && !isCpf && !isCnpj) {
-          alert("CPF ou CNPJ inválido. Digite 11 dígitos para CPF ou 14 para CNPJ.");
-          setLoading(false);
-          return;
+          if (documentToLogin && !isCpf && !isCnpj) {
+            alert("CPF ou CNPJ inválido. Digite 11 dígitos para CPF ou 14 para CNPJ.");
+            setLoading(false);
+            return;
+          }
         }
 
         if (!password) {
@@ -219,14 +233,14 @@ export default function AuthScreen() {
       let loginCpf: string | undefined;
       let loginCnpj: string | undefined;
       
-      if (mode === "login") {
+      if (mode === "login" && profile !== "deliverer") {
         const rawDoc = profile === "company" ? cnpj : cpf;
         const cleanDoc = rawDoc.replace(/\D/g, "");
         if (cleanDoc) {
           if (profile === "company") loginCnpj = cleanDoc;
           else loginCpf = cleanDoc;
         }
-      } else {
+      } else if (mode === "register") {
         loginCpf = profile === "customer" ? cpf : undefined;
         loginCnpj = profile === "company" ? cnpj : undefined;
       }
@@ -242,7 +256,7 @@ export default function AuthScreen() {
       const returnedUser = await login(
         email.trim(),
         name.trim() || "Usuário",
-        profile, // Not heavily enforced on the backend for login now
+        profile,
         password,
         mode === "register",
         loginCpf,
@@ -259,8 +273,13 @@ export default function AuthScreen() {
         router.push("/orders");
         return;
       }
+      
       router.dismiss();
-      if (actualProfile === "company") router.push("/dashboard");
+      if (actualProfile === "company") {
+        router.push("/dashboard");
+      } else if (actualProfile === "deliverer") {
+        router.push("/orders");
+      }
     } catch (err: any) {
       alert(err.message || "Erro de autenticação. Verifique suas credenciais.");
     } finally {
@@ -286,9 +305,10 @@ export default function AuthScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-          <Segment label="Sou Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
-          <Segment label="Sou Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+        <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
+          <Segment label="Cliente" active={profile === "customer"} onPress={() => { setProfile("customer"); setMode("login"); }} />
+          <Segment label="Empresa" active={profile === "company"} onPress={() => { setProfile("company"); setMode("login"); }} />
+          <Segment label="Entregador" active={profile === "deliverer"} onPress={() => { setProfile("deliverer"); setMode("login"); }} />
         </View>
 
         <View style={{ gap: 14, marginTop: 22 }}>
@@ -322,10 +342,14 @@ export default function AuthScreen() {
             </>
           ) : (
             <>
-              {profile === "customer" ? (
+              {profile === "customer" && (
                 <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
-              ) : (
+              )}
+              {profile === "company" && (
                 <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
+              )}
+              {profile === "deliverer" && (
+                <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@entregador.com" keyboardType="email-address" />
               )}
             </>
           )}
@@ -346,17 +370,19 @@ export default function AuthScreen() {
           </Text>
         </Pressable>
 
-        <Pressable
-          onPress={() => setMode(mode === "login" ? "register" : "login")}
-          style={({ pressed }) => [{ marginTop: 18, alignItems: "center", opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Text style={{ color: colors.muted, fontSize: 14 }}>
-            {mode === "login" ? "Não tem conta? " : "Já tem conta? "}
-            <Text style={{ color: colors.primary, fontWeight: "700" }}>
-              {mode === "login" ? "Cadastre-se" : "Entrar"}
+        {profile !== "deliverer" && (
+          <Pressable
+            onPress={() => setMode(mode === "login" ? "register" : "login")}
+            style={({ pressed }) => [{ marginTop: 18, alignItems: "center", opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Text style={{ color: colors.muted, fontSize: 14 }}>
+              {mode === "login" ? "Não tem conta? " : "Já tem conta? "}
+              <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                {mode === "login" ? "Cadastre-se" : "Entrar"}
+              </Text>
             </Text>
-          </Text>
-        </Pressable>
+          </Pressable>
+        )}
       </ScrollView>
     </ScreenContainer>
   );
@@ -380,7 +406,7 @@ function Segment({ label, active, onPress }: { label: string; active: boolean; o
         },
       ]}
     >
-      <Text style={{ color: active ? "#fff" : colors.foreground, fontWeight: "700", fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: active ? "#fff" : colors.foreground, fontWeight: "700", fontSize: 13 }}>{label}</Text>
     </Pressable>
   );
 }

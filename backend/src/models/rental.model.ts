@@ -1,8 +1,8 @@
 import { supabaseAdmin } from "../config/supabase";
 
-export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "active" | "completed" | "cancelled";
+export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "delivering" | "delivered" | "active" | "completed" | "cancelled";
 
-const SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name)";
+const SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name), deliverer:deliverers(name)";
 
 export interface Rental {
   id: string;
@@ -23,9 +23,12 @@ export interface Rental {
   address: any | null;
   coupon_code: string | null;
   coupon_discount: number;
+  deliverer_id: string | null;
+  delivered_at: string | null;
   tool?: { name: string; image: string };
   company?: { name: string };
   customer?: { name: string };
+  deliverer?: { name: string };
 }
 
 export interface CreateRentalInput {
@@ -123,10 +126,17 @@ export const RentalModel = {
     return data as Rental[];
   },
 
-  async updateStatus(id: string, status: RentalStatus): Promise<Rental> {
+  async updateStatus(id: string, status: RentalStatus, extras?: { deliverer_id?: string }): Promise<Rental> {
+    const updateData: any = { status };
+    if (status === "delivered") {
+      updateData.delivered_at = new Date().toISOString();
+    }
+    if (extras?.deliverer_id) {
+      updateData.deliverer_id = extras.deliverer_id;
+    }
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .update({ status })
+      .update(updateData)
       .eq("id", id)
       .select(SELECT_FIELDS)
       .single();

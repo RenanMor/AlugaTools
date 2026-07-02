@@ -69,6 +69,33 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="stats"
+        options={{
+          title: "Controle",
+          href: (isCompany ? "/stats" : null) as any,
+          tabBarIcon: ({ color, focused }) => (
+            <View
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                backgroundColor: focused ? colors.primary : colors.primary + "DD",
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: -16,
+                shadowColor: colors.primary,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 5,
+                elevation: 4,
+              }}
+            >
+              <IconSymbol size={24} name="chart.bar.fill" color="#fff" />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="cart"
         options={{
           title: "Carrinho",

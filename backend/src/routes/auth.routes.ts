@@ -190,6 +190,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
 
     // 3. Fetch company ID if company profile
     let companyId: string | undefined;
+    let delivererCompanyId: string | undefined;
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
         .from("companies")
@@ -217,6 +218,15 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
           companyId = newCompany.id;
         }
       }
+    } else if (dbUser.profile === "deliverer") {
+      const { data: delivererData } = await supabaseAdmin
+        .from("deliverers")
+        .select("company_id")
+        .eq("user_id", dbUser.id)
+        .maybeSingle();
+      if (delivererData) {
+        delivererCompanyId = delivererData.company_id;
+      }
     }
 
     res.json({
@@ -228,6 +238,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         profile: dbUser.profile,
         role: dbUser.role || "user",
         companyId,
+        delivererCompanyId,
       }
     });
   } catch (err) {
@@ -296,6 +307,7 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
     }
 
     let companyId: string | undefined;
+    let delivererCompanyId: string | undefined;
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
         .from("companies")
@@ -323,6 +335,15 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
           companyId = newCompany.id;
         }
       }
+    } else if (dbUser.profile === "deliverer") {
+      const { data: delivererData } = await supabaseAdmin
+        .from("deliverers")
+        .select("company_id")
+        .eq("user_id", dbUser.id)
+        .maybeSingle();
+      if (delivererData) {
+        delivererCompanyId = delivererData.company_id;
+      }
     }
 
     res.json({
@@ -333,6 +354,7 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         profile: dbUser.profile,
         role: dbUser.role || "user",
         companyId,
+        delivererCompanyId,
       }
     });
   } catch (err) {

@@ -8,6 +8,7 @@ router.post("/", verifySupabaseToken, RentalController.create);
 router.post("/:id/pay", verifySupabaseToken, RentalController.pay);
 router.post("/:id/cancel", verifySupabaseToken, RentalController.cancel);
 router.get("/me", verifySupabaseToken, RentalController.listByCustomer);
+router.get("/deliverer", verifySupabaseToken, RentalController.listByDeliverer);
 router.get("/company/:companyId", verifySupabaseToken, RentalController.listByCompany);
 router.get("/:id", verifySupabaseToken, RentalController.getById);
 router.patch("/:id/status", verifySupabaseToken, RentalController.updateStatus);

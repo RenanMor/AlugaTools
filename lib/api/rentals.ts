@@ -24,6 +24,8 @@ export function mapRental(data: any): Rental {
     address: data.address || undefined,
     couponCode: data.coupon_code || undefined,
     couponDiscount: data.coupon_discount !== undefined ? Number(data.coupon_discount) : undefined,
+    delivererId: data.deliverer_id || undefined,
+    deliveredAt: data.delivered_at ? new Date(data.delivered_at).getTime() : undefined,
   };
 }
 
@@ -39,6 +41,11 @@ export async function getRentalById(id: string): Promise<Rental> {
 
 export async function getRentalsByCompany(companyId: string): Promise<Rental[]> {
   const response = await apiCall<{ data: any[] }>(`/api/rentals/company/${companyId}`);
+  return (response.data || []).map(mapRental);
+}
+
+export async function getDelivererRentals(): Promise<Rental[]> {
+  const response = await apiCall<{ data: any[] }>("/api/rentals/deliverer");
   return (response.data || []).map(mapRental);
 }
 

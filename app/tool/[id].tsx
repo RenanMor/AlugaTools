@@ -9,10 +9,11 @@ import { useApp } from "@/lib/app-context";
 export default function ToolScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { tools, companies, cart, addToCart } = useApp();
+  const { tools, companies, cart, addToCart, user } = useApp();
   const tool = tools.find((t) => t.id === id);
   const company = companies.find((c) => c.id === tool?.companyId);
   const inCart = cart.some((i) => i.tool.id === id);
+  const isCompany = user?.profile === "company";
 
   if (!tool || !company) {
     return (
@@ -73,19 +74,21 @@ export default function ToolScreen() {
       <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
         <Pressable
           onPress={handleAdd}
-          disabled={tool.quantity <= 0 || !tool.available}
+          disabled={tool.quantity <= 0 || !tool.available || isCompany}
           style={({ pressed }) => [
             {
-              backgroundColor: tool.quantity <= 0 || !tool.available ? colors.border : colors.primary,
+              backgroundColor: tool.quantity <= 0 || !tool.available || isCompany ? colors.border : colors.primary,
               borderRadius: 14,
               paddingVertical: 16,
               alignItems: "center",
-              transform: [{ scale: pressed && tool.quantity > 0 && tool.available ? 0.98 : 1 }],
+              transform: [{ scale: pressed && tool.quantity > 0 && tool.available && !isCompany ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={{ color: tool.quantity <= 0 || !tool.available ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
-            {tool.quantity <= 0 || !tool.available
+          <Text style={{ color: tool.quantity <= 0 || !tool.available || isCompany ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
+            {isCompany
+              ? "Empresas não podem alugar"
+              : tool.quantity <= 0 || !tool.available
               ? "Sem estoque disponível"
               : inCart
               ? "Ir para o carrinho"

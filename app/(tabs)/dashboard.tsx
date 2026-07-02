@@ -6,16 +6,33 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
-import { Rental, Tool } from "@/lib/types";
+import { Rental, Tool, Deliverer } from "@/lib/types";
+import { RentalTimer } from "@/components/rental-timer";
 
 export default function DashboardScreen() {
   const colors = useColors();
-  const { user, tools, rentals, addTool, updateTool, deleteTool, setRentalStatus } = useApp();
+  const {
+    user,
+    tools,
+    rentals,
+    deliverers,
+    addTool,
+    updateTool,
+    deleteTool,
+    addDeliverer,
+    updateDeliverer,
+    deleteDeliverer,
+    setRentalStatus
+  } = useApp();
   const companyId = user?.companyId;
   const hasInvalidCompany = !companyId || companyId === "co1";
-  const [tab, setTab] = useState<"tools" | "requests">("requests");
-  const [editing, setEditing] = useState<Tool | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  
+  const [tab, setTab] = useState<"requests" | "tools" | "deliverers">("requests");
+  const [editingTool, setEditingTool] = useState<Tool | null>(null);
+  const [showToolForm, setShowToolForm] = useState(false);
+  
+  const [editingDeliverer, setEditingDeliverer] = useState<Deliverer | null>(null);
+  const [showDelivererForm, setShowDelivererForm] = useState(false);
 
   const myTools = useMemo(() => tools.filter((t) => t.companyId === companyId), [tools, companyId]);
   const myRequests = useMemo(() => rentals.filter((r) => r.companyId === companyId), [rentals, companyId]);
@@ -45,13 +62,22 @@ export default function DashboardScreen() {
     );
   }
 
-  const openNew = () => {
-    setEditing(null);
-    setShowForm(true);
+  const openNewTool = () => {
+    setEditingTool(null);
+    setShowToolForm(true);
   };
-  const openEdit = (t: Tool) => {
-    setEditing(t);
-    setShowForm(true);
+  const openEditTool = (t: Tool) => {
+    setEditingTool(t);
+    setShowToolForm(true);
+  };
+
+  const openNewDeliverer = () => {
+    setEditingDeliverer(null);
+    setShowDelivererForm(true);
+  };
+  const openEditDeliverer = (d: Deliverer) => {
+    setEditingDeliverer(d);
+    setShowDelivererForm(true);
   };
 
   return (
@@ -60,12 +86,13 @@ export default function DashboardScreen() {
         Painel da empresa
       </Text>
 
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+      <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
         <TabButton label="Pedidos" active={tab === "requests"} onPress={() => setTab("requests")} />
-        <TabButton label="Minhas ferramentas" active={tab === "tools"} onPress={() => setTab("tools")} />
+        <TabButton label="Ferramentas" active={tab === "tools"} onPress={() => setTab("tools")} />
+        <TabButton label="Entregadores" active={tab === "deliverers"} onPress={() => setTab("deliverers")} />
       </View>
 
-      {tab === "requests" ? (
+      {tab === "requests" && (
         <FlatList
           data={myRequests}
           keyExtractor={(i) => i.id}
@@ -76,11 +103,11 @@ export default function DashboardScreen() {
               Nenhum pedido recebido ainda.
             </Text>
           }
-          renderItem={({ item }) => (
-            <RequestCard rental={item} onStatus={(s) => setRentalStatus(item.id, s)} />
-          )}
+          renderItem={({ item }) => <RequestCard rental={item} />}
         />
-      ) : (
+      )}
+
+      {tab === "tools" && (
         <FlatList
           data={myTools}
           keyExtractor={(i) => i.id}
@@ -88,7 +115,7 @@ export default function DashboardScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           ListHeaderComponent={
             <Pressable
-              onPress={openNew}
+              onPress={openNewTool}
               style={({ pressed }) => [
                 {
                   flexDirection: "row",
@@ -108,20 +135,71 @@ export default function DashboardScreen() {
             </Pressable>
           }
           renderItem={({ item }) => (
-            <ToolManageRow tool={item} onEdit={() => openEdit(item)} onDelete={() => deleteTool(item.id)} />
+            <ToolManageRow tool={item} onEdit={() => openEditTool(item)} onDelete={() => deleteTool(item.id)} />
+          )}
+        />
+      )}
+
+      {tab === "deliverers" && (
+        <FlatList
+          data={deliverers}
+          keyExtractor={(i) => i.id}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          ListHeaderComponent={
+            <Pressable
+              onPress={openNewDeliverer}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  backgroundColor: colors.primary,
+                  marginBottom: 12,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <IconSymbol name="plus" size={18} color="#fff" />
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Adicionar entregador</Text>
+            </Pressable>
+          }
+          renderItem={({ item }) => (
+            <DelivererManageRow
+              deliverer={item}
+              onEdit={() => openEditDeliverer(item)}
+              onDelete={() => deleteDeliverer(item.id)}
+            />
           )}
         />
       )}
 
       <ToolFormModal
-        visible={showForm}
-        tool={editing}
+        visible={showToolForm}
+        tool={editingTool}
         companyId={companyId}
-        onClose={() => setShowForm(false)}
+        onClose={() => setShowToolForm(false)}
         onSave={(t) => {
           if ("id" in t && t.id) updateTool(t as Tool);
           else addTool(t);
-          setShowForm(false);
+          setShowToolForm(false);
+        }}
+      />
+
+      <DelivererFormModal
+        visible={showDelivererForm}
+        deliverer={editingDeliverer}
+        onClose={() => setShowDelivererForm(false)}
+        onSave={async (d) => {
+          if (editingDeliverer) {
+            await updateDeliverer(editingDeliverer.id, d);
+          } else {
+            await addDeliverer(d);
+          }
+          setShowDelivererForm(false);
         }}
       />
     </ScreenContainer>
@@ -151,8 +229,33 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
   );
 }
 
-function RequestCard({ rental, onStatus }: { rental: Rental; onStatus: (s: Rental["status"]) => void }) {
+const STATUS_LABEL_BACK: Record<string, string> = {
+  awaiting_payment: "Aguardando pag.",
+  pending: "Aguardando entrega",
+  accepted: "Aceito",
+  rejected: "Recusado",
+  delivering: "Em entrega",
+  delivered: "Entregue (Em uso)",
+  active: "Em andamento",
+  completed: "Concluído",
+  cancelled: "Cancelado",
+};
+
+const STATUS_COLOR_BACK: Record<string, string> = {
+  awaiting_payment: "#3B82F6",
+  pending: "#F59E0B",
+  accepted: "#3B82F6",
+  rejected: "#EF4444",
+  delivering: "#F97316",
+  delivered: "#22C55E",
+  active: "#22C55E",
+  completed: "#64748B",
+  cancelled: "#6B7280",
+};
+
+function RequestCard({ rental }: { rental: Rental }) {
   const colors = useColors();
+
   return (
     <View style={{ padding: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
       <View style={{ flexDirection: "row", gap: 12 }}>
@@ -161,43 +264,32 @@ function RequestCard({ rental, onStatus }: { rental: Rental; onStatus: (s: Renta
           <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
             {rental.toolName}
           </Text>
-          <Text style={{ fontSize: 12, color: colors.muted }}>{rental.customerName}</Text>
+          <Text style={{ fontSize: 12, color: colors.muted }}>Cliente: {rental.customerName}</Text>
           <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
             R$ {rental.totalPrice.toFixed(2)} · {rental.days}d
           </Text>
         </View>
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 8,
+            backgroundColor: (STATUS_COLOR_BACK[rental.status] || colors.muted) + "15",
+            alignSelf: "flex-start",
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "700", color: STATUS_COLOR_BACK[rental.status] || colors.muted }}>
+            {STATUS_LABEL_BACK[rental.status] || rental.status}
+          </Text>
+        </View>
       </View>
 
-      {rental.status === "pending" && (
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable
-            onPress={() => onStatus("accepted")}
-            style={({ pressed }) => [{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: colors.success, opacity: pressed ? 0.85 : 1 }]}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Aceitar</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => onStatus("rejected")}
-            style={({ pressed }) => [{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: colors.error, opacity: pressed ? 0.85 : 1 }]}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Recusar</Text>
-          </Pressable>
+      {/* Show Rental Countdown Timer if rental is delivered and active */}
+      {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active") && (
+        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, gap: 4 }}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Tempo Restante:</Text>
+          <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
         </View>
-      )}
-
-      {rental.status === "accepted" && (
-        <Pressable
-          onPress={() => onStatus("active")}
-          style={({ pressed }) => [{ paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
-        >
-          <Text style={{ color: "#fff", fontWeight: "700" }}>Iniciar serviço</Text>
-        </Pressable>
-      )}
-
-      {(rental.status === "active" || rental.status === "completed" || rental.status === "rejected") && (
-        <Text style={{ fontSize: 12, color: colors.muted }}>
-          Status: {rental.status === "active" ? "Em andamento" : rental.status === "completed" ? "Concluído" : "Recusado"}
-        </Text>
       )}
     </View>
   );
@@ -213,6 +305,41 @@ function ToolManageRow({ tool, onEdit, onDelete }: { tool: Tool; onEdit: () => v
         <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
           R$ {tool.pricePerDay}/dia · Qtd: {tool.quantity ?? 1}
         </Text>
+      </View>
+      <Pressable onPress={onEdit} style={({ pressed }) => [{ padding: 8, opacity: pressed ? 0.6 : 1 }]}>
+        <IconSymbol name="pencil" size={20} color={colors.muted} />
+      </Pressable>
+      <Pressable onPress={onDelete} style={({ pressed }) => [{ padding: 8, opacity: pressed ? 0.6 : 1 }]}>
+        <IconSymbol name="trash" size={20} color={colors.error} />
+      </Pressable>
+    </View>
+  );
+}
+
+function DelivererManageRow({
+  deliverer,
+  onEdit,
+  onDelete,
+}: {
+  deliverer: Deliverer;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <View style={{ flexDirection: "row", gap: 12, padding: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + "15", alignItems: "center", justifyContent: "center" }}>
+        <IconSymbol name="person.fill" size={20} color={colors.primary} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{deliverer.name}</Text>
+        <Text style={{ fontSize: 12, color: colors.muted }}>{deliverer.email} · {deliverer.phone}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: deliverer.active ? colors.success : colors.muted }} />
+          <Text style={{ fontSize: 11, fontWeight: "600", color: deliverer.active ? colors.success : colors.muted }}>
+            {deliverer.active ? "Ativo" : "Inativo"}
+          </Text>
+        </View>
       </View>
       <Pressable onPress={onEdit} style={({ pressed }) => [{ padding: 8, opacity: pressed ? 0.6 : 1 }]}>
         <IconSymbol name="pencil" size={20} color={colors.muted} />
@@ -388,9 +515,139 @@ function ToolFormModal({
   );
 }
 
+function DelivererFormModal({
+  visible,
+  deliverer,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  deliverer: Deliverer | null;
+  onClose: () => void;
+  onSave: (d: { name: string; email: string; phone: string; password?: string; active?: boolean }) => Promise<void>;
+}) {
+  const colors = useColors();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [active, setActive] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  useMemo(() => {
+    if (visible) {
+      setName(deliverer?.name ?? "");
+      setEmail(deliverer?.email ?? "");
+      setPhone(deliverer?.phone ?? "");
+      setPassword("");
+      setActive(deliverer ? deliverer.active : true);
+    }
+  }, [visible, deliverer]);
+
+  const handlePhoneChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 11);
+
+    let formatted = limited;
+    if (limited.length > 6) {
+      formatted = `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    } else if (limited.length > 2) {
+      formatted = `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    }
+    setPhone(formatted);
+  };
+
+  const save = async () => {
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      alert("Por favor, preencha todos os campos obrigatórios.");
+      return;
+    }
+    if (!deliverer && !password.trim()) {
+      alert("A senha de acesso temporária é obrigatória para novos entregadores.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password ? password : undefined,
+        active,
+      });
+      onClose();
+    } catch (e) {
+      // Already handled or logged
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "88%" }}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground, marginBottom: 16 }}>
+              {deliverer ? "Editar entregador" : "Adicionar entregador"}
+            </Text>
+
+            <Field label="Nome Completo *" value={name} onChangeText={setName} placeholder="Nome do entregador" />
+            <Field label="E-mail *" value={email} onChangeText={setEmail} placeholder="exemplo@entregador.com" keyboardType="default" />
+            <Field label="Telefone *" value={phone} onChangeText={handlePhoneChange} placeholder="(11) 99999-9999" keyboardType="numeric" />
+            
+            {!deliverer && (
+              <Field label="Senha Temporária *" value={password} onChangeText={setPassword} placeholder="Mínimo 6 caracteres" secureTextEntry />
+            )}
+
+            {deliverer && (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: 4 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>Conta Ativa</Text>
+                <Pressable
+                  onPress={() => setActive(!active)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    backgroundColor: active ? colors.success + "15" : colors.border,
+                  }}
+                >
+                  <Text style={{ color: active ? colors.success : colors.foreground, fontWeight: "700" }}>
+                    {active ? "Sim" : "Não"}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              <Pressable
+                onPress={onClose}
+                disabled={loading}
+                style={({ pressed }) => [{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Text style={{ color: colors.foreground, fontWeight: "700" }}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={save}
+                disabled={loading}
+                style={({ pressed }) => [{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: colors.primary, opacity: pressed || loading ? 0.85 : 1 }]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>
+                  {loading ? "Salvando..." : deliverer ? "Salvar" : "Adicionar"}
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function Field({
   label,
   multiline,
+  secureTextEntry,
   ...props
 }: {
   label: string;
@@ -399,6 +656,7 @@ function Field({
   placeholder?: string;
   keyboardType?: "default" | "numeric";
   multiline?: boolean;
+  secureTextEntry?: boolean;
 }) {
   const colors = useColors();
   return (
@@ -406,6 +664,7 @@ function Field({
       <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{label}</Text>
       <TextInput
         {...props}
+        secureTextEntry={secureTextEntry}
         placeholderTextColor={colors.muted}
         multiline={multiline}
         style={{
