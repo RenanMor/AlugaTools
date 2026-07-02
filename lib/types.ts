@@ -41,9 +41,11 @@ export interface Company {
 }
 
 export interface CartItem {
+  id: string;
   tool: Tool;
   companyName: string;
   days: number;
+  quantity: number;
 }
 
 export interface Deliverer {

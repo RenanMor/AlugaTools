@@ -2,12 +2,12 @@ create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,
   name text not null,
   email text not null unique,
-  profile text not null check (profile in ('customer', 'company')),
+  profile text not null check (profile in ('customer', 'company', 'deliverer')),
   cpf text unique,
   cnpj text unique,
   phone text not null,
   password text not null,
-  role text not null default 'user' check (role in ('user', 'admin', 'owner')),
+  role text not null default 'user' check (role in ('user', 'admin', 'owner', 'deliverer')),
   created_at timestamptz not null default now()
 );
 
@@ -114,5 +114,53 @@ create policy "rentals_company_update" on public.rentals
     exists (
       select 1 from public.companies c
       where c.id = rentals.company_id and c.owner_id = auth.uid()
+    )
+  );
+
+-- Deliverers table and security policies
+create table if not exists public.deliverers (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies (id) on delete cascade,
+  user_id uuid references public.users (id) on delete cascade,
+  name text not null,
+  email text not null,
+  phone text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.deliverers enable row level security;
+
+create policy "deliverers_select" on public.deliverers
+  for select using (
+    exists (
+      select 1 from public.companies c
+      where c.id = deliverers.company_id and c.owner_id = auth.uid()
+    )
+    or
+    auth.uid() = user_id
+  );
+
+create policy "deliverers_insert" on public.deliverers
+  for insert with check (
+    exists (
+      select 1 from public.companies c
+      where c.id = company_id and c.owner_id = auth.uid()
+    )
+  );
+
+create policy "deliverers_update" on public.deliverers
+  for update using (
+    exists (
+      select 1 from public.companies c
+      where c.id = deliverers.company_id and c.owner_id = auth.uid()
+    )
+  );
+
+create policy "deliverers_delete" on public.deliverers
+  for delete using (
+    exists (
+      select 1 from public.companies c
+      where c.id = deliverers.company_id and c.owner_id = auth.uid()
     )
   );

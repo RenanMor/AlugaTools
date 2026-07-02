@@ -152,18 +152,31 @@ export default function CheckoutScreen() {
       // 2. Create the rentals in awaiting_payment (only once!)
       let rentalsToPay = createdRentals;
       if (!rentalsToPay) {
+        // Flatten cartSnapshot by quantity
+        const flatItems: { tool: Tool; days: number; companyId: string }[] = [];
+        cartSnapshot.forEach((item) => {
+          const qty = item.quantity || 1;
+          for (let i = 0; i < qty; i++) {
+            flatItems.push({
+              tool: item.tool,
+              days: item.days,
+              companyId: item.tool.companyId,
+            });
+          }
+        });
+
         rentalsToPay = await Promise.all(
-          cartSnapshot.map((item) =>
+          flatItems.map((item) =>
             createRental({
               toolId: item.tool.id,
-              companyId: item.tool.companyId,
+              companyId: item.companyId,
               days: item.days,
-              totalPrice: item.tool.pricePerDay * item.days + selectedShipping.price / cartSnapshot.length - discountAmount / cartSnapshot.length,
+              totalPrice: item.tool.pricePerDay * item.days + selectedShipping.price / flatItems.length - discountAmount / flatItems.length,
               paymentMethod,
-              shippingPrice: selectedShipping.price / cartSnapshot.length,
+              shippingPrice: selectedShipping.price / flatItems.length,
               address,
               couponCode: appliedCoupon || undefined,
-              couponDiscount: discountAmount / cartSnapshot.length,
+              couponDiscount: discountAmount / flatItems.length,
             })
           )
         );
@@ -232,11 +245,11 @@ export default function CheckoutScreen() {
           <View style={{ gap: 8 }}>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Resumo das Ferramentas</Text>
             {cartSnapshot.map((item) => (
-              <View key={item.tool.id} style={{ flexDirection: "row", gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              <View key={item.id || item.tool.id} style={{ flexDirection: "row", gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
                 <Image source={{ uri: item.tool.image }} style={{ width: 50, height: 50, borderRadius: 8, backgroundColor: colors.border }} />
                 <View style={{ flex: 1, justifyContent: "center" }}>
                   <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{item.tool.name}</Text>
-                  <Text style={{ fontSize: 12, color: colors.muted }}>{item.days} {item.days > 1 ? "dias" : "dia"} · R$ {item.tool.pricePerDay * item.days}</Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>{item.quantity || 1} un. · {item.days} {item.days > 1 ? "dias" : "dia"} · R$ {((item.tool.pricePerDay * item.days) * (item.quantity || 1)).toFixed(2)}</Text>
                 </View>
               </View>
             ))}

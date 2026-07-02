@@ -25,7 +25,7 @@ export default function ToolScreen() {
 
   const handleAdd = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (!inCart) addToCart(tool, company.name);
+    addToCart(tool, company.name);
     router.push("/cart");
   };
 
@@ -91,7 +91,7 @@ export default function ToolScreen() {
               : tool.quantity <= 0 || !tool.available
               ? "Sem estoque disponível"
               : inCart
-              ? "Ir para o carrinho"
+              ? "Adicionar outro ao carrinho"
               : "Adicionar ao carrinho"}
           </Text>
         </Pressable>

@@ -29,8 +29,9 @@ interface AppState {
   deliverers: Deliverer[];
   user: SessionUser | null;
   addToCart: (tool: Tool, companyName: string) => void;
-  removeFromCart: (toolId: string) => void;
-  updateCartDays: (toolId: string, days: number) => void;
+  removeFromCart: (cartItemId: string) => void;
+  updateCartDays: (cartItemId: string, days: number) => void;
+  updateCartQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
   login: (
     email: string,
@@ -78,7 +79,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed.cart) setCart(parsed.cart);
+          if (parsed.cart) {
+            const sanitized = parsed.cart.map((item: any) => ({
+              ...item,
+              id: item.id || Math.random().toString(36).substring(2, 9),
+              quantity: item.quantity || 1,
+            }));
+            setCart(sanitized);
+          }
           if (parsed.user) setUser(parsed.user);
         }
       } catch (err) {
@@ -158,17 +166,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Cart operations
   const addToCart = useCallback((tool: Tool, companyName: string) => {
     setCart((prev) => {
-      if (prev.some((i) => i.tool.id === tool.id)) return prev;
-      return [...prev, { tool, companyName, days: 1 }];
+      const newItem: CartItem = {
+        id: Math.random().toString(36).substring(2, 9),
+        tool,
+        companyName,
+        days: 1,
+        quantity: 1,
+      };
+      return [...prev, newItem];
     });
   }, []);
 
-  const removeFromCart = useCallback((toolId: string) => {
-    setCart((prev) => prev.filter((i) => i.tool.id !== toolId));
+  const removeFromCart = useCallback((cartItemId: string) => {
+    setCart((prev) => prev.filter((i) => !(i.id === cartItemId || (!i.id && i.tool.id === cartItemId))));
   }, []);
 
-  const updateCartDays = useCallback((toolId: string, days: number) => {
-    setCart((prev) => prev.map((i) => (i.tool.id === toolId ? { ...i, days: Math.max(1, days) } : i)));
+  const updateCartDays = useCallback((cartItemId: string, days: number) => {
+    setCart((prev) => prev.map((i) => {
+      const match = i.id === cartItemId || (!i.id && i.tool.id === cartItemId);
+      return match ? { ...i, days: Math.max(1, days) } : i;
+    }));
+  }, []);
+
+  const updateCartQuantity = useCallback((cartItemId: string, quantity: number) => {
+    setCart((prev) => prev.map((i) => {
+      const match = i.id === cartItemId || (!i.id && i.tool.id === cartItemId);
+      return match ? { ...i, quantity: Math.max(1, quantity) } : i;
+    }));
   }, []);
 
   const clearCart = useCallback(() => setCart([]), []);
@@ -359,7 +383,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [loadDeliverers]);
 
   const cartTotal = useMemo(
-    () => cart.reduce((sum, i) => sum + i.tool.pricePerDay * i.days, 0),
+    () => cart.reduce((sum, i) => sum + i.tool.pricePerDay * i.days * (i.quantity || 1), 0),
     [cart],
   );
 
@@ -374,6 +398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addToCart,
       removeFromCart,
       updateCartDays,
+      updateCartQuantity,
       clearCart,
       login,
       logout,
@@ -401,6 +426,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addToCart,
       removeFromCart,
       updateCartDays,
+      updateCartQuantity,
       clearCart,
       login,
       logout,

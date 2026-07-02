@@ -9,7 +9,7 @@ import { CartItem } from "@/lib/types";
 
 export default function CartScreen() {
   const colors = useColors();
-  const { cart, cartTotal, removeFromCart, updateCartDays, user, checkout } = useApp();
+  const { cart, cartTotal, removeFromCart, updateCartDays, updateCartQuantity, user, checkout } = useApp();
 
   const handleCheckout = async () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -28,7 +28,7 @@ export default function CartScreen() {
 
       <FlatList
         data={cart}
-        keyExtractor={(item) => item.tool.id}
+        keyExtractor={(item) => item.id || item.tool.id}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         contentContainerStyle={{ paddingBottom: 16, flexGrow: 1 }}
         ListEmptyComponent={
@@ -53,7 +53,12 @@ export default function CartScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <CartRow item={item} onRemove={removeFromCart} onDays={updateCartDays} />
+          <CartRow
+            item={item}
+            onRemove={removeFromCart}
+            onDays={updateCartDays}
+            onQuantity={updateCartQuantity}
+          />
         )}
       />
 
@@ -91,10 +96,12 @@ function CartRow({
   item,
   onRemove,
   onDays,
+  onQuantity,
 }: {
   item: CartItem;
   onRemove: (id: string) => void;
   onDays: (id: string, days: number) => void;
+  onQuantity: (id: string, quantity: number) => void;
 }) {
   const colors = useColors();
   return (
@@ -110,27 +117,54 @@ function CartRow({
       }}
     >
       <Image source={{ uri: item.tool.image }} style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: colors.border }} />
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-          {item.tool.name}
-        </Text>
-        <Text style={{ fontSize: 12, color: colors.muted }}>{item.companyName}</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Stepper onPress={() => onDays(item.tool.id, item.days - 1)} label="−" />
-            <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 56, textAlign: "center" }}>
-              {item.days} {item.days > 1 ? "dias" : "dia"}
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+              {item.tool.name}
             </Text>
-            <Stepper onPress={() => onDays(item.tool.id, item.days + 1)} label="+" />
+            <Text style={{ fontSize: 12, color: colors.muted }}>{item.companyName}</Text>
           </View>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
-            R$ {(item.tool.pricePerDay * item.days).toFixed(0)}
+          <Pressable onPress={() => onRemove(item.id)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+            <IconSymbol name="trash" size={20} color={colors.error} />
+          </Pressable>
+        </View>
+
+        <View style={{ gap: 6 }}>
+          {/* Renting Days Stepper */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 12, color: colors.muted }}>Tempo aluguel:</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Stepper onPress={() => onDays(item.id, item.days - 1)} label="−" />
+              <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 50, textAlign: "center", fontSize: 13 }}>
+                {item.days} {item.days > 1 ? "dias" : "dia"}
+              </Text>
+              <Stepper onPress={() => onDays(item.id, item.days + 1)} label="+" />
+            </View>
+          </View>
+
+          {/* Item Quantity Stepper */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 12, color: colors.muted }}>Quant. itens:</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Stepper onPress={() => onQuantity(item.id, (item.quantity || 1) - 1)} label="−" />
+              <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 50, textAlign: "center", fontSize: 13 }}>
+                {item.quantity || 1} un.
+              </Text>
+              <Stepper onPress={() => onQuantity(item.id, (item.quantity || 1) + 1)} label="+" />
+            </View>
+          </View>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 2 }} />
+
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ fontSize: 12, color: colors.muted }}>Subtotal:</Text>
+          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary }}>
+            R$ {((item.tool.pricePerDay * item.days) * (item.quantity || 1)).toFixed(2)}
           </Text>
         </View>
       </View>
-      <Pressable onPress={() => onRemove(item.tool.id)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-        <IconSymbol name="trash" size={20} color={colors.error} />
-      </Pressable>
     </View>
   );
 }
