@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useEffect } from "react";
 import { FlatList, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -10,7 +11,13 @@ import { Company } from "@/lib/types";
 
 export default function HomeScreen() {
   const colors = useColors();
-  const { companies } = useApp();
+  const { companies, user } = useApp();
+
+  useEffect(() => {
+    if (user?.profile === "deliverer") {
+      router.replace("/orders");
+    }
+  }, [user]);
 
   return (
     <ScreenContainer>

@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { FlatList, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -10,7 +10,13 @@ import { Tool } from "@/lib/types";
 
 export default function SearchScreen() {
   const colors = useColors();
-  const { tools, companies } = useApp();
+  const { tools, companies, user } = useApp();
+
+  useEffect(() => {
+    if (user?.profile === "deliverer") {
+      router.replace("/orders");
+    }
+  }, [user]);
   const params = useLocalSearchParams<{ category?: string }>();
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(params.category ?? null);

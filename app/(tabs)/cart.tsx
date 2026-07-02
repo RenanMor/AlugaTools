@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { useEffect } from "react";
 import { FlatList, Image, Platform, Pressable, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -10,6 +11,12 @@ import { CartItem } from "@/lib/types";
 export default function CartScreen() {
   const colors = useColors();
   const { cart, cartTotal, removeFromCart, updateCartDays, updateCartQuantity, user, checkout } = useApp();
+
+  useEffect(() => {
+    if (user?.profile === "deliverer") {
+      router.replace("/orders");
+    }
+  }, [user]);
 
   const handleCheckout = async () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

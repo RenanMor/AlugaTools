@@ -41,7 +41,7 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 13, color: colors.muted }}>{user.email}</Text>
               <View style={{ alignSelf: "flex-start", marginTop: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, backgroundColor: colors.primary + "22" }}>
                 <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>
-                  {user.profile === "company" ? "Empresa" : "Cliente"}
+                  {user.profile === "company" ? "Empresa" : user.profile === "deliverer" ? "Entregador" : "Cliente"}
                 </Text>
               </View>
             </View>
