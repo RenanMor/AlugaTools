@@ -306,9 +306,11 @@ export default function AuthScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
         <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
-          <Segment label="Cliente" active={profile === "customer"} onPress={() => { setProfile("customer"); setMode("login"); }} />
-          <Segment label="Empresa" active={profile === "company"} onPress={() => { setProfile("company"); setMode("login"); }} />
-          <Segment label="Entregador" active={profile === "deliverer"} onPress={() => { setProfile("deliverer"); setMode("login"); }} />
+          <Segment label="Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
+          <Segment label="Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+          {mode === "login" && (
+            <Segment label="Entregador" active={profile === "deliverer"} onPress={() => { setProfile("deliverer"); setMode("login"); }} />
+          )}
         </View>
 
         <View style={{ gap: 14, marginTop: 22 }}>
@@ -372,7 +374,13 @@ export default function AuthScreen() {
 
         {profile !== "deliverer" && (
           <Pressable
-            onPress={() => setMode(mode === "login" ? "register" : "login")}
+            onPress={() => {
+              const newMode = mode === "login" ? "register" : "login";
+              setMode(newMode);
+              if (newMode === "register" && profile === "deliverer") {
+                setProfile("customer");
+              }
+            }}
             style={({ pressed }) => [{ marginTop: 18, alignItems: "center", opacity: pressed ? 0.6 : 1 }]}
           >
             <Text style={{ color: colors.muted, fontSize: 14 }}>

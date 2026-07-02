@@ -34,6 +34,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { cart, user } = useApp();
   const isCompany = user?.profile === "company";
+  const isDeliverer = user?.profile === "deliverer";
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
@@ -58,6 +59,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Início",
+          href: (isDeliverer ? null : "/") as any,
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
         }}
       />
@@ -65,6 +67,7 @@ export default function TabLayout() {
         name="search"
         options={{
           title: "Buscar",
+          href: (isDeliverer ? null : "/search") as any,
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="magnifyingglass" color={color} />,
         }}
       />
@@ -72,7 +75,7 @@ export default function TabLayout() {
         name="stats"
         options={{
           title: "Controle",
-          href: (isCompany ? "/stats" : null) as any,
+          href: (isCompany && !isDeliverer ? "/stats" : null) as any,
           tabBarIcon: ({ color, focused }) => (
             <View
               style={{
@@ -99,7 +102,7 @@ export default function TabLayout() {
         name="cart"
         options={{
           title: "Carrinho",
-          href: (isCompany ? null : "/cart") as any,
+          href: (isCompany || isDeliverer ? null : "/cart") as any,
           tabBarIcon: ({ color }) => (
             <View>
               <IconSymbol size={26} name="cart.fill" color={color} />
@@ -120,7 +123,7 @@ export default function TabLayout() {
         name="dashboard"
         options={{
           title: "Painel",
-          href: (isCompany ? "/dashboard" : null) as any,
+          href: (isCompany && !isDeliverer ? "/dashboard" : null) as any,
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="building.2.fill" color={color} />,
         }}
       />
