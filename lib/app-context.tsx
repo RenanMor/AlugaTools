@@ -166,11 +166,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Cart operations
   const addToCart = useCallback((tool: Tool, companyName: string) => {
     setCart((prev) => {
+      const initialDays = Math.max(1, tool.minDays || 1);
       const newItem: CartItem = {
         id: Math.random().toString(36).substring(2, 9),
         tool,
         companyName,
-        days: 1,
+        days: initialDays,
         quantity: 1,
       };
       return [...prev, newItem];
@@ -184,14 +185,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateCartDays = useCallback((cartItemId: string, days: number) => {
     setCart((prev) => prev.map((i) => {
       const match = i.id === cartItemId || (!i.id && i.tool.id === cartItemId);
-      return match ? { ...i, days: Math.max(1, days) } : i;
+      if (!match) return i;
+      const minD = i.tool.minDays || 1;
+      const maxD = i.tool.maxDays || 30;
+      return { ...i, days: Math.min(maxD, Math.max(minD, days)) };
     }));
   }, []);
 
   const updateCartQuantity = useCallback((cartItemId: string, quantity: number) => {
     setCart((prev) => prev.map((i) => {
       const match = i.id === cartItemId || (!i.id && i.tool.id === cartItemId);
-      return match ? { ...i, quantity: Math.max(1, quantity) } : i;
+      if (!match) return i;
+      const maxQty = i.tool.quantity || 1;
+      return { ...i, quantity: Math.min(maxQty, Math.max(1, quantity)) };
     }));
   }, []);
 

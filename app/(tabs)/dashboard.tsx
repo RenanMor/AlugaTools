@@ -305,6 +305,9 @@ function ToolManageRow({ tool, onEdit, onDelete }: { tool: Tool; onEdit: () => v
         <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
           R$ {tool.pricePerDay}/dia · Qtd: {tool.quantity ?? 1}
         </Text>
+        <Text style={{ fontSize: 11, color: colors.muted }}>
+          Aluguel: {tool.minDays ?? 1} a {tool.maxDays ?? 30} dias
+        </Text>
       </View>
       <Pressable onPress={onEdit} style={({ pressed }) => [{ padding: 8, opacity: pressed ? 0.6 : 1 }]}>
         <IconSymbol name="pencil" size={20} color={colors.muted} />
@@ -370,6 +373,8 @@ function ToolFormModal({
   const [price, setPrice] = useState("");
   const [image, setImage] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [minDays, setMinDays] = useState("1");
+  const [maxDays, setMaxDays] = useState("30");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   useMemo(() => {
@@ -384,11 +389,15 @@ function ToolFormModal({
         setSelectedCategories([CATEGORIES[0].id]);
       }
       setQuantity(tool ? String(tool.quantity ?? 1) : "1");
+      setMinDays(tool ? String(tool.minDays ?? 1) : "1");
+      setMaxDays(tool ? String(tool.maxDays ?? 30) : "30");
     }
   }, [visible, tool]);
 
   const save = () => {
-    const parsedQty = Number(quantity) || 1;
+    const parsedQty = Math.max(1, Number(quantity) || 1);
+    const parsedMin = Math.max(1, Number(minDays) || 1);
+    const parsedMax = Math.max(parsedMin, Number(maxDays) || 30);
     let cleanImage = image.trim();
     if (cleanImage && !/^https?:\/\//i.test(cleanImage)) {
       cleanImage = `https://${cleanImage}`;
@@ -402,6 +411,8 @@ function ToolFormModal({
       pricePerDay: Number(price) || 0,
       quantity: parsedQty,
       available: parsedQty > 0,
+      minDays: parsedMin,
+      maxDays: parsedMax,
     };
     if (tool) onSave({ ...base, id: tool.id });
     else onSave(base);
@@ -424,7 +435,16 @@ function ToolFormModal({
                 <Field label="Preço por dia (R$)" value={price} onChangeText={setPrice} placeholder="35" keyboardType="numeric" />
               </View>
               <View style={{ flex: 1 }}>
-                <Field label="Quantidade" value={quantity} onChangeText={setQuantity} placeholder="1" keyboardType="numeric" />
+                <Field label="Quantidade disponível" value={quantity} onChangeText={setQuantity} placeholder="1" keyboardType="numeric" />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Field label="Mínimo de dias" value={minDays} onChangeText={setMinDays} placeholder="1" keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Máximo de dias" value={maxDays} onChangeText={setMaxDays} placeholder="30" keyboardType="numeric" />
               </View>
             </View>
 

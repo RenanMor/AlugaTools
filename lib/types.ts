@@ -27,6 +27,8 @@ export interface Tool {
   pricePerDay: number;
   available: boolean;
   quantity: number;
+  minDays: number;
+  maxDays: number;
 }
 
 export interface Company {

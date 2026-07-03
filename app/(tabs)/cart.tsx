@@ -111,6 +111,12 @@ function CartRow({
   onQuantity: (id: string, quantity: number) => void;
 }) {
   const colors = useColors();
+  const minD = item.tool.minDays || 1;
+  const maxD = item.tool.maxDays || 30;
+  const maxQty = item.tool.quantity || 1;
+  const currentDays = item.days;
+  const currentQty = item.quantity || 1;
+
   return (
     <View
       style={{
@@ -140,25 +146,47 @@ function CartRow({
         <View style={{ gap: 6 }}>
           {/* Renting Days Stepper */}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>Tempo aluguel:</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>
+              Tempo aluguel:{" "}
+              <Text style={{ fontSize: 11, color: colors.muted }}>({minD}–{maxD} dias)</Text>
+            </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Stepper onPress={() => onDays(item.id, item.days - 1)} label="−" />
+              <Stepper
+                onPress={() => onDays(item.id, currentDays - 1)}
+                label="−"
+                disabled={currentDays <= minD}
+              />
               <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 50, textAlign: "center", fontSize: 13 }}>
-                {item.days} {item.days > 1 ? "dias" : "dia"}
+                {currentDays} {currentDays > 1 ? "dias" : "dia"}
               </Text>
-              <Stepper onPress={() => onDays(item.id, item.days + 1)} label="+" />
+              <Stepper
+                onPress={() => onDays(item.id, currentDays + 1)}
+                label="+"
+                disabled={currentDays >= maxD}
+              />
             </View>
           </View>
 
           {/* Item Quantity Stepper */}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>Quant. itens:</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>
+              Quant. itens:{" "}
+              <Text style={{ fontSize: 11, color: colors.muted }}>(máx. {maxQty})</Text>
+            </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Stepper onPress={() => onQuantity(item.id, (item.quantity || 1) - 1)} label="−" />
+              <Stepper
+                onPress={() => onQuantity(item.id, currentQty - 1)}
+                label="−"
+                disabled={currentQty <= 1}
+              />
               <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 50, textAlign: "center", fontSize: 13 }}>
-                {item.quantity || 1} un.
+                {currentQty} un.
               </Text>
-              <Stepper onPress={() => onQuantity(item.id, (item.quantity || 1) + 1)} label="+" />
+              <Stepper
+                onPress={() => onQuantity(item.id, currentQty + 1)}
+                label="+"
+                disabled={currentQty >= maxQty}
+              />
             </View>
           </View>
         </View>
@@ -168,7 +196,7 @@ function CartRow({
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={{ fontSize: 12, color: colors.muted }}>Subtotal:</Text>
           <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary }}>
-            R$ {((item.tool.pricePerDay * item.days) * (item.quantity || 1)).toFixed(2)}
+            R$ {((item.tool.pricePerDay * currentDays) * currentQty).toFixed(2)}
           </Text>
         </View>
       </View>
@@ -176,26 +204,26 @@ function CartRow({
   );
 }
 
-function Stepper({ label, onPress }: { label: string; onPress: () => void }) {
+function Stepper({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
   const colors = useColors();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
       style={({ pressed }) => [
         {
           width: 28,
           height: 28,
           borderRadius: 8,
-          backgroundColor: colors.background,
+          backgroundColor: disabled ? colors.border : colors.background,
           borderWidth: 1,
           borderColor: colors.border,
           alignItems: "center",
           justifyContent: "center",
-          opacity: pressed ? 0.6 : 1,
+          opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
         },
       ]}
     >
-      <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "700" }}>{label}</Text>
+      <Text style={{ color: disabled ? colors.muted : colors.foreground, fontSize: 18, fontWeight: "700" }}>{label}</Text>
     </Pressable>
   );
 }

@@ -10,13 +10,17 @@ export interface Tool {
   price_per_day: number;
   available: boolean;
   quantity: number;
+  min_days: number;
+  max_days: number;
 }
 
 function mapRow(row: any): Tool {
   if (!row) return row;
   return {
     ...row,
-    image: row.image || row.image_url || ""
+    image: row.image || row.image_url || "",
+    min_days: row.min_days ?? 1,
+    max_days: row.max_days ?? 30,
   };
 }
 
@@ -33,7 +37,7 @@ async function getToolColumns(): Promise<string[]> {
   } catch (err) {
     console.error("[getToolColumns] Error fetching columns:", err);
   }
-  return ["id", "company_id", "name", "description", "category_id", "image", "price_per_day", "available", "quantity"];
+  return ["id", "company_id", "name", "description", "category_id", "image", "price_per_day", "available", "quantity", "min_days", "max_days"];
 }
 
 async function resolveImageUrl(url: string): Promise<string> {

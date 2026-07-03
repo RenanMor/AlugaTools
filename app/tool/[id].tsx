@@ -64,6 +64,22 @@ export default function ToolScreen() {
             </Text>
           </View>
 
+          {tool.quantity > 0 && tool.available && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              <IconSymbol name="calendar" size={15} color={colors.muted} />
+              <Text style={{ fontSize: 13, color: colors.muted }}>
+                Aluguel:{" "}
+                <Text style={{ fontWeight: "700", color: colors.foreground }}>
+                  mín. {tool.minDays ?? 1} dia{(tool.minDays ?? 1) > 1 ? "s" : ""}
+                </Text>
+                {" · "}
+                <Text style={{ fontWeight: "700", color: colors.foreground }}>
+                  máx. {tool.maxDays ?? 30} dias
+                </Text>
+              </Text>
+            </View>
+          )}
+
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
 
           <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Descrição</Text>

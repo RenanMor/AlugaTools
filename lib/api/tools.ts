@@ -12,6 +12,8 @@ export function mapTool(data: any): Tool {
     pricePerDay: Number(data.price_per_day) || 0,
     available: !!data.available,
     quantity: Number(data.quantity) || 1,
+    minDays: Number(data.min_days) || 1,
+    maxDays: Number(data.max_days) || 30,
   };
 }
 
@@ -25,6 +27,8 @@ export function mapToolToDb(tool: Partial<Tool>): any {
   if (tool.pricePerDay !== undefined) data.price_per_day = tool.pricePerDay;
   if (tool.available !== undefined) data.available = tool.available;
   if (tool.quantity !== undefined) data.quantity = tool.quantity;
+  if (tool.minDays !== undefined) data.min_days = tool.minDays;
+  if (tool.maxDays !== undefined) data.max_days = tool.maxDays;
   return data;
 }
 
