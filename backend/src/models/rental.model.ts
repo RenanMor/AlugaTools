@@ -56,6 +56,7 @@ export const RentalModel = {
       .single();
 
     if (toolFetchError) {
+      console.error("[RentalModel.create] Tool fetch error:", toolFetchError);
       throw new Error("Ferramenta não encontrada");
     }
 
@@ -63,7 +64,8 @@ export const RentalModel = {
       throw new Error("Ferramenta sem estoque disponível");
     }
 
-    const newQuantity = Math.max(0, (toolData.quantity || 1) - 1);
+    const originalQuantity = toolData.quantity || 1;
+    const newQuantity = Math.max(0, originalQuantity - 1);
     const isAvailable = newQuantity > 0;
     await supabaseAdmin
       .from("tools")
@@ -87,12 +89,25 @@ export const RentalModel = {
       expires_at: rental.expires_at || null,
     };
 
+    console.log("[RentalModel.create] Inserting rental:", JSON.stringify(insertData));
+
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .insert(insertData)
       .select(SELECT_FIELDS)
       .single();
-    if (error) throw new Error(error.message);
+
+    if (error) {
+      // ROLLBACK: restore stock so quantity is never consumed without a rental
+      console.error("[RentalModel.create] INSERT failed — rolling back stock. Error:", error);
+      await supabaseAdmin
+        .from("tools")
+        .update({ quantity: originalQuantity, available: true })
+        .eq("id", rental.tool_id);
+      throw new Error(`Erro ao criar pedido: ${error.message} (code: ${error.code})`);
+    }
+
+    console.log("[RentalModel.create] Rental created successfully:", data?.id);
     return data as Rental;
   },
 

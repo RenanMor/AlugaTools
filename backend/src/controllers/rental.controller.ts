@@ -47,6 +47,7 @@ export const RentalController = {
 
       res.status(201).json({ data: rental });
     } catch (err) {
+      console.error("[RentalController.create] Error:", err);
       next(err);
     }
   },

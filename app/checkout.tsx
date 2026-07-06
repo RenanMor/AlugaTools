@@ -116,12 +116,12 @@ export default function CheckoutScreen() {
       return;
     }
 
-    if (cep.length !== 8) {
+    if (paymentMethod !== "PIX" && cep.length !== 8) {
       Alert.alert("Erro", "O CEP informado deve conter 8 dígitos.");
       return;
     }
 
-    if (!number.trim()) {
+    if (paymentMethod !== "PIX" && !number.trim()) {
       Alert.alert("Erro", "O número da residência é obrigatório.");
       return;
     }
