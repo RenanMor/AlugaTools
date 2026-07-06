@@ -28,7 +28,7 @@ export interface PagBankAddress {
   complement?: string;
   locality: string; // bairro
   city: string;
-  region: string; // UF
+  region?: string; // UF
   region_code: string; // UF 2 chars
   country: string; // "BRA"
   postal_code: string; // CEP sem hífen
@@ -92,6 +92,19 @@ const pagbankApi = axios.create({
   },
 });
 
+function cleanAddress(addr: PagBankAddress) {
+  return {
+    street: addr.street,
+    number: addr.number,
+    complement: addr.complement || undefined,
+    locality: addr.locality,
+    city: addr.city,
+    region_code: addr.region_code,
+    country: addr.country || "BRA",
+    postal_code: addr.postal_code,
+  };
+}
+
 // ---------- Create Order (without payment) ----------
 
 export async function createPagBankOrder(input: CreateOrderInput) {
@@ -100,7 +113,7 @@ export async function createPagBankOrder(input: CreateOrderInput) {
     customer: input.customer,
     items: input.items,
     shipping: input.shippingAddress
-      ? { address: input.shippingAddress }
+      ? { address: cleanAddress(input.shippingAddress) }
       : undefined,
   };
 
@@ -276,7 +289,7 @@ export async function payWithBoleto(
               name: holderName,
               tax_id: holderTaxId.replace(/\D/g, ""),
               email: holderEmail,
-              address: holderAddress,
+              address: cleanAddress(holderAddress),
             },
           },
         },
