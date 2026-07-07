@@ -56,6 +56,10 @@ export default function OrderDetailsScreen() {
   const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
+  const [selectedRating, setSelectedRating] = useState<number>(0);
+  const [ratingComment, setRatingComment] = useState<string>("");
+  const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+
   const isDeliverer = user?.profile === "deliverer";
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
@@ -432,15 +436,84 @@ export default function OrderDetailsScreen() {
           </>
         )}
 
-        {rental.status === "completed" && !isDeliverer && !isCompany && (
-          <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10, alignItems: "center" }}>
+        {rental.status === "completed" && !isDeliverer && (
+          <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10, alignItems: "center", width: "100%" }}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
               {rental.rating ? "Sua avaliação" : "Avalie este serviço"}
             </Text>
-            <StarRating value={rental.rating ?? 0} size={32} editable={!rental.rating} onChange={async (v) => {
-              await rateRental(rental.id, v);
-              await fetchOrder();
-            }} />
+            <StarRating 
+              value={rental.rating ?? selectedRating} 
+              size={32} 
+              editable={!rental.rating} 
+              onChange={(v) => {
+                setSelectedRating(v);
+              }} 
+            />
+
+            {!rental.rating && selectedRating > 0 && (
+              <View style={{ width: "100%", gap: 10, marginTop: 8 }}>
+                <TextInput
+                  value={ratingComment}
+                  onChangeText={setRatingComment}
+                  placeholder="Escreva sua opinião (opcional)"
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  numberOfLines={3}
+                  style={{
+                    width: "100%",
+                    minHeight: 60,
+                    backgroundColor: colors.background,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    color: colors.foreground,
+                    fontSize: 14,
+                    textAlignVertical: "top",
+                  }}
+                />
+                
+                <Pressable
+                  onPress={async () => {
+                    if (isSubmittingRating) return;
+                    setIsSubmittingRating(true);
+                    try {
+                      await rateRental(rental.id, selectedRating, ratingComment);
+                      await Promise.all([refreshRentals(), refreshCatalog()]);
+                      setSelectedRating(0);
+                      setRatingComment("");
+                      await fetchOrder();
+                      Alert.alert("Sucesso", "Obrigado por avaliar!");
+                    } catch (err: any) {
+                      Alert.alert("Erro", err.message || "Não foi possível enviar a avaliação.");
+                    } finally {
+                      setIsSubmittingRating(false);
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      width: "100%",
+                      backgroundColor: colors.primary,
+                      borderRadius: 10,
+                      paddingVertical: 12,
+                      alignItems: "center",
+                      opacity: pressed || isSubmittingRating ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
+                    {isSubmittingRating ? "Enviando..." : "Enviar avaliação"}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
+            {rental.rating && rental.ratingComment && (
+              <Text style={{ fontSize: 13, color: colors.muted, fontStyle: "italic", textAlign: "center", marginTop: 4 }}>
+                "{rental.ratingComment}"
+              </Text>
+            )}
           </View>
         )}
 

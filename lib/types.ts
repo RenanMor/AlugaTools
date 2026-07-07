@@ -29,6 +29,16 @@ export interface Tool {
   quantity: number;
   minDays: number;
   maxDays: number;
+  rating?: number;
+  ratingCount?: number;
+}
+
+export interface ToolReview {
+  id: string;
+  rating: number;
+  comment: string;
+  createdAt: number;
+  customerName: string;
 }
 
 export interface Company {
@@ -74,6 +84,7 @@ export interface Rental {
   status: RentalStatus;
   createdAt: number;
   rating?: number;
+  ratingComment?: string;
   paymentMethod?: string;
   paymentId?: string;
   paymentStatus?: string;

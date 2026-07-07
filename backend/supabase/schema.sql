@@ -46,6 +46,7 @@ create table if not exists public.rentals (
   total_price numeric(10,2) not null default 0,
   status text not null default 'pending' check (status in ('pending','accepted','rejected','active','completed')),
   rating integer check (rating between 1 and 5),
+  rating_comment text,
   created_at timestamptz not null default now()
 );
 

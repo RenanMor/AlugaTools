@@ -45,7 +45,7 @@ interface AppState {
   ) => Promise<void>;
   logout: () => void;
   checkout: () => Promise<void>;
-  rateRental: (rentalId: string, rating: number) => void;
+  rateRental: (rentalId: string, rating: number, comment?: string) => void;
   setRentalStatus: (rentalId: string, status: RentalStatus) => void;
   addTool: (tool: Omit<Tool, "id">) => void;
   updateTool: (tool: Tool) => void;
@@ -297,9 +297,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cart, user, clearCart, loadCatalog, loadRentals]);
 
-  const handleRateRental = useCallback(async (rentalId: string, rating: number) => {
+  const handleRateRental = useCallback(async (rentalId: string, rating: number, comment?: string) => {
     try {
-      await rateRental(rentalId, rating);
+      await rateRental(rentalId, rating, comment);
 
       // Refresh rentals and company ratings
       const [comps, rents] = await Promise.all([

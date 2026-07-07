@@ -136,13 +136,30 @@ function ToolRow({ tool, company }: { tool: Tool; company: string }) {
           {tool.name}
         </Text>
         <Text style={{ fontSize: 12, color: colors.muted }}>{company}</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+        <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 2 }}>
           <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
             R$ {tool.pricePerDay}/dia
           </Text>
-          <Text style={{ fontSize: 11, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
-            {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
-          </Text>
+          
+          <View style={{ alignItems: "flex-end", gap: 2 }}>
+            {tool.rating !== undefined && tool.rating > 0 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <IconSymbol name="star.fill" size={12} color="#FBBF24" />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.foreground }}>
+                  {tool.rating.toFixed(1)}
+                  <Text style={{ fontSize: 10, fontWeight: "400", color: colors.muted }}>
+                    {` (${tool.ratingCount})`}
+                  </Text>
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 10, color: colors.muted }}>Sem avaliações</Text>
+            )}
+
+            <Text style={{ fontSize: 11, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+              {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
+            </Text>
+          </View>
         </View>
       </View>
     </Pressable>

@@ -320,7 +320,8 @@ export const RentalController = {
 
   async rate(req: Request, res: Response, next: NextFunction) {
     try {
-      const rental = await RentalModel.setRating(req.params.id, req.body.rating);
+      const { rating, comment } = req.body;
+      const rental = await RentalModel.setRating(req.params.id, rating, comment);
       await CompanyModel.recalcRating(rental.company_id);
       res.json({ data: rental });
     } catch (err) {

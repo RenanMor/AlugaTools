@@ -13,6 +13,7 @@ export interface Rental {
   total_price: number;
   status: RentalStatus;
   rating: number | null;
+  rating_comment: string | null;
   created_at: string;
   payment_method: string | null;
   payment_id: string | null;
@@ -182,10 +183,10 @@ export const RentalModel = {
     return data as Rental;
   },
 
-  async setRating(id: string, rating: number): Promise<Rental> {
+  async setRating(id: string, rating: number, ratingComment?: string): Promise<Rental> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .update({ rating })
+      .update({ rating, rating_comment: ratingComment || null })
       .eq("id", id)
       .select(SELECT_FIELDS)
       .single();

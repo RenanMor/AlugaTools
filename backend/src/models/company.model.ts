@@ -43,20 +43,54 @@ export const CompanyModel = {
   },
 
   async recalcRating(companyId: string): Promise<void> {
-    const { data: ratings, error } = await supabaseAdmin
-      .from("rentals")
-      .select("rating")
-      .eq("company_id", companyId)
-      .not("rating", "is", null);
-    if (error) throw new Error(error.message);
+    // 1. Fetch all tools for this company
+    const { data: tools, error: toolsError } = await supabaseAdmin
+      .from("tools")
+      .select("id")
+      .eq("company_id", companyId);
+    if (toolsError) throw new Error(toolsError.message);
 
-    const values = (ratings ?? []).map((r: { rating: number }) => r.rating);
-    if (values.length === 0) return;
-    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+    if (!tools || tools.length === 0) return;
+
+    // 2. Fetch all rated rentals for these tools
+    const toolIds = tools.map((t) => t.id);
+    const { data: ratings, error: ratingsError } = await supabaseAdmin
+      .from("rentals")
+      .select("tool_id, rating")
+      .in("tool_id", toolIds)
+      .not("rating", "is", null);
+    if (ratingsError) throw new Error(ratingsError.message);
+
+    // 3. Compute average for each tool
+    const toolRatings: Record<string, { sum: number; count: number }> = {};
+    for (const r of (ratings ?? [])) {
+      if (!toolRatings[r.tool_id]) {
+        toolRatings[r.tool_id] = { sum: 0, count: 0 };
+      }
+      toolRatings[r.tool_id].sum += Number(r.rating);
+      toolRatings[r.tool_id].count += 1;
+    }
+
+    const averages: number[] = [];
+    let totalRatingsCount = 0;
+    for (const tid of toolIds) {
+      const rinfo = toolRatings[tid];
+      if (rinfo) {
+        averages.push(rinfo.sum / rinfo.count);
+        totalRatingsCount += rinfo.count;
+      }
+    }
+
+    // 4. Company rating is the average of the average rating of its rated tools
+    if (averages.length === 0) return;
+    const companyAvg = averages.reduce((a, b) => a + b, 0) / averages.length;
 
     await supabaseAdmin
       .from("companies")
-      .update({ rating: Math.round(avg * 10) / 10, rating_count: values.length })
+      .update({ 
+        rating: Math.round(companyAvg * 10) / 10, 
+        rating_count: totalRatingsCount 
+      })
       .eq("id", companyId);
   },
 };

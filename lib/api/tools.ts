@@ -14,6 +14,8 @@ export function mapTool(data: any): Tool {
     quantity: Number(data.quantity) || 1,
     minDays: Number(data.min_days) || 1,
     maxDays: Number(data.max_days) || 30,
+    rating: data.rating !== undefined ? Number(data.rating) : undefined,
+    ratingCount: data.rating_count !== undefined ? Number(data.rating_count) : undefined,
   };
 }
 
@@ -62,4 +64,9 @@ export async function deleteTool(id: string): Promise<void> {
   await apiCall<void>(`/api/tools/${id}`, {
     method: "DELETE",
   });
+}
+
+export async function getToolReviews(toolId: string): Promise<import("../types").ToolReview[]> {
+  const response = await apiCall<{ data: any[] }>(`/api/tools/${toolId}/reviews`);
+  return response.data || [];
 }

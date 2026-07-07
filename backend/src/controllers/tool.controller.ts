@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ToolModel } from "../models/tool.model";
+import { supabaseAdmin } from "../config/supabase";
 
 export const ToolController = {
   async listAll(_req: Request, res: Response, next: NextFunction) {
@@ -55,6 +56,31 @@ export const ToolController = {
     try {
       await ToolModel.remove(req.params.id);
       res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getReviews(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { data, error } = await supabaseAdmin
+        .from("rentals")
+        .select("id, rating, rating_comment, created_at, customer:users(name)")
+        .eq("tool_id", id)
+        .not("rating", "is", null)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+
+      const reviews = (data || []).map((r: any) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.rating_comment || "",
+        createdAt: new Date(r.created_at).getTime(),
+        customerName: r.customer?.name || "Cliente Anônimo",
+      }));
+
+      res.json({ data: reviews });
     } catch (err) {
       next(err);
     }

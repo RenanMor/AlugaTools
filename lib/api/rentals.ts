@@ -15,6 +15,7 @@ export function mapRental(data: any): Rental {
     status: data.status,
     createdAt: new Date(data.created_at).getTime(),
     rating: data.rating !== null ? Number(data.rating) : undefined,
+    ratingComment: data.rating_comment || undefined,
     paymentMethod: data.payment_method || undefined,
     paymentId: data.payment_id || undefined,
     paymentStatus: data.payment_status || undefined,
@@ -111,10 +112,10 @@ export async function updateRentalStatus(id: string, status: RentalStatus): Prom
   return mapRental(response.data);
 }
 
-export async function rateRental(id: string, rating: number): Promise<Rental> {
+export async function rateRental(id: string, rating: number, comment?: string): Promise<Rental> {
   const response = await apiCall<{ data: any }>(`/api/rentals/${id}/rating`, {
     method: "PATCH",
-    body: JSON.stringify({ rating }),
+    body: JSON.stringify({ rating, comment }),
   });
   return mapRental(response.data);
 }

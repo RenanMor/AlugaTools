@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { FlatList, Image, Pressable, Text, View } from "react-native";
+import { useState, useMemo } from "react";
+import { FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -14,6 +15,14 @@ export default function CompanyScreen() {
   const company = companies.find((c) => c.id === id);
   const companyTools = tools.filter((t) => t.companyId === id);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredTools = useMemo(() => {
+    return companyTools.filter((t) =>
+      t.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [companyTools, searchQuery]);
+
   if (!company) {
     return (
       <ScreenContainer className="p-4">
@@ -25,7 +34,7 @@ export default function CompanyScreen() {
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
       <FlatList
-        data={companyTools}
+        data={filteredTools}
         keyExtractor={(i) => i.id}
         numColumns={2}
         columnWrapperStyle={{ gap: 12, paddingHorizontal: 16 }}
@@ -56,7 +65,32 @@ export default function CompanyScreen() {
 
             <Text style={{ fontSize: 14, color: colors.muted }}>{company.description}</Text>
 
-            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginTop: 4 }}>
+            {/* Search Input */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: colors.surface,
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginTop: 6,
+              }}
+            >
+              <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Buscar ferramentas nesta empresa"
+                placeholderTextColor={colors.muted}
+                style={{ flex: 1, color: colors.foreground, fontSize: 14 }}
+              />
+            </View>
+
+            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginTop: 10 }}>
               Ferramentas disponíveis
             </Text>
           </View>
@@ -76,6 +110,7 @@ function ToolGridCard({ tool }: { tool: Tool }) {
       style={({ pressed }) => [
         {
           flex: 1,
+          maxWidth: "48%",
           borderRadius: 14,
           backgroundColor: colors.surface,
           borderWidth: 1,

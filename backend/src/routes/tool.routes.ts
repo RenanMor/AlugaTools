@@ -21,6 +21,7 @@ router.get("/debug-schema", async (req, res) => {
 
 router.get("/", ToolController.listAll);
 router.get("/:id", ToolController.getById);
+router.get("/:id/reviews", ToolController.getReviews);
 router.get("/company/:companyId", ToolController.listByCompany);
 router.post("/", verifySupabaseToken, ToolController.create);
 router.put("/:id", verifySupabaseToken, ToolController.update);

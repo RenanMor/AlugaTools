@@ -12,6 +12,8 @@ export interface Tool {
   quantity: number;
   min_days: number;
   max_days: number;
+  rating?: number;
+  rating_count?: number;
 }
 
 function mapRow(row: any): Tool {
@@ -142,6 +144,30 @@ export const ToolModel = {
       .select("*");
     if (error) throw new Error(error.message);
     const mapped = (data || []).map(mapRow);
+
+    // Add ratings
+    const { data: ratings } = await supabaseAdmin
+      .from("rentals")
+      .select("tool_id, rating")
+      .not("rating", "is", null);
+      
+    const toolRatings: Record<string, { sum: number; count: number }> = {};
+    if (ratings) {
+      for (const r of ratings) {
+        if (!toolRatings[r.tool_id]) {
+          toolRatings[r.tool_id] = { sum: 0, count: 0 };
+        }
+        toolRatings[r.tool_id].sum += Number(r.rating);
+        toolRatings[r.tool_id].count += 1;
+      }
+    }
+
+    mapped.forEach((t) => {
+      const info = toolRatings[t.id];
+      t.rating = info ? Math.round((info.sum / info.count) * 10) / 10 : 0;
+      t.rating_count = info ? info.count : 0;
+    });
+
     mapped.forEach(triggerBackgroundResolution);
     return mapped;
   },
@@ -154,7 +180,20 @@ export const ToolModel = {
       .single();
     if (error) return null;
     const mapped = mapRow(data);
-    if (mapped) triggerBackgroundResolution(mapped);
+    if (mapped) {
+      // Get ratings for this tool
+      const { data: ratings } = await supabaseAdmin
+        .from("rentals")
+        .select("rating")
+        .eq("tool_id", id)
+        .not("rating", "is", null);
+      
+      const values = (ratings || []).map((r: any) => Number(r.rating));
+      mapped.rating = values.length > 0 ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : 0;
+      mapped.rating_count = values.length;
+
+      triggerBackgroundResolution(mapped);
+    }
     return mapped;
   },
 
@@ -165,6 +204,31 @@ export const ToolModel = {
       .eq("company_id", companyId);
     if (error) throw new Error(error.message);
     const mapped = (data || []).map(mapRow);
+
+    // Add ratings
+    const { data: ratings } = await supabaseAdmin
+      .from("rentals")
+      .select("tool_id, rating")
+      .eq("company_id", companyId)
+      .not("rating", "is", null);
+      
+    const toolRatings: Record<string, { sum: number; count: number }> = {};
+    if (ratings) {
+      for (const r of ratings) {
+        if (!toolRatings[r.tool_id]) {
+          toolRatings[r.tool_id] = { sum: 0, count: 0 };
+        }
+        toolRatings[r.tool_id].sum += Number(r.rating);
+        toolRatings[r.tool_id].count += 1;
+      }
+    }
+
+    mapped.forEach((t) => {
+      const info = toolRatings[t.id];
+      t.rating = info ? Math.round((info.sum / info.count) * 10) / 10 : 0;
+      t.rating_count = info ? info.count : 0;
+    });
+
     mapped.forEach(triggerBackgroundResolution);
     return mapped;
   },
