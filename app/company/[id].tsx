@@ -56,6 +56,10 @@ export default function CompanyScreen() {
                   <Text style={{ fontSize: 12, color: colors.muted }}>
                     {company.rating.toFixed(1)} ({company.ratingCount})
                   </Text>
+                  <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.muted, marginHorizontal: 2 }} />
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: company.isOpen !== false ? colors.success : colors.error }}>
+                    {company.isOpen !== false ? "Loja Aberta" : "Loja Fechada"}
+                  </Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                   <IconSymbol name="location.fill" size={13} color={colors.muted} />
@@ -141,34 +145,37 @@ function ToolGridCard({ tool }: { tool: Tool }) {
       ]}
     >
       <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80" }} style={{ width: "100%", height: 110, backgroundColor: colors.border }} />
-      <View style={{ padding: 10, gap: 3 }}>
-        <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, minHeight: 34 }}>
-          {tool.name}
-        </Text>
-        
-        {categoryText ? (
-          <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted, marginBottom: 2 }}>
-            {categoryText}
+      <View style={{ padding: 10, gap: 4 }}>
+        <View style={{ gap: 2 }}>
+          <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, minHeight: 34 }}>
+            {tool.name}
           </Text>
-        ) : null}
+          {categoryText ? (
+            <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
+              {categoryText}
+            </Text>
+          ) : null}
+        </View>
 
-        <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>R$ {tool.pricePerDay}/dia</Text>
-        
-        <View style={{ gap: 2, marginTop: 4 }}>
-          {tool.rating !== undefined && tool.rating > 0 ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              <IconSymbol name="star.fill" size={11} color="#FBBF24" />
-              <Text style={{ fontSize: 10, fontWeight: "700", color: colors.foreground }}>
-                {tool.rating.toFixed(1)} ({tool.ratingCount})
-              </Text>
-            </View>
-          ) : (
-            <Text style={{ fontSize: 10, color: colors.muted }}>Sem avaliações</Text>
-          )}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 4 }}>
+          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>R$ {tool.pricePerDay}/dia</Text>
+          
+          <View style={{ alignItems: "flex-end", gap: 2 }}>
+            {tool.rating !== undefined && tool.rating > 0 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <IconSymbol name="star.fill" size={10} color="#FBBF24" />
+                <Text style={{ fontSize: 10, fontWeight: "700", color: colors.foreground }}>
+                  {tool.rating.toFixed(1)}
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 9, color: colors.muted }}>Sem avaliações</Text>
+            )}
 
-          <Text style={{ fontSize: 10, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
-            {tool.quantity > 0 && tool.available ? `${tool.quantity} disponíveis` : "Sem estoque"}
-          </Text>
+            <Text style={{ fontSize: 10, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+              {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
+            </Text>
+          </View>
         </View>
       </View>
     </Pressable>

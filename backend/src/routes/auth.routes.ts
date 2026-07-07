@@ -389,6 +389,13 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
       return res.status(400).json({ error: dbError.message });
     }
 
+    if (dbUser.profile === "company") {
+      await supabaseAdmin
+        .from("companies")
+        .update({ logo: avatarUrl })
+        .eq("owner_id", userId);
+    }
+
     res.json({
       user: {
         id: dbUser.id,

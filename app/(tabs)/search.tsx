@@ -154,8 +154,8 @@ function ToolRow({ tool, company }: { tool: Tool; company: string }) {
         <View
           style={{
             position: "absolute",
-            top: -8,
-            right: 12,
+            top: 8,
+            right: 8,
             flexDirection: "row",
             alignItems: "center",
             gap: 3,

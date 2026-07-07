@@ -10,7 +10,7 @@ import { CartItem } from "@/lib/types";
 
 export default function CartScreen() {
   const colors = useColors();
-  const { cart, cartTotal, removeFromCart, updateCartDays, updateCartQuantity, user, checkout } = useApp();
+  const { cart, cartTotal, removeFromCart, updateCartDays, updateCartQuantity, user, checkout, companies } = useApp();
 
   useEffect(() => {
     if (user?.profile === "deliverer") {
@@ -20,6 +20,18 @@ export default function CartScreen() {
 
   const handleCheckout = async () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const closedItems = cart.filter((item) => {
+      const comp = companies.find((c) => c.id === item.tool.companyId);
+      return comp ? comp.isOpen === false : false;
+    });
+
+    if (closedItems.length > 0) {
+      const closedStoreNames = Array.from(new Set(closedItems.map((item) => item.companyName))).join(", ");
+      alert(`Não é possível finalizar o aluguel. A(s) seguinte(s) loja(s) de ferramentas está(ão) fechada(s): ${closedStoreNames}`);
+      return;
+    }
+
     if (!user) {
       router.push({ pathname: "/auth", params: { intent: "checkout" } });
       return;

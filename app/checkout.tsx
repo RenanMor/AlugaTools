@@ -27,7 +27,7 @@ const SHIPPING_OPTIONS = [
 
 export default function CheckoutScreen() {
   const colors = useColors();
-  const { cart, cartTotal, clearCart, refreshCatalog, refreshRentals, user } = useApp();
+  const { cart, cartTotal, clearCart, refreshCatalog, refreshRentals, user, companies } = useApp();
 
   // Address fields
   const [cep, setCep] = useState("");
@@ -110,6 +110,21 @@ export default function CheckoutScreen() {
 
   // Submit Rent & Payment Order
   const handlePay = async () => {
+    // Check if any company is closed
+    const closedItems = cartSnapshot.filter((item) => {
+      const comp = companies.find((c) => c.id === item.tool.companyId);
+      return comp ? comp.isOpen === false : false;
+    });
+
+    if (closedItems.length > 0) {
+      const closedStoreNames = Array.from(new Set(closedItems.map((item) => item.companyName))).join(", ");
+      Alert.alert(
+        "Loja Fechada",
+        `Não é possível prosseguir. A(s) seguinte(s) loja(s) está(ão) fechada(s): ${closedStoreNames}`
+      );
+      return;
+    }
+
     // 1. Validations
     if (paymentMethod !== "PIX" && (!cep || !number || !street || !city || !state)) {
       Alert.alert("Erro", "CEP, Número da residência e endereço são obrigatórios para entregas e faturamento.");

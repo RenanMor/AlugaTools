@@ -314,12 +314,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       if (res.user) {
         setUser((prev) => prev ? { ...prev, avatarUrl: res.user.avatarUrl || res.user.avatar_url } : null);
+        await loadCatalog();
       }
     } catch (err) {
       console.error("Erro ao atualizar avatar:", err);
       throw err;
     }
-  }, []);
+  }, [loadCatalog]);
 
   const updateCompanyStatus = useCallback(async (isOpen: boolean) => {
     if (!user?.companyId) return;

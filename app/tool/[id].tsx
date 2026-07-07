@@ -185,20 +185,22 @@ export default function ToolScreen() {
       <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
         <Pressable
           onPress={handleAdd}
-          disabled={availableQty <= 0 || !tool.available || isCompany}
+          disabled={availableQty <= 0 || !tool.available || isCompany || company?.isOpen === false}
           style={({ pressed }) => [
             {
-              backgroundColor: availableQty <= 0 || !tool.available || isCompany ? colors.border : colors.primary,
+              backgroundColor: availableQty <= 0 || !tool.available || isCompany || company?.isOpen === false ? colors.border : colors.primary,
               borderRadius: 14,
               paddingVertical: 16,
               alignItems: "center",
-              transform: [{ scale: pressed && availableQty > 0 && tool.available && !isCompany ? 0.98 : 1 }],
+              transform: [{ scale: pressed && availableQty > 0 && tool.available && !isCompany && company?.isOpen !== false ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={{ color: availableQty <= 0 || !tool.available || isCompany ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
+          <Text style={{ color: availableQty <= 0 || !tool.available || isCompany || company?.isOpen === false ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
             {isCompany
               ? "Empresas não podem alugar"
+              : company?.isOpen === false
+              ? "Loja fechada no momento"
               : !tool.available || tool.quantity <= 0
               ? "Sem estoque disponível"
               : availableQty <= 0
