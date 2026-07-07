@@ -165,21 +165,23 @@ export default function CheckoutScreen() {
           }
         });
 
-        rentalsToPay = await Promise.all(
-          flatItems.map((item) =>
-            createRental({
-              toolId: item.tool.id,
-              companyId: item.companyId,
-              days: item.days,
-              totalPrice: item.tool.pricePerDay * item.days + selectedShipping.price / flatItems.length - discountAmount / flatItems.length,
-              paymentMethod,
-              shippingPrice: selectedShipping.price / flatItems.length,
-              address,
-              couponCode: appliedCoupon || undefined,
-              couponDiscount: discountAmount / flatItems.length,
-            })
-          )
-        );
+        const created: any[] = [];
+        for (const item of flatItems) {
+          const rental = await createRental({
+            toolId: item.tool.id,
+            companyId: item.companyId,
+            days: item.days,
+            totalPrice: item.tool.pricePerDay * item.days + selectedShipping.price / flatItems.length - discountAmount / flatItems.length,
+            paymentMethod,
+            shippingPrice: selectedShipping.price / flatItems.length,
+            address,
+            couponCode: appliedCoupon || undefined,
+            couponDiscount: discountAmount / flatItems.length,
+          });
+          created.push(rental);
+        }
+
+        rentalsToPay = created;
         setCreatedRentals(rentalsToPay);
         // Clear global cart so no duplicates are made if user backs out
         clearCart();

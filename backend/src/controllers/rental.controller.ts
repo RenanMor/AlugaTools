@@ -97,8 +97,25 @@ export const RentalController = {
       }
 
       const cleanPhone = (user.phone || "").replace(/\D/g, "");
-      const phoneArea = cleanPhone.substring(0, 2) || "11";
-      const phoneNumber = cleanPhone.substring(2) || "999999999";
+      let normalizedPhone = cleanPhone;
+      if (normalizedPhone.startsWith("55") && (normalizedPhone.length === 12 || normalizedPhone.length === 13)) {
+        normalizedPhone = normalizedPhone.substring(2);
+      }
+
+      let phoneArea = "11";
+      let phoneNumber = "999999999";
+      if (normalizedPhone.length >= 10) {
+        phoneArea = normalizedPhone.substring(0, 2);
+        phoneNumber = normalizedPhone.substring(2);
+      } else if (normalizedPhone.length === 8 || normalizedPhone.length === 9) {
+        phoneNumber = normalizedPhone;
+      }
+
+      // Format user name to ensure it has both first and last name for PagBank
+      const customerName = (user.name || "").trim();
+      const formattedName = customerName.split(/\s+/).length >= 2 
+        ? customerName 
+        : `${customerName} Silva`;
 
       // Map checkout address to PagBank format
       const addr = rental.address || {};
@@ -109,7 +126,7 @@ export const RentalController = {
         locality: addr.neighborhood || "Bairro",
         city: addr.city || "Cidade",
         region: addr.state || "SP",
-        region_code: (addr.state || "SP").substring(0, 2),
+        region_code: (addr.state || "SP").substring(0, 2).toUpperCase(),
         country: "BRA",
         postal_code: (addr.cep || "").replace(/\D/g, "") || "01001000",
       };
@@ -118,7 +135,7 @@ export const RentalController = {
       const order = await createPagBankOrder({
         referenceId: `rental_${rental.id}`,
         customer: {
-          name: user.name,
+          name: formattedName,
           email: user.email,
           tax_id: cleanCpf,
           phones: [

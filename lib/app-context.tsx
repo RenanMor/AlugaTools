@@ -166,15 +166,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Cart operations
   const addToCart = useCallback((tool: Tool, companyName: string) => {
     setCart((prev) => {
-      const initialDays = Math.max(1, tool.minDays || 1);
-      const newItem: CartItem = {
-        id: Math.random().toString(36).substring(2, 9),
-        tool,
-        companyName,
-        days: initialDays,
-        quantity: 1,
-      };
-      return [...prev, newItem];
+      const existingIndex = prev.findIndex((item) => item.tool.id === tool.id);
+      if (existingIndex > -1) {
+        return prev.map((item, index) => {
+          if (index === existingIndex) {
+            const maxQty = tool.quantity || 1;
+            const newQty = Math.min(maxQty, (item.quantity || 1) + 1);
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        });
+      } else {
+        const initialDays = Math.max(1, tool.minDays || 1);
+        const newItem: CartItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          tool,
+          companyName,
+          days: initialDays,
+          quantity: 1,
+        };
+        return [...prev, newItem];
+      }
     });
   }, []);
 

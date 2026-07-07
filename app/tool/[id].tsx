@@ -12,7 +12,10 @@ export default function ToolScreen() {
   const { tools, companies, cart, addToCart, user } = useApp();
   const tool = tools.find((t) => t.id === id);
   const company = companies.find((c) => c.id === tool?.companyId);
-  const inCart = cart.some((i) => i.tool.id === id);
+  const cartItem = cart.find((i) => i.tool.id === id);
+  const quantityInCart = cartItem ? (cartItem.quantity || 1) : 0;
+  const availableQty = Math.max(0, (tool?.quantity || 0) - quantityInCart);
+  const inCart = quantityInCart > 0;
   const isCompany = user?.profile === "company";
 
   if (!tool || !company) {
@@ -58,9 +61,11 @@ export default function ToolScreen() {
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tool.quantity > 0 && tool.available ? colors.success : colors.error }} />
-            <Text style={{ fontSize: 14, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
-              {tool.quantity > 0 && tool.available ? `${tool.quantity} disponível(eis)` : "Indisponível no momento"}
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: availableQty > 0 && tool.available ? colors.success : (quantityInCart > 0 ? colors.warning : colors.error) }} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: availableQty > 0 && tool.available ? colors.success : (quantityInCart > 0 ? colors.warning : colors.error) }}>
+              {availableQty > 0 && tool.available 
+                ? `${availableQty} disponível(eis)` 
+                : (quantityInCart > 0 ? "Limite de estoque atingido (no carrinho)" : "Indisponível no momento")}
             </Text>
           </View>
 
@@ -90,22 +95,24 @@ export default function ToolScreen() {
       <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
         <Pressable
           onPress={handleAdd}
-          disabled={tool.quantity <= 0 || !tool.available || isCompany}
+          disabled={availableQty <= 0 || !tool.available || isCompany}
           style={({ pressed }) => [
             {
-              backgroundColor: tool.quantity <= 0 || !tool.available || isCompany ? colors.border : colors.primary,
+              backgroundColor: availableQty <= 0 || !tool.available || isCompany ? colors.border : colors.primary,
               borderRadius: 14,
               paddingVertical: 16,
               alignItems: "center",
-              transform: [{ scale: pressed && tool.quantity > 0 && tool.available && !isCompany ? 0.98 : 1 }],
+              transform: [{ scale: pressed && availableQty > 0 && tool.available && !isCompany ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={{ color: tool.quantity <= 0 || !tool.available || isCompany ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
+          <Text style={{ color: availableQty <= 0 || !tool.available || isCompany ? colors.muted : "#fff", fontWeight: "800", fontSize: 16 }}>
             {isCompany
               ? "Empresas não podem alugar"
-              : tool.quantity <= 0 || !tool.available
+              : !tool.available || tool.quantity <= 0
               ? "Sem estoque disponível"
+              : availableQty <= 0
+              ? "Limite de estoque atingido"
               : inCart
               ? "Adicionar outro ao carrinho"
               : "Adicionar ao carrinho"}
