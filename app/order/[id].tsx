@@ -202,7 +202,7 @@ export default function OrderDetailsScreen() {
         </View>
 
         {/* Timer de uso do aluguel */}
-        {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active") && (
+        {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active" || rental.status === "accepted") && (
           <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8, alignItems: "center" }}>
             <Text style={{ fontSize: 14, color: colors.muted, fontWeight: "700" }}>Tempo de Uso Restante</Text>
             <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />

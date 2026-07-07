@@ -338,7 +338,15 @@ export const RentalController = {
       }
       // Return all rentals for the company this deliverer belongs to
       const rentals = await RentalModel.findByCompany(deliverer.company_id);
-      res.json({ data: rentals });
+      
+      // Filter: only show deliveries that need a courier (not pickup, and status is pending or delivering)
+      const filtered = rentals.filter((r) => {
+        const isPickup = !r.address || Number(r.shipping_price) === 0;
+        const needsDelivery = r.status === "pending" || r.status === "delivering";
+        return !isPickup && needsDelivery;
+      });
+
+      res.json({ data: filtered });
     } catch (err) {
       next(err);
     }

@@ -238,7 +238,7 @@ export default function StatsScreen() {
               </View>
             </View>
 
-            {item.deliveredAt && (item.status === "delivered" || item.status === "active") && (
+            {item.deliveredAt && (item.status === "delivered" || item.status === "active" || item.status === "accepted") && (
               <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>Restante:</Text>
                 <RentalTimer deliveredAt={item.deliveredAt} days={item.days} />

@@ -130,7 +130,7 @@ function OrderCard({ rental }: { rental: Rental }) {
         </View>
       </View>
 
-      {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active") && (
+      {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active" || rental.status === "accepted") && (
         <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Tempo de Uso Restante:</Text>
           <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />

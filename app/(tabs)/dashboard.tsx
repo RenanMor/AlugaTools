@@ -298,7 +298,7 @@ function RequestCard({ rental }: { rental: Rental }) {
       </View>
 
       {/* Show Rental Countdown Timer if rental is delivered and active */}
-      {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active") && (
+      {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active" || rental.status === "accepted") && (
         <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, gap: 4 }}>
           <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Tempo Restante:</Text>
           <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />

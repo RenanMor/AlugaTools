@@ -144,7 +144,14 @@ export const RentalModel = {
   async updateStatus(id: string, status: RentalStatus, extras?: { deliverer_id?: string }): Promise<Rental> {
     const updateData: any = { status };
     if (status === "delivered") {
-      updateData.delivered_at = new Date().toISOString();
+      const { data: current } = await supabaseAdmin
+        .from("rentals")
+        .select("delivered_at")
+        .eq("id", id)
+        .single();
+      if (!current?.delivered_at) {
+        updateData.delivered_at = new Date().toISOString();
+      }
     }
     if (extras?.deliverer_id) {
       updateData.deliverer_id = extras.deliverer_id;
