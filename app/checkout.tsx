@@ -139,7 +139,7 @@ export default function CheckoutScreen() {
     setIsSubmitting(true);
 
     try {
-      const address = {
+      const address = shippingId === "pickup" ? null : {
         cep,
         street,
         number,

@@ -17,7 +17,7 @@ import { RentalTimer } from "@/components/rental-timer";
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
   pending: "Aguardando entrega",
-  accepted: "Aceito",
+  accepted: "Entrega antecipada solicitada",
   rejected: "Recusado",
   delivering: "Em rota de entrega",
   delivered: "Entregue (Em uso)",
@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
 const STATUS_COLOR: Record<RentalStatus, string> = {
   awaiting_payment: "#3B82F6",
   pending: "#F59E0B",
-  accepted: "#3B82F6",
+  accepted: "#8B5CF6",
   rejected: "#EF4444",
   delivering: "#F97316",
   delivered: "#22C55E",

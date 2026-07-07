@@ -232,7 +232,7 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
 const STATUS_LABEL_BACK: Record<string, string> = {
   awaiting_payment: "Aguardando pag.",
   pending: "Aguardando entrega",
-  accepted: "Aceito",
+  accepted: "Entrega ant. solicitada",
   rejected: "Recusado",
   delivering: "Em entrega",
   delivered: "Entregue (Em uso)",
@@ -244,7 +244,7 @@ const STATUS_LABEL_BACK: Record<string, string> = {
 const STATUS_COLOR_BACK: Record<string, string> = {
   awaiting_payment: "#3B82F6",
   pending: "#F59E0B",
-  accepted: "#3B82F6",
+  accepted: "#8B5CF6",
   rejected: "#EF4444",
   delivering: "#F97316",
   delivered: "#22C55E",
@@ -257,7 +257,20 @@ function RequestCard({ rental }: { rental: Rental }) {
   const colors = useColors();
 
   return (
-    <View style={{ padding: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
+    <Pressable
+      onPress={() => router.push(`/order/${rental.id}`)}
+      style={({ pressed }) => [
+        {
+          padding: 12,
+          borderRadius: 14,
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: 10,
+          opacity: pressed ? 0.85 : 1,
+        }
+      ]}
+    >
       <View style={{ flexDirection: "row", gap: 12 }}>
         <Image source={{ uri: rental.toolImage }} style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: colors.border }} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -291,7 +304,7 @@ function RequestCard({ rental }: { rental: Rental }) {
           <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }
 

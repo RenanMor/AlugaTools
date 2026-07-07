@@ -24,7 +24,7 @@ import { RentalTimer } from "@/components/rental-timer";
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
   pending: "Aguardando entrega",
-  accepted: "Aceito",
+  accepted: "Entrega antecipada solicitada",
   rejected: "Recusado",
   delivering: "Em rota de entrega",
   delivered: "Entregue (Em uso)",
@@ -36,7 +36,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
 const STATUS_COLOR: Record<RentalStatus, string> = {
   awaiting_payment: "#3B82F6",
   pending: "#F59E0B",
-  accepted: "#3B82F6",
+  accepted: "#8B5CF6",
   rejected: "#EF4444",
   delivering: "#F97316",
   delivered: "#22C55E",
@@ -57,6 +57,8 @@ export default function OrderDetailsScreen() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   const isDeliverer = user?.profile === "deliverer";
+  const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
+  const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
 
   const fetchOrder = async () => {
     try {
@@ -336,8 +338,8 @@ export default function OrderDetailsScreen() {
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <>
-            {/* Deliverer Actions */}
-            {isDeliverer && rental.status === "pending" && (
+            {/* Deliverer Actions (Standard/Express Delivery) */}
+            {!isPickup && isDeliverer && rental.status === "pending" && (
               <Pressable
                 onPress={() => handleUpdateStatus("delivering")}
                 style={({ pressed }) => [
@@ -348,7 +350,7 @@ export default function OrderDetailsScreen() {
               </Pressable>
             )}
 
-            {isDeliverer && rental.status === "delivering" && (
+            {!isPickup && isDeliverer && rental.status === "delivering" && (
               <Pressable
                 onPress={() => handleUpdateStatus("delivered")}
                 style={({ pressed }) => [
@@ -359,8 +361,43 @@ export default function OrderDetailsScreen() {
               </Pressable>
             )}
 
-            {/* Customer/Company Actions */}
-            {!isDeliverer && (rental.status === "delivered" || rental.status === "active") && (
+            {/* Company Actions for Pickup (Retirada no local) */}
+            {isPickup && isCompany && rental.status === "pending" && (
+              <Pressable
+                onPress={() => handleUpdateStatus("delivering")}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Iniciar Entrega</Text>
+              </Pressable>
+            )}
+
+            {isPickup && isCompany && rental.status === "delivering" && (
+              <Pressable
+                onPress={() => handleUpdateStatus("delivered")}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Finalizar Entrega</Text>
+              </Pressable>
+            )}
+
+            {/* Customer Actions: Entregar Antecipadamente */}
+            {!isDeliverer && !isCompany && (rental.status === "delivered" || rental.status === "active") && (
+              <Pressable
+                onPress={() => handleUpdateStatus("accepted")}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Entregar antecipadamente</Text>
+              </Pressable>
+            )}
+
+            {/* Company Actions: Marcar como concluído direct */}
+            {isCompany && (rental.status === "delivered" || rental.status === "active") && (
               <Pressable
                 onPress={() => handleUpdateStatus("completed")}
                 style={({ pressed }) => [
@@ -370,10 +407,32 @@ export default function OrderDetailsScreen() {
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Marcar como concluído</Text>
               </Pressable>
             )}
+
+            {/* Company Actions: Accept/Reject Early Return */}
+            {isCompany && rental.status === "accepted" && (
+              <View style={{ gap: 10 }}>
+                <Pressable
+                  onPress={() => handleUpdateStatus("completed")}
+                  style={({ pressed }) => [
+                    { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Aceitar Entrega Antecipada</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleUpdateStatus("delivered")}
+                  style={({ pressed }) => [
+                    { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.error, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <Text style={{ color: colors.error, fontWeight: "800", fontSize: 15 }}>Recusar Entrega Antecipada</Text>
+                </Pressable>
+              </View>
+            )}
           </>
         )}
 
-        {rental.status === "completed" && !isDeliverer && (
+        {rental.status === "completed" && !isDeliverer && !isCompany && (
           <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10, alignItems: "center" }}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
               {rental.rating ? "Sua avaliação" : "Avalie este serviço"}

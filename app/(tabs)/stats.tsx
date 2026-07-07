@@ -11,7 +11,7 @@ import { router } from "expo-router";
 const STATUS_LABEL_BACK: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
   pending: "Aguardando entrega",
-  accepted: "Aceito",
+  accepted: "Entrega antecipada solicitada",
   rejected: "Recusado",
   delivering: "Em entrega",
   delivered: "Entregue (Em uso)",
@@ -23,7 +23,7 @@ const STATUS_LABEL_BACK: Record<string, string> = {
 const STATUS_COLOR_BACK: Record<string, string> = {
   awaiting_payment: "#3B82F6",
   pending: "#F59E0B",
-  accepted: "#3B82F6",
+  accepted: "#8B5CF6",
   rejected: "#EF4444",
   delivering: "#F97316",
   delivered: "#22C55E",
