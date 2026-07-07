@@ -6,6 +6,7 @@ import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
+import { CATEGORIES } from "@/lib/data";
 import { Tool } from "@/lib/types";
 
 export default function CompanyScreen() {
@@ -58,7 +59,9 @@ export default function CompanyScreen() {
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                   <IconSymbol name="location.fill" size={13} color={colors.muted} />
-                  <Text style={{ fontSize: 12, color: colors.muted }}>{company.location}</Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>
+                    {company.city && company.state ? `${company.city}, ${company.state}` : company.location}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -104,6 +107,23 @@ export default function CompanyScreen() {
 
 function ToolGridCard({ tool }: { tool: Tool }) {
   const colors = useColors();
+
+  const categoryNames = useMemo(() => {
+    if (!tool.categoryId) return [];
+    const ids = tool.categoryId.split(",").map((c) => c.trim());
+    return ids
+      .map((id) => CATEGORIES.find((c) => c.id === id)?.name)
+      .filter((n): n is string => !!n);
+  }, [tool.categoryId]);
+
+  const categoryText = useMemo(() => {
+    if (categoryNames.length === 0) return "";
+    if (categoryNames.length <= 2) {
+      return categoryNames.join(", ");
+    }
+    return `${categoryNames.slice(0, 2).join(", ")} e +${categoryNames.length - 2}`;
+  }, [categoryNames]);
+
   return (
     <Pressable
       onPress={() => router.push({ pathname: "/tool/[id]", params: { id: tool.id } })}
@@ -125,7 +145,31 @@ function ToolGridCard({ tool }: { tool: Tool }) {
         <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, minHeight: 34 }}>
           {tool.name}
         </Text>
+        
+        {categoryText ? (
+          <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted, marginBottom: 2 }}>
+            {categoryText}
+          </Text>
+        ) : null}
+
         <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>R$ {tool.pricePerDay}/dia</Text>
+        
+        <View style={{ gap: 2, marginTop: 4 }}>
+          {tool.rating !== undefined && tool.rating > 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+              <IconSymbol name="star.fill" size={11} color="#FBBF24" />
+              <Text style={{ fontSize: 10, fontWeight: "700", color: colors.foreground }}>
+                {tool.rating.toFixed(1)} ({tool.ratingCount})
+              </Text>
+            </View>
+          ) : (
+            <Text style={{ fontSize: 10, color: colors.muted }}>Sem avaliações</Text>
+          )}
+
+          <Text style={{ fontSize: 10, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+            {tool.quantity > 0 && tool.available ? `${tool.quantity} disponíveis` : "Sem estoque"}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

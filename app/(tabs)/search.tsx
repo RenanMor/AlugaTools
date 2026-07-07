@@ -22,12 +22,23 @@ export default function SearchScreen() {
   const [activeCat, setActiveCat] = useState<string | null>(params.category ?? null);
 
   const results = useMemo(() => {
-    return tools.filter((t) => {
+    const filtered = tools.filter((t) => {
       const matchQuery = query.trim() === "" || t.name.toLowerCase().includes(query.toLowerCase());
       const matchCat = !activeCat || (t.categoryId && t.categoryId.split(",").map((c) => c.trim()).includes(activeCat));
       return matchQuery && matchCat;
     });
-  }, [tools, query, activeCat]);
+
+    // Prioritize open stores: "A busca de ferramentas dá prioridade para ferramentas de lojas abertas;"
+    return filtered.sort((a, b) => {
+      const aComp = companies.find((c) => c.id === a.companyId);
+      const bComp = companies.find((c) => c.id === b.companyId);
+      const aOpen = aComp?.isOpen !== false;
+      const bOpen = bComp?.isOpen !== false;
+      if (aOpen && !bOpen) return -1;
+      if (!aOpen && bOpen) return 1;
+      return 0;
+    });
+  }, [tools, query, activeCat, companies]);
 
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? "";
 
@@ -114,6 +125,13 @@ function CategoryChip({ label, active, onPress }: { label: string; active: boole
 
 function ToolRow({ tool, company }: { tool: Tool; company: string }) {
   const colors = useColors();
+  const { companies } = useApp();
+
+  const isCompanyClosed = useMemo(() => {
+    const comp = companies.find((c) => c.name === company);
+    return comp ? comp.isOpen === false : false;
+  }, [companies, company]);
+
   return (
     <Pressable
       onPress={() => router.push({ pathname: "/tool/[id]", params: { id: tool.id } })}
@@ -127,35 +145,65 @@ function ToolRow({ tool, company }: { tool: Tool; company: string }) {
           borderWidth: 1,
           borderColor: colors.border,
           opacity: pressed ? 0.75 : 1,
+          position: "relative",
         },
       ]}
     >
+      {/* Pop-out rating badge: "No buscar a avaliação é no topo da box, com efeito 'saindo da box'" */}
+      {tool.rating !== undefined && tool.rating > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            top: -8,
+            right: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 3,
+            backgroundColor: "#1F2937",
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 12,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 5,
+            zIndex: 10,
+          }}
+        >
+          <IconSymbol name="star.fill" size={10} color="#FBBF24" />
+          <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>
+            {tool.rating.toFixed(1)}
+            <Text style={{ fontWeight: "400", color: "#9CA3AF" }}>
+              {` (${tool.ratingCount})`}
+            </Text>
+          </Text>
+        </View>
+      )}
+
       <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80" }} style={{ width: 70, height: 70, borderRadius: 12, backgroundColor: colors.border }} />
       <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
           {tool.name}
         </Text>
-        <Text style={{ fontSize: 12, color: colors.muted }}>{company}</Text>
+        
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={{ fontSize: 12, color: colors.muted }}>{company}</Text>
+          {isCompanyClosed && (
+            <Text style={{ fontSize: 10, fontWeight: "700", color: colors.error }}>
+              • Loja Fechada
+            </Text>
+          )}
+        </View>
+
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 2 }}>
           <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
             R$ {tool.pricePerDay}/dia
           </Text>
           
           <View style={{ alignItems: "flex-end", gap: 2 }}>
-            {tool.rating !== undefined && tool.rating > 0 ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                <IconSymbol name="star.fill" size={12} color="#FBBF24" />
-                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.foreground }}>
-                  {tool.rating.toFixed(1)}
-                  <Text style={{ fontSize: 10, fontWeight: "400", color: colors.muted }}>
-                    {` (${tool.ratingCount})`}
-                  </Text>
-                </Text>
-              </View>
-            ) : (
-              <Text style={{ fontSize: 10, color: colors.muted }}>Sem avaliações</Text>
-            )}
-
             <Text style={{ fontSize: 11, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
               {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
             </Text>

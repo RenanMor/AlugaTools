@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { FlatList, Image, Modal, Pressable, ScrollView, Text, TextInput, View, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -22,7 +22,10 @@ export default function DashboardScreen() {
     addDeliverer,
     updateDeliverer,
     deleteDeliverer,
-    setRentalStatus
+    setRentalStatus,
+    companies,
+    updateCompanyStatus,
+    refreshCatalog,
   } = useApp();
   const companyId = user?.companyId;
   const hasInvalidCompany = !companyId || companyId === "co1";
@@ -30,6 +33,8 @@ export default function DashboardScreen() {
   const [tab, setTab] = useState<"requests" | "tools" | "deliverers">("requests");
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [showToolForm, setShowToolForm] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const myCompany = companyId ? companies.find((c) => c.id === companyId) : null;
   
   const [editingDeliverer, setEditingDeliverer] = useState<Deliverer | null>(null);
   const [showDelivererForm, setShowDelivererForm] = useState(false);
@@ -85,6 +90,65 @@ export default function DashboardScreen() {
       <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
         Painel da empresa
       </Text>
+
+      {/* Toggle Open/Closed store */}
+      {myCompany && (
+        <Pressable
+          onPress={async () => {
+            if (isUpdatingStatus) return;
+            setIsUpdatingStatus(true);
+            try {
+              const nextStatus = !myCompany.isOpen;
+              await updateCompanyStatus(nextStatus);
+              await refreshCatalog();
+              Alert.alert("Sucesso", `Sua loja agora está ${nextStatus ? "ABERTA" : "FECHADA"}.`);
+            } catch (err: any) {
+              Alert.alert("Erro", "Não foi possível alterar o status da loja.");
+            } finally {
+              setIsUpdatingStatus(false);
+            }
+          }}
+          disabled={isUpdatingStatus}
+          style={({ pressed }) => [
+            {
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backgroundColor: myCompany.isOpen ? colors.success + "15" : colors.error + "15",
+              borderColor: myCompany.isOpen ? colors.success : colors.error,
+              borderWidth: 1,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              marginBottom: 16,
+              opacity: pressed || isUpdatingStatus ? 0.8 : 1,
+            },
+          ]}
+        >
+          <View style={{ gap: 2, flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+              Status da Loja: {myCompany.isOpen ? "Loja Aberta" : "Loja Fechada"}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.muted }}>
+              {myCompany.isOpen 
+                ? "Clientes podem buscar e alugar suas ferramentas" 
+                : "Sua loja está fechada para novos aluguéis"}
+            </Text>
+          </View>
+          <View
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 8,
+              backgroundColor: myCompany.isOpen ? colors.success : colors.error,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 11 }}>
+              {myCompany.isOpen ? "Fechar Loja" : "Abrir Loja"}
+            </Text>
+          </View>
+        </Pressable>
+      )}
 
       <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
         <TabButton label="Pedidos" active={tab === "requests"} onPress={() => setTab("requests")} />

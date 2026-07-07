@@ -79,6 +79,8 @@ export default function AuthScreen() {
   const [cnpj, setCnpj] = useState("");
   const [phone, setPhone] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -147,6 +149,11 @@ export default function AuthScreen() {
           }
           if (!validateCNPJ(cleanCnpj)) {
             alert("CNPJ inválido. Digite um CNPJ real.");
+            setLoading(false);
+            return;
+          }
+          if (!state.trim() || !city.trim()) {
+            alert("Estado e Cidade são obrigatórios para empresas");
             setLoading(false);
             return;
           }
@@ -261,7 +268,9 @@ export default function AuthScreen() {
         mode === "register",
         loginCpf,
         phone,
-        loginCnpj
+        loginCnpj,
+        state.trim(),
+        city.trim()
       );
 
       // Use the returned user's actual profile!
@@ -337,6 +346,8 @@ export default function AuthScreen() {
                     placeholder="Razão social ou nome fantasia"
                     editable={validateCNPJ(cnpj.replace(/\D/g, ""))}
                   />
+                  <Input label="Estado (UF)" value={state} onChangeText={setState} placeholder="Ex: SP" />
+                  <Input label="Cidade" value={city} onChangeText={setCity} placeholder="Ex: Campinas" />
                 </>
               )}
               <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />

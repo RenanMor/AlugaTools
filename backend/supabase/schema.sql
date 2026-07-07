@@ -8,6 +8,7 @@ create table if not exists public.users (
   phone text not null,
   password text not null,
   role text not null default 'user' check (role in ('user', 'admin', 'owner', 'deliverer')),
+  avatar_url text,
   created_at timestamptz not null default now()
 );
 
@@ -19,6 +20,9 @@ create table if not exists public.companies (
   description text,
   category_id text,
   location text,
+  state text,
+  city text,
+  is_open boolean not null default true,
   rating numeric(2,1) not null default 0,
   rating_count integer not null default 0,
   created_at timestamptz not null default now()

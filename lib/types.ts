@@ -50,6 +50,9 @@ export interface Company {
   rating: number;
   ratingCount: number;
   location: string;
+  state?: string;
+  city?: string;
+  isOpen?: boolean;
 }
 
 export interface CartItem {
@@ -106,4 +109,5 @@ export interface SessionUser {
   companyId?: string;
   delivererCompanyId?: string;
   role?: string;
+  avatarUrl?: string;
 }

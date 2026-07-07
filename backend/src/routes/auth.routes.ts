@@ -6,7 +6,7 @@ const router = Router();
 
 router.post("/signup", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, profile, cpf, cnpj, phone, role } = req.body;
+    const { email, password, name, profile, cpf, cnpj, phone, role, state, city } = req.body;
 
     if (profile === "company") {
       if (!email || !password || !name || !cnpj || !phone) {
@@ -54,15 +54,18 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
     // 3. Create default company if profile is 'company'
     let companyId: string | undefined;
     if (profile === "company") {
+      const cleanName = name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
       const { data: companyData, error: companyError } = await supabaseAdmin
         .from("companies")
         .insert({
           owner_id: userData.user.id,
-          name: `${name} Locações`,
+          name: cleanName,
           logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-          description: "Locação de ferramentas",
+          description: "Locação de ferramentas e serviços",
           category_id: "c1",
-          location: "São Paulo, SP",
+          location: `${city || "São Paulo"}, ${state || "SP"}`,
+          state: state || "SP",
+          city: city || "São Paulo",
         })
         .select()
         .single();
@@ -202,15 +205,18 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         companyId = companyData.id;
       } else {
         // Self-healing: create the missing company record!
+        const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
         const { data: newCompany } = await supabaseAdmin
           .from("companies")
           .insert({
             owner_id: dbUser.id,
-            name: `${dbUser.name} Locações`,
+            name: cleanCompName,
             logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-            description: "Locação de ferramentas",
+            description: "Locação de ferramentas e serviços",
             category_id: "c1",
             location: "São Paulo, SP",
+            state: "SP",
+            city: "São Paulo",
           })
           .select()
           .single();
@@ -239,6 +245,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         role: dbUser.role || "user",
         companyId,
         delivererCompanyId,
+        avatarUrl: dbUser.avatar_url,
       }
     });
   } catch (err) {
@@ -319,15 +326,18 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         companyId = companyData.id;
       } else {
         // Self-healing: create the missing company record!
+        const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
         const { data: newCompany } = await supabaseAdmin
           .from("companies")
           .insert({
             owner_id: dbUser.id,
-            name: `${dbUser.name} Locações`,
+            name: cleanCompName,
             logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-            description: "Locação de ferramentas",
+            description: "Locação de ferramentas e serviços",
             category_id: "c1",
             location: "São Paulo, SP",
+            state: "SP",
+            city: "São Paulo",
           })
           .select()
           .single();
@@ -355,6 +365,38 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         role: dbUser.role || "user",
         companyId,
         delivererCompanyId,
+        avatarUrl: dbUser.avatar_url,
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId;
+    const { avatarUrl } = req.body;
+
+    const { data: dbUser, error: dbError } = await supabaseAdmin
+      .from("users")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (dbError) {
+      return res.status(400).json({ error: dbError.message });
+    }
+
+    res.json({
+      user: {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        profile: dbUser.profile,
+        role: dbUser.role || "user",
+        avatarUrl: dbUser.avatar_url,
       }
     });
   } catch (err) {

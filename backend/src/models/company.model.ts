@@ -9,6 +9,9 @@ export interface Company {
   rating: number;
   rating_count: number;
   location: string;
+  state: string | null;
+  city: string | null;
+  is_open: boolean;
   owner_id: string;
 }
 

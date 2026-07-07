@@ -1,17 +1,17 @@
 import { router } from "expo-router";
-import { useEffect } from "react";
-import { FlatList, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useState, useMemo } from "react";
+import { FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
-import { CATEGORIES } from "@/lib/data";
 import { Company } from "@/lib/types";
 
 export default function HomeScreen() {
   const colors = useColors();
   const { companies, user } = useApp();
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (user?.profile === "deliverer") {
@@ -19,10 +19,24 @@ export default function HomeScreen() {
     }
   }, [user]);
 
+  const filteredCompanies = useMemo(() => {
+    const filtered = companies.filter((c) =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    // Prioritize open stores: "A busca de empresas dá prioridade para lojas abertas;"
+    return filtered.sort((a, b) => {
+      const aOpen = a.isOpen !== false;
+      const bOpen = b.isOpen !== false;
+      if (aOpen && !bOpen) return -1;
+      if (!aOpen && bOpen) return 1;
+      return 0;
+    });
+  }, [companies, searchQuery]);
+
   return (
     <ScreenContainer>
       <FlatList
-        data={companies}
+        data={filteredCompanies}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
         ListHeaderComponent={
@@ -36,8 +50,7 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            <Pressable
-              onPress={() => router.push("/search")}
+            <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -45,58 +58,19 @@ export default function HomeScreen() {
                 backgroundColor: colors.surface,
                 borderRadius: 14,
                 paddingHorizontal: 14,
-                paddingVertical: 13,
+                paddingVertical: 12,
                 borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
               <IconSymbol name="magnifyingglass" size={20} color={colors.muted} />
-              <Text style={{ color: colors.muted, fontSize: 15 }}>O que você precisa alugar?</Text>
-            </Pressable>
-
-            <View>
-              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
-                Categorias
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ flexGrow: 0 }}
-                contentContainerStyle={{ gap: 12, alignItems: "center" }}
-              >
-                {CATEGORIES.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => router.push({ pathname: "/search", params: { category: cat.id } })}
-                    style={({ pressed }) => [
-                      {
-                        alignItems: "center",
-                        gap: 8,
-                        width: 78,
-                        opacity: pressed ? 0.7 : 1,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: 18,
-                        backgroundColor: colors.surface,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                    >
-                      <IconSymbol name="wrench.fill" size={26} color={colors.primary} />
-                    </View>
-                    <Text numberOfLines={1} style={{ fontSize: 12, color: colors.foreground, textAlign: "center" }}>
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Buscar empresas pelo nome"
+                placeholderTextColor={colors.muted}
+                style={{ flex: 1, color: colors.foreground, fontSize: 15 }}
+              />
             </View>
 
             <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginTop: 4 }}>
@@ -142,6 +116,10 @@ function CompanyCard({ company }: { company: Company }) {
           <StarRating value={company.rating} size={14} />
           <Text style={{ fontSize: 12, color: colors.muted }}>
             {company.rating.toFixed(1)} ({company.ratingCount})
+          </Text>
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.muted, marginHorizontal: 2 }} />
+          <Text style={{ fontSize: 11, fontWeight: "700", color: (company.isOpen !== false) ? colors.success : colors.error }}>
+            {(company.isOpen !== false) ? "Loja Aberta" : "Loja Fechada"}
           </Text>
         </View>
       </View>

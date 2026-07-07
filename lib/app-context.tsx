@@ -41,8 +41,10 @@ interface AppState {
     isRegister?: boolean,
     cpf?: string,
     phone?: string,
-    cnpj?: string
-  ) => Promise<void>;
+    cnpj?: string,
+    state?: string,
+    city?: string
+  ) => Promise<any>;
   logout: () => void;
   checkout: () => Promise<void>;
   rateRental: (rentalId: string, rating: number, comment?: string) => void;
@@ -57,6 +59,9 @@ interface AppState {
   refreshCatalog: () => Promise<void>;
   refreshRentals: () => Promise<void>;
   refreshDeliverers: () => Promise<void>;
+  updateAvatar: (avatarUrl: string) => Promise<void>;
+  updateCompanyStatus: (isOpen: boolean) => Promise<void>;
+  checkSession: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -224,7 +229,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isRegister?: boolean,
     cpf?: string,
     phone?: string,
-    cnpj?: string
+    cnpj?: string,
+    state?: string,
+    city?: string
   ) => {
     try {
       let response: any;
@@ -240,6 +247,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             cpf: cpf ? cpf.replace(/\D/g, "") : undefined,
             cnpj: cnpj ? cnpj.replace(/\D/g, "") : undefined,
             phone: phone ? phone.replace(/\D/g, "") : "",
+            state,
+            city,
           }),
         });
       } else {
@@ -284,6 +293,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshRentals = useCallback(async () => {
     await loadRentals();
   }, [loadRentals]);
+
+  const checkSession = useCallback(async () => {
+    try {
+      const response = await apiCall<{ user: SessionUser }>("/api/auth/me");
+      if (response.user) {
+        setUser(response.user);
+      }
+    } catch (err) {
+      console.error("Erro ao verificar sessão:", err);
+    }
+  }, []);
+
+  const updateAvatar = useCallback(async (avatarUrl: string) => {
+    try {
+      const res = await apiCall<{ user: any }>("/api/auth/avatar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl }),
+      });
+      if (res.user) {
+        setUser((prev) => prev ? { ...prev, avatarUrl: res.user.avatarUrl || res.user.avatar_url } : null);
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar avatar:", err);
+      throw err;
+    }
+  }, []);
+
+  const updateCompanyStatus = useCallback(async (isOpen: boolean) => {
+    if (!user?.companyId) return;
+    try {
+      await apiCall<{ data: any }>(`/api/companies/${user.companyId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_open: isOpen }),
+      });
+      await loadCatalog();
+    } catch (err) {
+      console.error("Erro ao atualizar status da empresa:", err);
+      throw err;
+    }
+  }, [user, loadCatalog]);
 
   // Rental operations (Legacy context helper - actual checkout happens on the checkout screen)
   const checkout = useCallback(async () => {
@@ -433,6 +484,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshCatalog,
       refreshRentals,
       refreshDeliverers,
+      updateAvatar,
+      updateCompanyStatus,
+      checkSession,
     }),
     [
       companies,
@@ -461,6 +515,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshCatalog,
       refreshRentals,
       refreshDeliverers,
+      updateAvatar,
+      updateCompanyStatus,
+      checkSession,
     ],
   );
 

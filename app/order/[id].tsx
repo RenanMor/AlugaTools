@@ -436,7 +436,7 @@ export default function OrderDetailsScreen() {
           </>
         )}
 
-        {rental.status === "completed" && !isDeliverer && (
+        {rental.status === "completed" && user?.profile === "customer" && (
           <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10, alignItems: "center", width: "100%" }}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
               {rental.rating ? "Sua avaliação" : "Avalie este serviço"}

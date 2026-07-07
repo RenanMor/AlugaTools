@@ -1,15 +1,70 @@
 import { router } from "expo-router";
-import { Pressable, Switch, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, Switch, Text, View, Platform, Alert, Image } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
-import { useThemeContext } from "@/lib/theme-provider";
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const { user, logout } = useApp();
-  const themeMode = useThemeContext();
+  const { user, logout, companies, updateAvatar, updateCompanyStatus, refreshCatalog } = useApp();
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+
+  const myCompany = user?.profile === "company" && user.companyId 
+    ? companies.find((c) => c.id === user.companyId) 
+    : null;
+
+  const handleUploadImage = () => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const base64 = reader.result as string;
+            await uploadAvatar(base64);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      Alert.prompt(
+        "Atualizar Foto de Perfil",
+        "Insira a URL da foto de perfil:",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Salvar",
+            onPress: async (url) => {
+              if (url) {
+                await uploadAvatar(url);
+              }
+            },
+          },
+        ],
+        "plain-text",
+        user?.avatarUrl || ""
+      );
+    }
+  };
+
+  const uploadAvatar = async (urlOrBase64: string) => {
+    if (isUpdatingAvatar) return;
+    setIsUpdatingAvatar(true);
+    try {
+      await updateAvatar(urlOrBase64);
+      Alert.alert("Sucesso", "Foto de perfil atualizada!");
+    } catch (err: any) {
+      Alert.alert("Erro", err.message || "Erro ao atualizar foto.");
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
 
   return (
     <ScreenContainer className="p-4">
@@ -31,11 +86,31 @@ export default function ProfileScreen() {
               borderColor: colors.border,
             }}
           >
-            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
-                {user.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            <Pressable
+              onPress={handleUploadImage}
+              style={({ pressed }) => [
+                {
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  opacity: pressed || isUpdatingAvatar ? 0.8 : 1,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {user.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={{ width: "100%", height: "100%" }} />
+              ) : (
+                <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
+                  {user.name.charAt(0).toUpperCase()}
+                </Text>
+              )}
+            </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>{user.name}</Text>
               <Text style={{ fontSize: 13, color: colors.muted }}>{user.email}</Text>
@@ -47,17 +122,26 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <Row
-            icon="gearshape.fill"
-            label="Modo escuro"
-            right={
-              <Switch
-                value={themeMode.colorScheme === "dark"}
-                onValueChange={(v) => themeMode.setColorScheme(v ? "dark" : "light")}
-                trackColor={{ true: colors.primary }}
-              />
-            }
-          />
+          {myCompany && (
+            <Row
+              icon="storefront.fill"
+              label={`Status da Loja: ${myCompany.isOpen ? "Aberta" : "Fechada"}`}
+              right={
+                <Switch
+                  value={myCompany.isOpen}
+                  onValueChange={async (v) => {
+                    try {
+                      await updateCompanyStatus(v);
+                      await refreshCatalog();
+                    } catch (err: any) {
+                      Alert.alert("Erro", "Não foi possível alterar o status.");
+                    }
+                  }}
+                  trackColor={{ true: colors.success }}
+                />
+              }
+            />
+          )}
 
           <Pressable
             onPress={() => {
