@@ -29,6 +29,7 @@ const MAPPING = {
   "wrench.fill": "build",
   "location.fill": "location-on",
   "tag.fill": "local-offer",
+  "trending.up": "trending-up",
 } as IconMapping;
 
 export function IconSymbol({

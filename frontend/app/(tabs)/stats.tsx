@@ -101,7 +101,7 @@ export default function StatsScreen() {
     return (
       <ScreenContainer className="p-4">
         <View style={{ alignItems: "center", marginTop: 100, gap: 12 }}>
-          <IconSymbol name="chart.bar.fill" size={48} color={colors.muted} />
+          <IconSymbol name="trending.up" size={48} color={colors.muted} />
           <Text style={{ color: colors.muted, textAlign: "center" }}>
             Apenas empresas podem acessar o controle de estatísticas.
           </Text>

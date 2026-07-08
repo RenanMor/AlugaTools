@@ -76,7 +76,7 @@ export default function TabLayout() {
         options={{
           title: "Controle",
           href: (isCompany && !isDeliverer ? "/stats" : null) as any,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="trending.up" color={color} />,
         }}
       />
       <Tabs.Screen
