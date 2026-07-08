@@ -1,0 +1,469 @@
+import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+import { Pressable, Text, TextInput, View, ScrollView } from "react-native";
+import { ScreenContainer } from "@/components/screen-container";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useColors } from "@/hooks/use-colors";
+import { useApp } from "@/lib/app-context";
+import { ProfileType } from "@/lib/types";
+
+function validateCPF(cpf: string): boolean {
+  cpf = cpf.replace(/[^\d]+/g, "");
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  let sum = 0;
+  let remainder;
+
+  for (let i = 1; i <= 9; i++) {
+    sum = sum + parseInt(cpf.substring(i - 1, i)) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum = sum + parseInt(cpf.substring(i - 1, i)) * (12 - i);
+  }
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf.substring(10, 11))) return false;
+
+  return true;
+}
+
+function validateCNPJ(cnpj: string): boolean {
+  cnpj = cnpj.replace(/[^\d]+/g, "");
+  if (cnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+
+  let size = cnpj.length - 2;
+  let numbers = cnpj.substring(0, size);
+  const digits = cnpj.substring(size);
+  let sum = 0;
+  let pos = size - 7;
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (result !== parseInt(digits.charAt(0))) return false;
+
+  size = size + 1;
+  numbers = cnpj.substring(0, size);
+  sum = 0;
+  pos = size - 7;
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (result !== parseInt(digits.charAt(1))) return false;
+
+  return true;
+}
+
+export default function AuthScreen() {
+  const colors = useColors();
+  const { login, checkout, cart } = useApp();
+  const params = useLocalSearchParams<{ intent?: string }>();
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [profile, setProfile] = useState<ProfileType>("customer");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [phone, setPhone] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+  const handleCpfChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 11);
+
+    let formatted = limited;
+    if (limited.length > 9) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
+    } else if (limited.length > 6) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
+    } else if (limited.length > 3) {
+      formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+    }
+    setCpf(formatted);
+  };
+
+  const handleCnpjChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 14);
+
+    let formatted = limited;
+    if (limited.length > 12) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8, 12)}-${limited.slice(12, 14)}`;
+    } else if (limited.length > 8) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5, 8)}/${limited.slice(8)}`;
+    } else if (limited.length > 5) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2, 5)}.${limited.slice(5)}`;
+    } else if (limited.length > 2) {
+      formatted = `${limited.slice(0, 2)}.${limited.slice(2)}`;
+    }
+    setCnpj(formatted);
+  };
+
+  const handlePhoneChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    const limited = cleaned.slice(0, 11);
+
+    let formatted = limited;
+    if (limited.length > 6) {
+      formatted = `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    } else if (limited.length > 2) {
+      formatted = `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    }
+    setPhone(formatted);
+  };
+
+  const submit = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (mode === "register") {
+        if (profile === "deliverer") {
+          alert("Cadastro de entregador deve ser realizado pela empresa parceira.");
+          setLoading(false);
+          return;
+        }
+
+        if (profile === "company") {
+          const cleanCnpj = cnpj.replace(/\D/g, "");
+          if (!cleanCnpj) {
+            alert("CNPJ é obrigatório para empresas");
+            setLoading(false);
+            return;
+          }
+          if (!validateCNPJ(cleanCnpj)) {
+            alert("CNPJ inválido. Digite um CNPJ real.");
+            setLoading(false);
+            return;
+          }
+          if (!state.trim() || !city.trim()) {
+            alert("Estado e Cidade são obrigatórios para empresas");
+            setLoading(false);
+            return;
+          }
+        } else {
+          const cleanCpf = cpf.replace(/\D/g, "");
+          if (!cleanCpf) {
+            alert("CPF é obrigatório para clientes");
+            setLoading(false);
+            return;
+          }
+          if (!validateCPF(cleanCpf)) {
+            alert("CPF inválido. Digite um CPF real.");
+            setLoading(false);
+            return;
+          }
+        }
+
+        const cleanPhone = phone.replace(/\D/g, "");
+        if (!cleanPhone || cleanPhone.length < 10) {
+          alert("Telefone inválido (deve conter DDD e o número)");
+          setLoading(false);
+          return;
+        }
+
+        if (!name.trim()) {
+          alert(profile === "company" ? "Nome da empresa é obrigatório" : "Nome completo é obrigatório");
+          setLoading(false);
+          return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email.trim() || !emailRegex.test(email.trim())) {
+          alert("E-mail inválido. Digite um e-mail válido.");
+          setLoading(false);
+          return;
+        }
+
+        if (!password || password.length < 6) {
+          alert("A senha deve ter pelo menos 6 caracteres");
+          setLoading(false);
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          alert("A confirmação de senha não coincide com a senha preenchida");
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Mode: Login
+        if (profile === "deliverer") {
+          if (!email.trim()) {
+            alert("E-mail é obrigatório para entrar");
+            setLoading(false);
+            return;
+          }
+        } else {
+          const documentToLogin = (profile === "company" ? cnpj : cpf).replace(/\D/g, "");
+          
+          if (!documentToLogin && !email.trim()) {
+            alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
+            setLoading(false);
+            return;
+          }
+
+          const isCpf = documentToLogin.length === 11;
+          const isCnpj = documentToLogin.length === 14;
+
+          if (documentToLogin && !isCpf && !isCnpj) {
+            alert("CPF ou CNPJ inválido. Digite 11 dígitos para CPF ou 14 para CNPJ.");
+            setLoading(false);
+            return;
+          }
+        }
+
+        if (!password) {
+          alert("Senha é obrigatória");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If they used a document, figure out which one it is
+      let loginCpf: string | undefined;
+      let loginCnpj: string | undefined;
+      
+      if (mode === "login" && profile !== "deliverer") {
+        const rawDoc = profile === "company" ? cnpj : cpf;
+        const cleanDoc = rawDoc.replace(/\D/g, "");
+        if (cleanDoc) {
+          if (profile === "company") loginCnpj = cleanDoc;
+          else loginCpf = cleanDoc;
+        }
+      } else if (mode === "register") {
+        loginCpf = profile === "customer" ? cpf : undefined;
+        loginCnpj = profile === "company" ? cnpj : undefined;
+      }
+      
+      console.log("[Frontend Auth] Invoking login()", {
+        email: email.trim(),
+        profile,
+        loginCpf,
+        loginCnpj,
+        isRegister: mode === "register"
+      });
+
+      const returnedUser = await login(
+        email.trim(),
+        name.trim() || "Usuário",
+        profile,
+        password,
+        mode === "register",
+        loginCpf,
+        phone,
+        loginCnpj,
+        state.trim(),
+        city.trim()
+      );
+
+      // Use the returned user's actual profile!
+      const actualProfile = returnedUser?.profile || profile;
+
+      if (params.intent === "checkout" && actualProfile === "customer" && cart.length > 0) {
+        await checkout();
+        router.dismiss();
+        router.push("/orders");
+        return;
+      }
+      
+      router.dismiss();
+      if (actualProfile === "company") {
+        router.push("/dashboard");
+      } else if (actualProfile === "deliverer") {
+        router.push("/orders");
+      }
+    } catch (err: any) {
+      alert(err.message || "Erro de autenticação. Verifique suas credenciais.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ScreenContainer edges={["top", "left", "right"]} className="p-5">
+      <Pressable onPress={() => router.dismiss()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, alignSelf: "flex-end" }]}>
+        <IconSymbol name="xmark" size={24} color={colors.foreground} />
+      </Pressable>
+
+      <View style={{ marginTop: 12, gap: 6, marginBottom: 12 }}>
+        <Text style={{ fontSize: 26, fontWeight: "800", color: colors.foreground }}>
+          {mode === "login" ? "Entrar" : "Criar conta"}
+        </Text>
+        <Text style={{ fontSize: 14, color: colors.muted }}>
+          {params.intent === "checkout"
+            ? "Entre para finalizar seu aluguel"
+            : "Acesse sua conta AlugaTools"}
+        </Text>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
+        <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
+          <Segment label="Cliente" active={profile === "customer"} onPress={() => setProfile("customer")} />
+          <Segment label="Empresa" active={profile === "company"} onPress={() => setProfile("company")} />
+          {mode === "login" && (
+            <Segment label="Entregador" active={profile === "deliverer"} onPress={() => { setProfile("deliverer"); setMode("login"); }} />
+          )}
+        </View>
+
+        <View style={{ gap: 14, marginTop: 22 }}>
+          {mode === "register" ? (
+            <>
+              {profile === "customer" ? (
+                <>
+                  <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
+                  <Input
+                    label="Nome completo"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Nome do titular do CPF"
+                    editable={validateCPF(cpf.replace(/\D/g, ""))}
+                  />
+                </>
+              ) : (
+                <>
+                  <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
+                  <Input
+                    label="Nome da empresa"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Razão social ou nome fantasia"
+                    editable={validateCNPJ(cnpj.replace(/\D/g, ""))}
+                  />
+                  <Input label="Estado (UF)" value={state} onChangeText={setState} placeholder="Ex: SP" />
+                  <Input label="Cidade" value={city} onChangeText={setCity} placeholder="Ex: Campinas" />
+                </>
+              )}
+              <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
+              <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@exemplo.com" keyboardType="email-address" />
+            </>
+          ) : (
+            <>
+              {profile === "customer" && (
+                <Input label="CPF" value={cpf} onChangeText={handleCpfChange} placeholder="000.000.000-00" keyboardType="number-pad" />
+              )}
+              {profile === "company" && (
+                <Input label="CNPJ" value={cnpj} onChangeText={handleCnpjChange} placeholder="00.000.000/0000-00" keyboardType="number-pad" />
+              )}
+              {profile === "deliverer" && (
+                <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@entregador.com" keyboardType="email-address" />
+              )}
+            </>
+          )}
+          <Input label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
+          {mode === "register" && (
+            <Input label="Confirmar Senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••••" secureTextEntry />
+          )}
+        </View>
+
+        <Pressable
+          onPress={submit}
+          style={({ pressed }) => [
+            { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 24, transform: [{ scale: pressed ? 0.98 : 1 }] },
+          ]}
+        >
+          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
+            {loading ? "Carregando..." : (mode === "login" ? "Entrar" : "Criar conta e continuar")}
+          </Text>
+        </Pressable>
+
+        {profile !== "deliverer" && (
+          <Pressable
+            onPress={() => {
+              const newMode = mode === "login" ? "register" : "login";
+              setMode(newMode);
+              if (newMode === "register" && profile === "deliverer") {
+                setProfile("customer");
+              }
+            }}
+            style={({ pressed }) => [{ marginTop: 18, alignItems: "center", opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Text style={{ color: colors.muted, fontSize: 14 }}>
+              {mode === "login" ? "Não tem conta? " : "Já tem conta? "}
+              <Text style={{ color: colors.primary, fontWeight: "700" }}>
+                {mode === "login" ? "Cadastre-se" : "Entrar"}
+              </Text>
+            </Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </ScreenContainer>
+  );
+}
+
+function Segment({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const colors = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flex: 1,
+          paddingVertical: 12,
+          borderRadius: 12,
+          alignItems: "center",
+          backgroundColor: active ? colors.primary : colors.surface,
+          borderWidth: 1,
+          borderColor: active ? colors.primary : colors.border,
+          opacity: pressed ? 0.85 : 1,
+        },
+      ]}
+    >
+      <Text style={{ color: active ? "#fff" : colors.foreground, fontWeight: "700", fontSize: 13 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Input({
+  label,
+  editable = true,
+  ...props
+}: {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "email-address" | "number-pad" | "phone-pad";
+  secureTextEntry?: boolean;
+  editable?: boolean;
+}) {
+  const colors = useColors();
+  return (
+    <View style={{ gap: 6, opacity: editable ? 1 : 0.5 }}>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>{label}</Text>
+      <TextInput
+        {...props}
+        editable={editable}
+        autoCapitalize="none"
+        placeholderTextColor={colors.muted}
+        returnKeyType="done"
+        style={{
+          backgroundColor: editable ? colors.surface : colors.background,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          paddingHorizontal: 14,
+          paddingVertical: 13,
+          color: colors.foreground,
+          fontSize: 15,
+        }}
+      />
+    </View>
+  );
+}
