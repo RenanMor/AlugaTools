@@ -2,9 +2,13 @@ import { apiCall } from "../_core/api";
 import { Company } from "../types";
 
 export function mapCompany(data: any): Company {
+  const cleanName = (data.name || "")
+    .replace(/^Locações\s+/i, "")
+    .replace(/\s+Locações$/i, "");
+
   return {
     id: data.id,
-    name: data.name,
+    name: cleanName,
     logo: data.logo || "",
     description: data.description || "",
     categoryId: data.category_id,

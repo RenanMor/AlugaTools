@@ -119,7 +119,6 @@ function ToolGridCard({ tool }: { tool: Tool }) {
       .map((id) => CATEGORIES.find((c) => c.id === id)?.name)
       .filter((n): n is string => !!n);
   }, [tool.categoryId]);
-
   const categoryText = useMemo(() => {
     if (categoryNames.length === 0) return "";
     if (categoryNames.length <= 2) {
@@ -147,7 +146,7 @@ function ToolGridCard({ tool }: { tool: Tool }) {
       <Image source={{ uri: tool.image || "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80" }} style={{ width: "100%", height: 110, backgroundColor: colors.border }} />
       <View style={{ padding: 10, gap: 4 }}>
         <View style={{ gap: 2 }}>
-          <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, minHeight: 34 }}>
+          <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
             {tool.name}
           </Text>
           {categoryText ? (
