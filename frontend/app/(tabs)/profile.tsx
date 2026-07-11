@@ -64,9 +64,9 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer className="p-4" style={{ position: "relative" }}>
-      {user?.avatarUrl ? (
+      {user?.avatarUrl || myCompany?.logo ? (
         <Image
-          source={{ uri: user.avatarUrl }}
+          source={{ uri: user.avatarUrl || myCompany?.logo }}
           style={{
             position: "absolute",
             alignSelf: "center",
@@ -114,8 +114,8 @@ export default function ProfileScreen() {
                 },
               ]}
             >
-              {user.avatarUrl ? (
-                <Image source={{ uri: user.avatarUrl }} style={{ width: "100%", height: "100%" }} />
+              {user.avatarUrl || myCompany?.logo ? (
+                <Image source={{ uri: user.avatarUrl || myCompany?.logo }} style={{ width: "100%", height: "100%" }} />
               ) : (
                 <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
                   {user.name.charAt(0).toUpperCase()}

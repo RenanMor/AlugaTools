@@ -84,7 +84,7 @@ export default function ToolScreen() {
             <Text style={{ fontSize: 14, color: colors.muted }}>{company.name}</Text>
           </Pressable>
 
-          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.primary }}>
+          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.success }}>
             R$ {tool.pricePerDay}
             <Text style={{ fontSize: 15, color: colors.muted, fontWeight: "500" }}> /dia</Text>
           </Text>

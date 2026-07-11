@@ -24,12 +24,13 @@ export function useColors(colorSchemeOverride?: ColorScheme): ThemeColorPalette 
 
   const baseColors = Colors[scheme];
   if (dynamicPrimary) {
+    const activeColor = dynamicSecondary || dynamicPrimary;
     return {
       ...baseColors,
-      primary: dynamicPrimary,
-      secondary: dynamicSecondary || baseColors.secondary || dynamicPrimary,
-      tint: dynamicPrimary,
-      tabIconSelected: dynamicPrimary,
+      primary: activeColor,
+      secondary: dynamicPrimary,
+      tint: activeColor,
+      tabIconSelected: activeColor,
     };
   }
 

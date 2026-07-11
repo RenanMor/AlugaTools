@@ -1,7 +1,9 @@
 import { View, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
-
+import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from "react-native-svg";
 import { cn } from "@/lib/utils";
+import { useColors } from "@/hooks/use-colors";
+import { useThemeContext } from "@/lib/theme-provider";
 
 export interface ScreenContainerProps extends ViewProps {
   /**
@@ -28,15 +30,6 @@ export interface ScreenContainerProps extends ViewProps {
  *
  * The outer View extends to full screen (including status bar area) with the background color,
  * while the inner SafeAreaView ensures content is within safe bounds.
- *
- * Usage:
- * ```tsx
- * <ScreenContainer className="p-4">
- *   <Text className="text-2xl font-bold text-foreground">
- *     Welcome
- *   </Text>
- * </ScreenContainer>
- * ```
  */
 export function ScreenContainer({
   children,
@@ -47,6 +40,15 @@ export function ScreenContainer({
   style,
   ...props
 }: ScreenContainerProps) {
+  const colors = useColors();
+  let primaryColor: string | null = null;
+  try {
+    const themeContext = useThemeContext();
+    primaryColor = themeContext?.primaryColor;
+  } catch (err) {
+    // Silent fallback
+  }
+
   return (
     <View
       className={cn(
@@ -54,8 +56,22 @@ export function ScreenContainer({
         "bg-background",
         containerClassName
       )}
+      style={{ position: "relative" }}
       {...props}
     >
+      {primaryColor ? (
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: -2 }}>
+          <Svg height="100%" width="100%">
+            <Defs>
+              <SvgGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <Stop offset="0%" stopColor={colors.background} stopOpacity="1" />
+                <Stop offset="100%" stopColor={primaryColor} stopOpacity="0.18" />
+              </SvgGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#bgGrad)" />
+          </Svg>
+        </View>
+      ) : null}
       <SafeAreaView
         edges={edges}
         className={cn("flex-1", safeAreaClassName)}

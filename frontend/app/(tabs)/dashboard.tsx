@@ -437,7 +437,7 @@ function ToolManageRow({ tool, onEdit, onDelete }: { tool: Tool; onEdit: () => v
       <Image source={tool.image ? { uri: tool.image } : require("@/assets/images/sem-imagem.png")} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: colors.border }} />
       <View style={{ flex: 1 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{tool.name}</Text>
-        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.success }}>
           R$ {tool.pricePerDay}/dia · Qtd: {tool.quantity ?? 1}
         </Text>
         <Text style={{ fontSize: 11, color: colors.muted }}>

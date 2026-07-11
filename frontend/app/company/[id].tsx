@@ -194,7 +194,7 @@ function ToolGridCard({ tool }: { tool: Tool }) {
         </View>
 
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>R$ {tool.pricePerDay}/dia</Text>
+          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.success }}>R$ {tool.pricePerDay}/dia</Text>
           
           <View style={{ alignItems: "flex-end", gap: 2 }}>
             {tool.rating !== undefined && tool.rating > 0 ? (

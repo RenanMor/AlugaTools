@@ -199,7 +199,7 @@ function ToolRow({ tool, company }: { tool: Tool; company: string }) {
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 2 }}>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.success }}>
             R$ {tool.pricePerDay}/dia
           </Text>
           
