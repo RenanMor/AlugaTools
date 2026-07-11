@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Image, Platform, Pressable, ScrollView, Text, View, Modal, TextInput } from "react-native";
 import { StarRating } from "@/components/star-rating";
 import { getToolReviews } from "@/lib/api/tools";
@@ -34,24 +34,30 @@ export default function ToolScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (company) {
-      if (company.primaryColor) {
-        setPrimaryColor(company.primaryColor);
-        if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
-      } else if (company.logo) {
-        extractPalette(company.logo).then((palette) => {
-          setPrimaryColor(palette.primary);
-          setSecondaryColor(palette.secondary);
-        });
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (company) {
+        if (company.primaryColor) {
+          setPrimaryColor(company.primaryColor);
+          if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
+        } else if (company.logo) {
+          extractPalette(company.logo).then((palette) => {
+            if (active) {
+              setPrimaryColor(palette.primary);
+              setSecondaryColor(palette.secondary);
+            }
+          });
+        }
       }
-    }
-    return () => {
-      // Restore user's own brand colors on leave instead of resetting to null
-      setPrimaryColor(user?.primaryColor || null);
-      setSecondaryColor(user?.secondaryColor || null);
-    };
-  }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor]);
+      return () => {
+        active = false;
+        // Restore user's own brand colors on leave instead of resetting to null
+        setPrimaryColor(user?.primaryColor || null);
+        setSecondaryColor(user?.secondaryColor || null);
+      };
+    }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
+  );
 
   const topReviews = useMemo(() => {
     return [...reviews].sort((a, b) => b.rating - a.rating).slice(0, 4);

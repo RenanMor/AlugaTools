@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useState, useMemo, useEffect } from "react";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -28,24 +28,30 @@ export default function CompanyScreen() {
     );
   }, [companyTools, searchQuery]);
 
-  useEffect(() => {
-    if (company) {
-      if (company.primaryColor) {
-        setPrimaryColor(company.primaryColor);
-        if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
-      } else if (company.logo) {
-        extractPalette(company.logo).then((palette) => {
-          setPrimaryColor(palette.primary);
-          setSecondaryColor(palette.secondary);
-        });
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (company) {
+        if (company.primaryColor) {
+          setPrimaryColor(company.primaryColor);
+          if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
+        } else if (company.logo) {
+          extractPalette(company.logo).then((palette) => {
+            if (active) {
+              setPrimaryColor(palette.primary);
+              setSecondaryColor(palette.secondary);
+            }
+          });
+        }
       }
-    }
-    return () => {
-      // Restore user's own brand colors on leave instead of resetting to null
-      setPrimaryColor(user?.primaryColor || null);
-      setSecondaryColor(user?.secondaryColor || null);
-    };
-  }, [company?.logo, company?.primaryColor, company?.secondaryColor]);
+      return () => {
+        active = false;
+        // Restore user's own brand colors on leave instead of resetting to null
+        setPrimaryColor(user?.primaryColor || null);
+        setSecondaryColor(user?.secondaryColor || null);
+      };
+    }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
+  );
 
   if (!company) {
     return (
