@@ -56,23 +56,7 @@ export default function CompanyScreen() {
   }
 
   return (
-    <ScreenContainer edges={["top", "left", "right"]}>
-      {/* Background large transparent logo */}
-      {company.logo ? (
-        <Image
-          source={{ uri: company.logo }}
-          style={{
-            position: "absolute",
-            top: 120,
-            right: -60,
-            width: 280,
-            height: 280,
-            opacity: 0.20,
-            resizeMode: "contain",
-            transform: [{ rotate: "-15deg" }],
-          }}
-        />
-      ) : null}
+    <ScreenContainer edges={["top", "left", "right"]} watermarkUri={company.logo}>
       <FlatList
         data={filteredTools}
         keyExtractor={(i) => i.id}

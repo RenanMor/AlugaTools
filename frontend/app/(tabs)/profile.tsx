@@ -63,22 +63,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScreenContainer className="p-4" style={{ position: "relative" }}>
-      {user?.avatarUrl || myCompany?.logo ? (
-        <Image
-          source={{ uri: user.avatarUrl || myCompany?.logo }}
-          style={{
-            position: "absolute",
-            alignSelf: "center",
-            top: "30%",
-            width: 320,
-            height: 320,
-            opacity: 0.20,
-            resizeMode: "contain",
-            zIndex: -1,
-          }}
-        />
-      ) : null}
+    <ScreenContainer className="p-4">
       <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 20 }}>
         Perfil
       </Text>

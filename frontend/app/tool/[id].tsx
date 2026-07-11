@@ -8,6 +8,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
+import { useThemeContext } from "@/lib/theme-provider";
+import { extractPalette } from "@/lib/utils";
 
 export default function ToolScreen() {
   const colors = useColors();
@@ -24,12 +26,32 @@ export default function ToolScreen() {
   const [reviews, setReviews] = useState<import("@/lib/types").ToolReview[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [filterType, setFilterType] = useState<"highest" | "lowest" | "recent">("highest");
+  const { setPrimaryColor, setSecondaryColor } = useThemeContext();
 
   useEffect(() => {
     if (id) {
       getToolReviews(id).then(setReviews).catch(err => console.error(err));
     }
   }, [id]);
+
+  useEffect(() => {
+    if (company) {
+      if (company.primaryColor) {
+        setPrimaryColor(company.primaryColor);
+        if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
+      } else if (company.logo) {
+        extractPalette(company.logo).then((palette) => {
+          setPrimaryColor(palette.primary);
+          setSecondaryColor(palette.secondary);
+        });
+      }
+    }
+    return () => {
+      // Restore user's own brand colors on leave instead of resetting to null
+      setPrimaryColor(user?.primaryColor || null);
+      setSecondaryColor(user?.secondaryColor || null);
+    };
+  }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor]);
 
   const topReviews = useMemo(() => {
     return [...reviews].sort((a, b) => b.rating - a.rating).slice(0, 4);
@@ -62,7 +84,7 @@ export default function ToolScreen() {
   };
 
   return (
-    <ScreenContainer edges={["top", "left", "right"]}>
+    <ScreenContainer edges={["top", "left", "right"]} watermarkUri={company.logo}>
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         <View style={{ padding: 16 }}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 6 }]}>

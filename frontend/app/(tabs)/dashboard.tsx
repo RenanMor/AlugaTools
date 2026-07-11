@@ -129,22 +129,7 @@ export default function DashboardScreen() {
   };
 
   return (
-    <ScreenContainer className="p-4" style={{ position: "relative" }}>
-      {myCompany?.logo ? (
-        <Image
-          source={{ uri: myCompany.logo }}
-          style={{
-            position: "absolute",
-            alignSelf: "center",
-            top: "30%",
-            width: 320,
-            height: 320,
-            opacity: 0.20,
-            resizeMode: "contain",
-            zIndex: -1,
-          }}
-        />
-      ) : null}
+    <ScreenContainer className="p-4">
       <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
         Painel da empresa
       </Text>
