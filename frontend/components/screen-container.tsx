@@ -1,6 +1,6 @@
 import { View, Image, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
-import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Defs, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from "react-native-svg";
 import { cn } from "@/lib/utils";
 import { useColors } from "@/hooks/use-colors";
 import { useThemeContext } from "@/lib/theme-provider";
@@ -49,9 +49,11 @@ export function ScreenContainer({
   const colors = useColors();
   const { user, companies } = useApp();
   let primaryColor: string | null = null;
+  let secondaryColor: string | null = null;
   try {
     const themeContext = useThemeContext();
     primaryColor = themeContext?.primaryColor;
+    secondaryColor = themeContext?.secondaryColor;
   } catch (err) {
     // Silent fallback
   }
@@ -69,6 +71,10 @@ export function ScreenContainer({
     }
   }
 
+  const baseColor = primaryColor || colors.primary || "#F97316";
+  const compColor = secondaryColor || "#D946EF";
+  const purpleColor = "#4C1D95";
+
   return (
     <View
       style={{
@@ -81,13 +87,31 @@ export function ScreenContainer({
       <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: -2 }}>
         <Svg height="100%" width="100%" style={{ width: "100%", height: "100%" }}>
           <Defs>
-            <SvgGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#000000" stopOpacity="1" />
-              <Stop offset="35%" stopColor="#000000" stopOpacity="1" />
-              <Stop offset="100%" stopColor={primaryColor || colors.primary} stopOpacity="0.45" />
-            </SvgGradient>
+            <RadialGradient id="topLeftGrad" cx="0%" cy="10%" r="80%" fx="0%" fy="10%">
+              <Stop offset="0%" stopColor={baseColor} stopOpacity="0.55" />
+              <Stop offset="50%" stopColor={baseColor} stopOpacity="0.20" />
+              <Stop offset="100%" stopColor={baseColor} stopOpacity="0" />
+            </RadialGradient>
+
+            <RadialGradient id="rightGrad" cx="100%" cy="50%" r="90%" fx="100%" fy="50%">
+              <Stop offset="0%" stopColor={compColor} stopOpacity="0.45" />
+              <Stop offset="50%" stopColor={compColor} stopOpacity="0.15" />
+              <Stop offset="100%" stopColor={compColor} stopOpacity="0" />
+            </RadialGradient>
+
+            <RadialGradient id="bottomGrad" cx="40%" cy="95%" r="75%" fx="40%" fy="95%">
+              <Stop offset="0%" stopColor={purpleColor} stopOpacity="0.40" />
+              <Stop offset="60%" stopColor={purpleColor} stopOpacity="0.10" />
+              <Stop offset="100%" stopColor={purpleColor} stopOpacity="0" />
+            </RadialGradient>
           </Defs>
-          <Rect width="100%" height="100%" fill="url(#bgGrad)" />
+          {/* Base pure black background */}
+          <Rect width="100%" height="100%" fill="#000000" />
+          
+          {/* Layered glows to form the premium mesh gradient */}
+          <Rect width="100%" height="100%" fill="url(#topLeftGrad)" />
+          <Rect width="100%" height="100%" fill="url(#rightGrad)" />
+          <Rect width="100%" height="100%" fill="url(#bottomGrad)" />
         </Svg>
       </View>
       {watermarkSource ? (
