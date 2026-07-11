@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, Switch, Text, View, Platform, Alert, Image } from "react-native";
+import { Pressable, Switch, Text, View, Platform, Alert, Image, Modal, TextInput } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -10,6 +10,8 @@ export default function ProfileScreen() {
   const colors = useColors();
   const { user, logout, companies, updateAvatar, updateCompanyStatus, refreshCatalog } = useApp();
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [urlInput, setUrlInput] = useState(user?.avatarUrl || "");
 
   const myCompany = user?.profile === "company" && user.companyId 
     ? companies.find((c) => c.id === user.companyId) 
@@ -33,23 +35,8 @@ export default function ProfileScreen() {
       };
       input.click();
     } else {
-      Alert.prompt(
-        "Atualizar Foto de Perfil",
-        "Insira a URL da foto de perfil:",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Salvar",
-            onPress: async (url) => {
-              if (url) {
-                await uploadAvatar(url);
-              }
-            },
-          },
-        ],
-        "plain-text",
-        user?.avatarUrl || ""
-      );
+      setUrlInput(user?.avatarUrl || "");
+      setShowUrlModal(true);
     }
   };
 
@@ -206,6 +193,49 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       )}
+      {/* Modal for Avatar URL Input */}
+      <Modal visible={showUrlModal} transparent={true} animationType="slide" onRequestClose={() => setShowUrlModal(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Inserir URL da Foto</Text>
+              <Pressable onPress={() => setShowUrlModal(false)}>
+                <IconSymbol name="xmark" size={24} color={colors.foreground} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              value={urlInput}
+              onChangeText={setUrlInput}
+              placeholder="https://exemplo.com/foto.jpg"
+              placeholderTextColor={colors.muted}
+              style={{
+                backgroundColor: colors.background,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                color: colors.foreground,
+              }}
+            />
+
+            <Pressable
+              onPress={() => {
+                setShowUrlModal(false);
+                if (urlInput.trim()) {
+                  uploadAvatar(urlInput.trim());
+                }
+              }}
+              style={({ pressed }) => [
+                { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Salvar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

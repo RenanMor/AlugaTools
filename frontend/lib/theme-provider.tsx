@@ -7,12 +7,15 @@ import { SchemeColors, type ColorScheme } from "@/constants/theme";
 type ThemeContextValue = {
   colorScheme: ColorScheme;
   setColorScheme: (scheme: ColorScheme) => void;
+  primaryColor: string | null;
+  setPrimaryColor: (color: string | null) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("dark");
+  const [primaryColor, setPrimaryColor] = useState<string | null>(null);
 
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
@@ -25,8 +28,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       Object.entries(palette).forEach(([token, value]) => {
         root.style.setProperty(`--color-${token}`, value);
       });
+      if (primaryColor) {
+        root.style.setProperty("--color-primary", primaryColor);
+      }
     }
-  }, []);
+  }, [primaryColor]);
 
   const setColorScheme = useCallback((scheme: ColorScheme) => {
     setColorSchemeState(scheme);
@@ -37,10 +43,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyScheme(colorScheme);
   }, [applyScheme, colorScheme]);
 
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const root = document.documentElement;
+      if (primaryColor) {
+        root.style.setProperty("--color-primary", primaryColor);
+      } else {
+        root.style.setProperty("--color-primary", SchemeColors[colorScheme].primary);
+      }
+    }
+  }, [primaryColor, colorScheme]);
+
   const themeVariables = useMemo(
     () =>
       vars({
-        "color-primary": SchemeColors[colorScheme].primary,
+        "color-primary": primaryColor || SchemeColors[colorScheme].primary,
         "color-background": SchemeColors[colorScheme].background,
         "color-surface": SchemeColors[colorScheme].surface,
         "color-foreground": SchemeColors[colorScheme].foreground,
@@ -50,15 +67,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         "color-warning": SchemeColors[colorScheme].warning,
         "color-error": SchemeColors[colorScheme].error,
       }),
-    [colorScheme],
+    [colorScheme, primaryColor],
   );
 
   const value = useMemo(
     () => ({
       colorScheme,
       setColorScheme,
+      primaryColor,
+      setPrimaryColor,
     }),
-    [colorScheme, setColorScheme],
+    [colorScheme, setColorScheme, primaryColor, setPrimaryColor],
   );
 
   return (

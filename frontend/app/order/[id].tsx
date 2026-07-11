@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  Modal,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";

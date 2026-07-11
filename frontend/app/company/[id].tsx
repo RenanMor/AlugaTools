@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -8,6 +8,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
 import { Tool } from "@/lib/types";
+import { useThemeContext } from "@/lib/theme-provider";
+import { extractPrimaryColor } from "@/lib/utils";
 
 export default function CompanyScreen() {
   const colors = useColors();
@@ -17,12 +19,24 @@ export default function CompanyScreen() {
   const companyTools = tools.filter((t) => t.companyId === id);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const { setPrimaryColor } = useThemeContext();
 
   const filteredTools = useMemo(() => {
     return companyTools.filter((t) =>
       t.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [companyTools, searchQuery]);
+
+  useEffect(() => {
+    if (company && company.logo) {
+      extractPrimaryColor(company.logo).then((color) => {
+        setPrimaryColor(color);
+      });
+    }
+    return () => {
+      setPrimaryColor(null);
+    };
+  }, [company?.logo]);
 
   if (!company) {
     return (
@@ -34,6 +48,22 @@ export default function CompanyScreen() {
 
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
+      {/* Background large transparent logo */}
+      {company.logo ? (
+        <Image
+          source={{ uri: company.logo }}
+          style={{
+            position: "absolute",
+            top: 120,
+            right: -60,
+            width: 280,
+            height: 280,
+            opacity: 0.05,
+            resizeMode: "contain",
+            transform: [{ rotate: "-15deg" }],
+          }}
+        />
+      ) : null}
       <FlatList
         data={filteredTools}
         keyExtractor={(i) => i.id}
