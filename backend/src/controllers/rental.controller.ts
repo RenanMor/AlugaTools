@@ -297,7 +297,7 @@ export const RentalController = {
 
   async updateStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const { status } = req.body;
+      const { status, receiver_name, receiver_cpf } = req.body;
       const userId = (req as any).userId as string;
       
       let delivererId: string | undefined = req.body.deliverer_id;
@@ -310,7 +310,11 @@ export const RentalController = {
         }
       }
 
-      const extras = delivererId ? { deliverer_id: delivererId } : undefined;
+      const extras: any = {};
+      if (delivererId) extras.deliverer_id = delivererId;
+      if (receiver_name) extras.receiver_name = receiver_name;
+      if (receiver_cpf) extras.receiver_cpf = receiver_cpf;
+
       const rental = await RentalModel.updateStatus(req.params.id, status, extras);
       res.json({ data: rental });
     } catch (err) {
@@ -340,11 +344,11 @@ export const RentalController = {
       // Return all rentals for the company this deliverer belongs to
       const rentals = await RentalModel.findByCompany(deliverer.company_id);
       
-      // Filter: only show deliveries that need a courier (not pickup, and status is pending or delivering)
+      // Filter: show deliveries that need a courier (not pickup, and status is pending, delivering, delivered, or completed)
       const filtered = rentals.filter((r) => {
         const isPickup = !r.address || Number(r.shipping_price) === 0;
-        const needsDelivery = r.status === "pending" || r.status === "delivering";
-        return !isPickup && needsDelivery;
+        const isRelevantStatus = r.status === "pending" || r.status === "delivering" || r.status === "delivered" || r.status === "completed";
+        return !isPickup && isRelevantStatus;
       });
 
       res.json({ data: filtered });

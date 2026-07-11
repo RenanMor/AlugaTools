@@ -122,6 +122,31 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {user.isOwner && (
+            <Pressable
+              onPress={() => router.push("/dashboard-owner")}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: 16,
+                  borderRadius: 14,
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <IconSymbol name="shield.fill" size={22} color={colors.primary} />
+              <Text style={{ flex: 1, fontSize: 15, color: colors.foreground, fontWeight: "600" }}>
+                Painel do Administrador
+              </Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.muted} />
+            </Pressable>
+          )}
+
           {myCompany && (
             <Row
               icon="storefront.fill"

@@ -193,16 +193,18 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
 
     // 3. Fetch company ID if company profile
     let companyId: string | undefined;
+    let companyStatus: string | undefined;
     let delivererCompanyId: string | undefined;
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
         .from("companies")
-        .select("id")
+        .select("id, status")
         .eq("owner_id", dbUser.id)
         .single();
       
       if (companyData) {
         companyId = companyData.id;
+        companyStatus = companyData.status;
       } else {
         // Self-healing: create the missing company record!
         const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
@@ -222,6 +224,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
           .single();
         if (newCompany) {
           companyId = newCompany.id;
+          companyStatus = newCompany.status;
         }
       }
     } else if (dbUser.profile === "deliverer") {
@@ -243,7 +246,9 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         email: dbUser.email,
         profile: dbUser.profile,
         role: dbUser.role || "user",
+        isOwner: dbUser.is_owner || false,
         companyId,
+        companyStatus,
         delivererCompanyId,
         avatarUrl: dbUser.avatar_url,
       }
@@ -314,16 +319,18 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
     }
 
     let companyId: string | undefined;
+    let companyStatus: string | undefined;
     let delivererCompanyId: string | undefined;
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
         .from("companies")
-        .select("id")
+        .select("id, status")
         .eq("owner_id", dbUser.id)
         .single();
       
       if (companyData) {
         companyId = companyData.id;
+        companyStatus = companyData.status;
       } else {
         // Self-healing: create the missing company record!
         const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
@@ -343,6 +350,7 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
           .single();
         if (newCompany) {
           companyId = newCompany.id;
+          companyStatus = newCompany.status;
         }
       }
     } else if (dbUser.profile === "deliverer") {
@@ -363,7 +371,9 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         email: dbUser.email,
         profile: dbUser.profile,
         role: dbUser.role || "user",
+        isOwner: dbUser.is_owner || false,
         companyId,
+        companyStatus,
         delivererCompanyId,
         avatarUrl: dbUser.avatar_url,
       }

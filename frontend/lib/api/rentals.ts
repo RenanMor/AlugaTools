@@ -27,6 +27,10 @@ export function mapRental(data: any): Rental {
     couponDiscount: data.coupon_discount !== undefined ? Number(data.coupon_discount) : undefined,
     delivererId: data.deliverer_id || undefined,
     deliveredAt: data.delivered_at ? new Date(data.delivered_at).getTime() : undefined,
+    customerNote: data.customer_note || undefined,
+    receiverName: data.receiver_name || undefined,
+    receiverCpf: data.receiver_cpf || undefined,
+    delivererName: data.deliverer?.name || undefined,
   };
 }
 
@@ -60,6 +64,7 @@ export async function createRental(rental: {
   address?: any;
   couponCode?: string;
   couponDiscount?: number;
+  customerNote?: string;
 }): Promise<Rental> {
   const response = await apiCall<{ data: any }>("/api/rentals", {
     method: "POST",
@@ -73,6 +78,7 @@ export async function createRental(rental: {
       address: rental.address,
       coupon_code: rental.couponCode,
       coupon_discount: rental.couponDiscount,
+      customer_note: rental.customerNote,
     }),
   });
   return mapRental(response.data);
@@ -104,10 +110,19 @@ export async function lookupCep(cep: string): Promise<any> {
   return response.data;
 }
 
-export async function updateRentalStatus(id: string, status: RentalStatus): Promise<Rental> {
+export async function updateRentalStatus(
+  id: string,
+  status: RentalStatus,
+  receiverName?: string,
+  receiverCpf?: string
+): Promise<Rental> {
   const response = await apiCall<{ data: any }>(`/api/rentals/${id}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({
+      status,
+      receiver_name: receiverName,
+      receiver_cpf: receiverCpf,
+    }),
   });
   return mapRental(response.data);
 }

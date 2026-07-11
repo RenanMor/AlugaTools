@@ -13,6 +13,7 @@ export interface Company {
   city: string | null;
   is_open: boolean;
   owner_id: string;
+  status: string;
 }
 
 export const CompanyModel = {
@@ -20,6 +21,7 @@ export const CompanyModel = {
     const { data, error } = await supabaseAdmin
       .from("companies")
       .select("*")
+      .eq("status", "approved")
       .order("rating", { ascending: false })
       .limit(limit);
     if (error) throw new Error(error.message);
@@ -40,9 +42,40 @@ export const CompanyModel = {
     const { data, error } = await supabaseAdmin
       .from("companies")
       .select("*")
-      .eq("category_id", categoryId);
+      .eq("category_id", categoryId)
+      .eq("status", "approved");
     if (error) throw new Error(error.message);
     return data as Company[];
+  },
+
+  async findPending(): Promise<Company[]> {
+    const { data, error } = await supabaseAdmin
+      .from("companies")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data as Company[];
+  },
+
+  async findAll(): Promise<Company[]> {
+    const { data, error } = await supabaseAdmin
+      .from("companies")
+      .select("*")
+      .order("name", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data as Company[];
+  },
+
+  async updateStatus(id: string, status: "approved" | "rejected"): Promise<Company> {
+    const { data, error } = await supabaseAdmin
+      .from("companies")
+      .update({ status })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data as Company;
   },
 
   async recalcRating(companyId: string): Promise<void> {

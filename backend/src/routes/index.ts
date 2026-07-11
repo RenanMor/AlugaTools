@@ -6,6 +6,7 @@ import rentalRoutes from "./rental.routes";
 import cepRoutes from "./cep.routes";
 import webhookRoutes from "./webhook.routes";
 import delivererRoutes from "./deliverer.routes";
+import adminRoutes from "./admin.routes";
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use("/rentals", rentalRoutes);
 router.use("/cep", cepRoutes);
 router.use("/webhooks", webhookRoutes);
 router.use("/deliverers", delivererRoutes);
+router.use("/admin", adminRoutes);
 
 export default router;

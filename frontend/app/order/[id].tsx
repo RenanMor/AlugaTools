@@ -60,6 +60,10 @@ export default function OrderDetailsScreen() {
   const [ratingComment, setRatingComment] = useState<string>("");
   const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
 
+  const [showReceiverModal, setShowReceiverModal] = useState(false);
+  const [receiverName, setReceiverName] = useState("");
+  const [receiverCpf, setReceiverCpf] = useState("");
+
   const isDeliverer = user?.profile === "deliverer";
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
@@ -158,11 +162,11 @@ export default function OrderDetailsScreen() {
     return { barcode, bookletUrl };
   }, [rental]);
 
-  const handleUpdateStatus = async (status: RentalStatus) => {
+  const handleUpdateStatus = async (status: RentalStatus, rName?: string, rCpf?: string) => {
     if (isStatusLoading) return;
     setIsStatusLoading(true);
     try {
-      await setRentalStatus(rental!.id, status);
+      await setRentalStatus(rental!.id, status, rName, rCpf);
       await fetchOrder();
     } catch (err: any) {
       Alert.alert("Erro", err.message || "Não foi possível atualizar o status.");
@@ -302,8 +306,33 @@ export default function OrderDetailsScreen() {
             ) : (
               <Text style={{ fontSize: 14, color: colors.muted }}>Retirada no local</Text>
             )}
+
+            {/* Deliverer Name */}
+            {rental.delivererName ? (
+              <View style={{ marginTop: 8, borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8 }}>
+                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>Entregador: <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.delivererName}</Text></Text>
+              </View>
+            ) : null}
+
+            {/* Receiver Name / CPF */}
+            {rental.receiverName ? (
+              <View style={{ marginTop: 4, gap: 2 }}>
+                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>Recebido por: <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.receiverName}</Text></Text>
+                {rental.receiverCpf ? (
+                  <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>CPF do Recebedor: <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.receiverCpf}</Text></Text>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         </View>
+
+        {/* Observações do Cliente */}
+        {rental.customerNote ? (
+          <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: colors.foreground }}>Observações do Pedido</Text>
+            <Text style={{ fontSize: 14, color: colors.muted }}>{rental.customerNote}</Text>
+          </View>
+        ) : null}
 
         {/* Resumo Financeiro */}
         <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
@@ -356,7 +385,7 @@ export default function OrderDetailsScreen() {
 
             {!isPickup && isDeliverer && rental.status === "delivering" && (
               <Pressable
-                onPress={() => handleUpdateStatus("delivered")}
+                onPress={() => setShowReceiverModal(true)}
                 style={({ pressed }) => [
                   { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}
@@ -518,6 +547,87 @@ export default function OrderDetailsScreen() {
         )}
 
       </ScrollView>
+
+      {/* Modal para Dados do Recebedor */}
+      <Modal visible={showReceiverModal} transparent={true} animationType="slide" onRequestClose={() => setShowReceiverModal(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Confirmar Recebimento</Text>
+              <Pressable onPress={() => setShowReceiverModal(false)}>
+                <IconSymbol name="xmark" size={24} color={colors.foreground} />
+              </Pressable>
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo do Recebedor</Text>
+              <TextInput
+                value={receiverName}
+                onChangeText={setReceiverName}
+                placeholder="Ex: João da Silva"
+                placeholderTextColor={colors.muted}
+                style={{
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.foreground,
+                }}
+              />
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF do Recebedor</Text>
+              <TextInput
+                value={receiverCpf}
+                onChangeText={(text) => {
+                  const cleaned = text.replace(/\D/g, "");
+                  const limited = cleaned.slice(0, 11);
+                  let formatted = limited;
+                  if (limited.length > 9) {
+                    formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
+                  } else if (limited.length > 6) {
+                    formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
+                  } else if (limited.length > 3) {
+                    formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+                  }
+                  setReceiverCpf(formatted);
+                }}
+                placeholder="000.000.000-00"
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.foreground,
+                }}
+              />
+            </View>
+
+            <Pressable
+              onPress={() => {
+                if (!receiverName.trim() || receiverCpf.replace(/\D/g, "").length !== 11) {
+                  Alert.alert("Erro", "Por favor, preencha o Nome e CPF completo (11 dígitos) do recebedor.");
+                  return;
+                }
+                setShowReceiverModal(false);
+                handleUpdateStatus("delivered", receiverName, receiverCpf);
+              }}
+              style={({ pressed }) => [
+                { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Finalizar Entrega</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

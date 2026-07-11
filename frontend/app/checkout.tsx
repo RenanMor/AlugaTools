@@ -62,6 +62,7 @@ export default function CheckoutScreen() {
   const [installments, setInstallments] = useState("1");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerNote, setCustomerNote] = useState("");
 
   // CEP Lookup trigger
   const handleCepChange = async (val: string) => {
@@ -192,6 +193,7 @@ export default function CheckoutScreen() {
             address,
             couponCode: appliedCoupon || undefined,
             couponDiscount: discountAmount / flatItems.length,
+            customerNote: customerNote.trim() || undefined,
           });
           created.push(rental);
         }
@@ -218,10 +220,17 @@ export default function CheckoutScreen() {
           };
         }
 
-        await payRental(rental.id, {
-          card: cardPayload,
-          installments: paymentMethod === "CREDIT_CARD" ? Number(installments) || 1 : undefined,
-        });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("O pagamento demorou muito para responder. Por favor, verifique se o pagamento foi concluído em Meus Pedidos.")), 25000)
+        );
+
+        await Promise.race([
+          payRental(rental.id, {
+            card: cardPayload,
+            installments: paymentMethod === "CREDIT_CARD" ? Number(installments) || 1 : undefined,
+          }),
+          timeoutPromise
+        ]);
       }
 
       // 4. Cleanup & Complete
@@ -660,6 +669,31 @@ export default function CheckoutScreen() {
               )}
             </View>
           )}
+
+          {/* Observações */}
+          <View style={{ gap: 10 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Observações (Opcional)</Text>
+            <TextInput
+              value={customerNote}
+              onChangeText={setCustomerNote}
+              placeholder="Ex: retirar na portaria, ligar ao chegar, etc."
+              placeholderTextColor={colors.muted}
+              multiline
+              numberOfLines={3}
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                color: colors.foreground,
+                fontSize: 14,
+                textAlignVertical: "top",
+                minHeight: 60,
+              }}
+            />
+          </View>
 
           {/* Resumo financeiro */}
           <View style={{ padding: 14, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8 }}>

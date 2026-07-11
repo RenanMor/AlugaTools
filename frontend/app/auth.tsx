@@ -68,7 +68,7 @@ function validateCNPJ(cnpj: string): boolean {
 
 export default function AuthScreen() {
   const colors = useColors();
-  const { login, checkout, cart } = useApp();
+  const { login, checkout, cart, logout } = useApp();
   const params = useLocalSearchParams<{ intent?: string }>();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [profile, setProfile] = useState<ProfileType>("customer");
@@ -83,6 +83,7 @@ export default function AuthScreen() {
   const [city, setCity] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [companyApprovalStatus, setCompanyApprovalStatus] = useState<"pending" | "rejected" | null>(null);
 
   const handleCpfChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
@@ -273,8 +274,20 @@ export default function AuthScreen() {
         city.trim()
       );
 
-      // Use the returned user's actual profile!
       const actualProfile = returnedUser?.profile || profile;
+
+      // Redirect Owner to dashboard-owner
+      if (returnedUser?.isOwner) {
+        router.dismiss();
+        router.push("/dashboard-owner");
+        return;
+      }
+
+      // Check Company Approval Status
+      if (actualProfile === "company" && returnedUser?.companyStatus !== "approved") {
+        setCompanyApprovalStatus(returnedUser?.companyStatus === "rejected" ? "rejected" : "pending");
+        return;
+      }
 
       if (params.intent === "checkout" && actualProfile === "customer" && cart.length > 0) {
         await checkout();
@@ -295,6 +308,48 @@ export default function AuthScreen() {
       setLoading(false);
     }
   };
+
+  if (companyApprovalStatus) {
+    const isPending = companyApprovalStatus === "pending";
+    return (
+      <ScreenContainer edges={["top", "left", "right"]} className="p-5" style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 20, paddingHorizontal: 20 }}>
+          <IconSymbol
+            name={isPending ? "clock.fill" : "exclamationmark.triangle.fill"}
+            size={64}
+            color={isPending ? colors.primary : "#EF4444"}
+          />
+          <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, textAlign: "center" }}>
+            {isPending ? "Aguardando Análise" : "Cadastro Recusado"}
+          </Text>
+          <Text style={{ fontSize: 15, color: colors.muted, textAlign: "center", lineHeight: 22 }}>
+            {isPending
+              ? "Sua empresa foi cadastrada com sucesso! Nossa equipe está analisando os dados. Você receberá uma notificação assim que for aprovada."
+              : "Sua empresa foi recusada pelo administrador do sistema. Por favor, entre em contato com o administrador do sistema para mais informações."}
+          </Text>
+          <Pressable
+            onPress={async () => {
+              await logout();
+              setCompanyApprovalStatus(null);
+            }}
+            style={({ pressed }) => [
+              {
+                backgroundColor: colors.primary,
+                borderRadius: 12,
+                paddingVertical: 14,
+                paddingHorizontal: 24,
+                alignItems: "center",
+                marginTop: 10,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Voltar para o Login</Text>
+          </Pressable>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer edges={["top", "left", "right"]} className="p-5">

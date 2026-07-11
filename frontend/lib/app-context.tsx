@@ -48,7 +48,7 @@ interface AppState {
   logout: () => void;
   checkout: () => Promise<void>;
   rateRental: (rentalId: string, rating: number, comment?: string) => void;
-  setRentalStatus: (rentalId: string, status: RentalStatus) => void;
+  setRentalStatus: (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string) => void;
   addTool: (tool: Omit<Tool, "id">) => void;
   updateTool: (tool: Tool) => void;
   deleteTool: (toolId: string) => void;
@@ -365,9 +365,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus) => {
+  const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string) => {
     try {
-      await updateRentalStatus(rentalId, status);
+      await updateRentalStatus(rentalId, status, receiverName, receiverCpf);
 
       // Refresh rentals
       let list: Rental[] = [];

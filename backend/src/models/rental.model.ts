@@ -26,6 +26,9 @@ export interface Rental {
   coupon_discount: number;
   deliverer_id: string | null;
   delivered_at: string | null;
+  customer_note: string | null;
+  receiver_name: string | null;
+  receiver_cpf: string | null;
   tool?: { name: string; image: string };
   company?: { name: string };
   customer?: { name: string };
@@ -45,6 +48,7 @@ export interface CreateRentalInput {
   coupon_code?: string;
   coupon_discount?: number;
   expires_at?: string;
+  customer_note?: string;
 }
 
 export const RentalModel = {
@@ -88,6 +92,7 @@ export const RentalModel = {
       coupon_code: rental.coupon_code || null,
       coupon_discount: rental.coupon_discount || 0,
       expires_at: rental.expires_at || null,
+      customer_note: rental.customer_note || null,
     };
 
     console.log("[RentalModel.create] Inserting rental:", JSON.stringify(insertData));
@@ -142,7 +147,11 @@ export const RentalModel = {
     return data as Rental[];
   },
 
-  async updateStatus(id: string, status: RentalStatus, extras?: { deliverer_id?: string }): Promise<Rental> {
+  async updateStatus(
+    id: string,
+    status: RentalStatus,
+    extras?: { deliverer_id?: string; receiver_name?: string; receiver_cpf?: string }
+  ): Promise<Rental> {
     const updateData: any = { status };
     if (status === "delivered") {
       const { data: current } = await supabaseAdmin
@@ -152,6 +161,12 @@ export const RentalModel = {
         .single();
       if (!current?.delivered_at) {
         updateData.delivered_at = new Date().toISOString();
+      }
+      if (extras?.receiver_name) {
+        updateData.receiver_name = extras.receiver_name;
+      }
+      if (extras?.receiver_cpf) {
+        updateData.receiver_cpf = extras.receiver_cpf;
       }
     }
     if (extras?.deliverer_id) {

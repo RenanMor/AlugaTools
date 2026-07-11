@@ -53,6 +53,7 @@ export interface Company {
   state?: string;
   city?: string;
   isOpen?: boolean;
+  status?: "pending" | "approved" | "rejected";
 }
 
 export interface CartItem {
@@ -99,6 +100,10 @@ export interface Rental {
   couponDiscount?: number;
   delivererId?: string;
   deliveredAt?: number;
+  customerNote?: string;
+  receiverName?: string;
+  receiverCpf?: string;
+  delivererName?: string;
 }
 
 export interface SessionUser {
@@ -110,4 +115,6 @@ export interface SessionUser {
   delivererCompanyId?: string;
   role?: string;
   avatarUrl?: string;
+  isOwner?: boolean;
+  companyStatus?: string;
 }
