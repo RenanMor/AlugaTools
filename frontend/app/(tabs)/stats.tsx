@@ -220,7 +220,7 @@ export default function StatsScreen() {
                   {item.toolName}
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.muted }}>Cliente: {item.customerName}</Text>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.success }}>
                   R$ {item.totalPrice.toFixed(2)} · {item.days}d
                 </Text>
               </View>

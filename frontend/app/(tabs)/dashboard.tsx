@@ -139,7 +139,7 @@ export default function DashboardScreen() {
             top: "30%",
             width: 320,
             height: 320,
-            opacity: 0.05,
+            opacity: 0.20,
             resizeMode: "contain",
             zIndex: -1,
           }}
@@ -172,8 +172,8 @@ export default function DashboardScreen() {
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "space-between",
-              backgroundColor: myCompany.isOpen ? colors.primary + "15" : colors.error + "15",
-              borderColor: myCompany.isOpen ? colors.primary : colors.error,
+              backgroundColor: myCompany.isOpen ? colors.success + "15" : colors.error + "15",
+              borderColor: myCompany.isOpen ? colors.success : colors.error,
               borderWidth: 1,
               borderRadius: 12,
               paddingHorizontal: 16,
@@ -198,7 +198,7 @@ export default function DashboardScreen() {
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 8,
-              backgroundColor: myCompany.isOpen ? colors.primary : colors.error,
+              backgroundColor: myCompany.isOpen ? colors.success : colors.error,
             }}
           >
             <Text style={{ color: "#fff", fontWeight: "800", fontSize: 11 }}>
@@ -400,7 +400,7 @@ function RequestCard({ rental }: { rental: Rental }) {
             {rental.toolName}
           </Text>
           <Text style={{ fontSize: 12, color: colors.muted }}>Cliente: {rental.customerName}</Text>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.success }}>
             R$ {rental.totalPrice.toFixed(2)} · {rental.days}d
           </Text>
         </View>

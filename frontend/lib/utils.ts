@@ -15,6 +15,36 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Returns true when the color is too close to gray (saturation < threshold) */
+function isGrayish(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max - min;
+  const luminance = (max + min) / 2;
+  const saturation = luminance === 0 || luminance === 255 ? 0 : chroma / (255 - Math.abs(2 * luminance - 255));
+  return saturation < 0.18;
+}
+
+/** Returns true when the color is too close to green or red (to keep those semantic) */
+function isForbiddenHue(r: number, g: number, b: number): boolean {
+  // Green hue: green channel dominates strongly
+  const isGreen = g > r * 1.4 && g > b * 1.4;
+  // Red hue: red channel dominates strongly
+  const isRed = r > g * 1.4 && r > b * 1.4;
+  return isGreen || isRed;
+}
+
+function sanitizeColor(hex: string): string | null {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return null;
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  if (isGrayish(r, g, b)) return "#FFFFFF"; // gray → white
+  if (isForbiddenHue(r, g, b)) return null; // green/red → skip
+  return hex;
+}
+
 export async function extractPalette(imageUrl: string): Promise<{ primary: string; secondary: string }> {
   const defaultColors = { primary: "#F97316", secondary: "#FB923C" };
   if (!imageUrl || imageUrl.includes("sem-imagem")) {
@@ -55,8 +85,31 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
           }
           
           const sortedColors = Object.entries(colorCount).sort((a, b) => b[1] - a[1]);
-          const primary = sortedColors[0]?.[0] || "#F97316";
-          const secondary = sortedColors[1]?.[0] || "#FB923C";
+          
+          // Find primary: first non-forbidden color (or sanitized to white if gray)
+          let primary = defaultColors.primary;
+          let secondary = defaultColors.secondary;
+          let primarySet = false;
+          
+          for (const [hex] of sortedColors) {
+            const h = hex.replace("#", "");
+            const r = parseInt(h.substring(0, 2), 16);
+            const g = parseInt(h.substring(2, 4), 16);
+            const b = parseInt(h.substring(4, 6), 16);
+            const sanitized = sanitizeColor(hex);
+            if (!primarySet) {
+              if (sanitized) {
+                primary = sanitized;
+                primarySet = true;
+              }
+            } else {
+              if (sanitized && sanitized !== primary) {
+                secondary = sanitized;
+                break;
+              }
+            }
+          }
+          
           resolve({ primary, secondary });
         } catch {
           resolve(defaultColors);
@@ -74,10 +127,10 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
     const palettes = [
       { primary: "#F97316", secondary: "#FB923C" },
       { primary: "#3B82F6", secondary: "#60A5FA" },
-      { primary: "#10B981", secondary: "#34D399" },
       { primary: "#8B5CF6", secondary: "#A78BFA" },
       { primary: "#EC4899", secondary: "#F472B6" },
       { primary: "#F59E0B", secondary: "#FBBF24" },
+      { primary: "#06B6D4", secondary: "#22D3EE" },
     ];
     const index = Math.abs(hash) % palettes.length;
     return palettes[index];

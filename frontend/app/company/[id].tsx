@@ -20,6 +20,7 @@ export default function CompanyScreen() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const { setPrimaryColor, setSecondaryColor } = useThemeContext();
+  const { user } = useApp();
 
   const filteredTools = useMemo(() => {
     return companyTools.filter((t) =>
@@ -40,8 +41,9 @@ export default function CompanyScreen() {
       }
     }
     return () => {
-      setPrimaryColor(null);
-      setSecondaryColor(null);
+      // Restore user's own brand colors on leave instead of resetting to null
+      setPrimaryColor(user?.primaryColor || null);
+      setSecondaryColor(user?.secondaryColor || null);
     };
   }, [company?.logo, company?.primaryColor, company?.secondaryColor]);
 
@@ -65,7 +67,7 @@ export default function CompanyScreen() {
             right: -60,
             width: 280,
             height: 280,
-            opacity: 0.05,
+            opacity: 0.20,
             resizeMode: "contain",
             transform: [{ rotate: "-15deg" }],
           }}

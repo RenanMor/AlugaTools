@@ -73,7 +73,7 @@ export default function ProfileScreen() {
             top: "30%",
             width: 320,
             height: 320,
-            opacity: 0.05,
+            opacity: 0.20,
             resizeMode: "contain",
             zIndex: -1,
           }}
@@ -173,8 +173,8 @@ export default function ProfileScreen() {
                       Alert.alert("Erro", "Não foi possível alterar o status.");
                     }
                   }}
-                  trackColor={{ true: colors.primary + "50", false: colors.border }}
-                  thumbColor={myCompany.isOpen ? colors.primary : colors.muted}
+                  trackColor={{ true: colors.success + "50", false: colors.error + "50" }}
+                  thumbColor={myCompany.isOpen ? colors.success : colors.error}
                 />
               }
             />
