@@ -9,7 +9,7 @@ import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
 import { Tool } from "@/lib/types";
 import { useThemeContext } from "@/lib/theme-provider";
-import { extractPrimaryColor } from "@/lib/utils";
+import { extractPalette } from "@/lib/utils";
 
 export default function CompanyScreen() {
   const colors = useColors();
@@ -19,7 +19,7 @@ export default function CompanyScreen() {
   const companyTools = tools.filter((t) => t.companyId === id);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const { setPrimaryColor } = useThemeContext();
+  const { setPrimaryColor, setSecondaryColor } = useThemeContext();
 
   const filteredTools = useMemo(() => {
     return companyTools.filter((t) =>
@@ -28,15 +28,22 @@ export default function CompanyScreen() {
   }, [companyTools, searchQuery]);
 
   useEffect(() => {
-    if (company && company.logo) {
-      extractPrimaryColor(company.logo).then((color) => {
-        setPrimaryColor(color);
-      });
+    if (company) {
+      if (company.primaryColor) {
+        setPrimaryColor(company.primaryColor);
+        if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
+      } else if (company.logo) {
+        extractPalette(company.logo).then((palette) => {
+          setPrimaryColor(palette.primary);
+          setSecondaryColor(palette.secondary);
+        });
+      }
     }
     return () => {
       setPrimaryColor(null);
+      setSecondaryColor(null);
     };
-  }, [company?.logo]);
+  }, [company?.logo, company?.primaryColor, company?.secondaryColor]);
 
   if (!company) {
     return (

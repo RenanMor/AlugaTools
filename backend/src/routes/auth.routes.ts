@@ -251,6 +251,8 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         companyStatus,
         delivererCompanyId,
         avatarUrl: dbUser.avatar_url,
+        primaryColor: dbUser.primary_color,
+        secondaryColor: dbUser.secondary_color,
       }
     });
   } catch (err) {
@@ -376,6 +378,8 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         companyStatus,
         delivererCompanyId,
         avatarUrl: dbUser.avatar_url,
+        primaryColor: dbUser.primary_color,
+        secondaryColor: dbUser.secondary_color,
       }
     });
   } catch (err) {
@@ -386,11 +390,15 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
 router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).userId;
-    const { avatarUrl } = req.body;
+    const { avatarUrl, primaryColor, secondaryColor } = req.body;
 
     const { data: dbUser, error: dbError } = await supabaseAdmin
       .from("users")
-      .update({ avatar_url: avatarUrl })
+      .update({
+        avatar_url: avatarUrl,
+        primary_color: primaryColor || null,
+        secondary_color: secondaryColor || null
+      })
       .eq("id", userId)
       .select()
       .single();
@@ -402,7 +410,11 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
     if (dbUser.profile === "company") {
       await supabaseAdmin
         .from("companies")
-        .update({ logo: avatarUrl })
+        .update({
+          logo: avatarUrl,
+          primary_color: primaryColor || null,
+          secondary_color: secondaryColor || null
+        })
         .eq("owner_id", userId);
     }
 
@@ -414,6 +426,8 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
         profile: dbUser.profile,
         role: dbUser.role || "user",
         avatarUrl: dbUser.avatar_url,
+        primaryColor: dbUser.primary_color,
+        secondaryColor: dbUser.secondary_color,
       }
     });
   } catch (err) {

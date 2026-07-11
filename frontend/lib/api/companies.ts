@@ -18,6 +18,8 @@ export function mapCompany(data: any): Company {
     state: data.state || undefined,
     city: data.city || undefined,
     isOpen: data.is_open !== undefined ? !!data.is_open : true,
+    primaryColor: data.primary_color || undefined,
+    secondaryColor: data.secondary_color || undefined,
   };
 }
 

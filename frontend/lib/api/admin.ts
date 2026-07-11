@@ -2,7 +2,6 @@ import { apiCall } from "../_core/api";
 import { Company, Rental } from "../types";
 import { mapRental } from "./rentals";
 
-// Map raw company object to Company interface if needed
 function mapCompany(data: any): Company {
   return {
     id: data.id,
@@ -17,6 +16,8 @@ function mapCompany(data: any): Company {
     city: data.city || undefined,
     isOpen: data.is_open,
     status: data.status,
+    primaryColor: data.primary_color || undefined,
+    secondaryColor: data.secondary_color || undefined,
   };
 }
 

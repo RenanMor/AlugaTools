@@ -54,6 +54,8 @@ export interface Company {
   city?: string;
   isOpen?: boolean;
   status?: "pending" | "approved" | "rejected";
+  primaryColor?: string;
+  secondaryColor?: string;
 }
 
 export interface CartItem {
@@ -117,4 +119,6 @@ export interface SessionUser {
   avatarUrl?: string;
   isOwner?: boolean;
   companyStatus?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
 }

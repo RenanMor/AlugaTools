@@ -9,6 +9,8 @@ type ThemeContextValue = {
   setColorScheme: (scheme: ColorScheme) => void;
   primaryColor: string | null;
   setPrimaryColor: (color: string | null) => void;
+  secondaryColor: string | null;
+  setSecondaryColor: (color: string | null) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -16,6 +18,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("dark");
   const [primaryColor, setPrimaryColor] = useState<string | null>(null);
+  const [secondaryColor, setSecondaryColor] = useState<string | null>(null);
 
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
@@ -31,8 +34,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (primaryColor) {
         root.style.setProperty("--color-primary", primaryColor);
       }
+      if (secondaryColor) {
+        root.style.setProperty("--color-secondary", secondaryColor);
+      }
     }
-  }, [primaryColor]);
+  }, [primaryColor, secondaryColor]);
 
   const setColorScheme = useCallback((scheme: ColorScheme) => {
     setColorSchemeState(scheme);
@@ -51,8 +57,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       } else {
         root.style.setProperty("--color-primary", SchemeColors[colorScheme].primary);
       }
+      if (secondaryColor) {
+        root.style.setProperty("--color-secondary", secondaryColor);
+      } else {
+        root.style.setProperty("--color-secondary", (SchemeColors[colorScheme] as any).secondary || SchemeColors[colorScheme].primary);
+      }
     }
-  }, [primaryColor, colorScheme]);
+  }, [primaryColor, secondaryColor, colorScheme]);
 
   const themeVariables = useMemo(
     () =>
@@ -66,8 +77,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         "color-success": SchemeColors[colorScheme].success,
         "color-warning": SchemeColors[colorScheme].warning,
         "color-error": SchemeColors[colorScheme].error,
+        "color-secondary": secondaryColor || (SchemeColors[colorScheme] as any).secondary || SchemeColors[colorScheme].primary,
       }),
-    [colorScheme, primaryColor],
+    [colorScheme, primaryColor, secondaryColor],
   );
 
   const value = useMemo(
@@ -76,8 +88,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setColorScheme,
       primaryColor,
       setPrimaryColor,
+      secondaryColor,
+      setSecondaryColor,
     }),
-    [colorScheme, setColorScheme, primaryColor, setPrimaryColor],
+    [colorScheme, setColorScheme, primaryColor, setPrimaryColor, secondaryColor, setSecondaryColor],
   );
 
   return (

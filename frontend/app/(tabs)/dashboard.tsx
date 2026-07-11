@@ -129,7 +129,22 @@ export default function DashboardScreen() {
   };
 
   return (
-    <ScreenContainer className="p-4">
+    <ScreenContainer className="p-4" style={{ position: "relative" }}>
+      {myCompany?.logo ? (
+        <Image
+          source={{ uri: myCompany.logo }}
+          style={{
+            position: "absolute",
+            alignSelf: "center",
+            top: "30%",
+            width: 320,
+            height: 320,
+            opacity: 0.05,
+            resizeMode: "contain",
+            zIndex: -1,
+          }}
+        />
+      ) : null}
       <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
         Painel da empresa
       </Text>
@@ -157,8 +172,8 @@ export default function DashboardScreen() {
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "space-between",
-              backgroundColor: myCompany.isOpen ? colors.success + "15" : colors.error + "15",
-              borderColor: myCompany.isOpen ? colors.success : colors.error,
+              backgroundColor: myCompany.isOpen ? colors.primary + "15" : colors.error + "15",
+              borderColor: myCompany.isOpen ? colors.primary : colors.error,
               borderWidth: 1,
               borderRadius: 12,
               paddingHorizontal: 16,
@@ -183,7 +198,7 @@ export default function DashboardScreen() {
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 8,
-              backgroundColor: myCompany.isOpen ? colors.success : colors.error,
+              backgroundColor: myCompany.isOpen ? colors.primary : colors.error,
             }}
           >
             <Text style={{ color: "#fff", fontWeight: "800", fontSize: 11 }}>

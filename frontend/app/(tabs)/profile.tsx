@@ -5,6 +5,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
+import { useThemeContext } from "@/lib/theme-provider";
+import { extractPalette, adjustContrast } from "@/lib/utils";
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -40,11 +42,18 @@ export default function ProfileScreen() {
     }
   };
 
+  const { colorScheme } = useThemeContext();
+
   const uploadAvatar = async (urlOrBase64: string) => {
     if (isUpdatingAvatar) return;
     setIsUpdatingAvatar(true);
     try {
-      await updateAvatar(urlOrBase64);
+      const palette = await extractPalette(urlOrBase64);
+      const isDark = colorScheme === "dark";
+      const primaryAdjusted = adjustContrast(palette.primary, isDark);
+      const secondaryAdjusted = adjustContrast(palette.secondary, isDark);
+
+      await updateAvatar(urlOrBase64, primaryAdjusted, secondaryAdjusted);
       Alert.alert("Sucesso", "Foto de perfil atualizada!");
     } catch (err: any) {
       Alert.alert("Erro", err.message || "Erro ao atualizar foto.");
@@ -54,7 +63,22 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScreenContainer className="p-4">
+    <ScreenContainer className="p-4" style={{ position: "relative" }}>
+      {user?.avatarUrl ? (
+        <Image
+          source={{ uri: user.avatarUrl }}
+          style={{
+            position: "absolute",
+            alignSelf: "center",
+            top: "30%",
+            width: 320,
+            height: 320,
+            opacity: 0.05,
+            resizeMode: "contain",
+            zIndex: -1,
+          }}
+        />
+      ) : null}
       <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 20 }}>
         Perfil
       </Text>
@@ -149,7 +173,8 @@ export default function ProfileScreen() {
                       Alert.alert("Erro", "Não foi possível alterar o status.");
                     }
                   }}
-                  trackColor={{ true: colors.success }}
+                  trackColor={{ true: colors.primary + "50", false: colors.border }}
+                  thumbColor={myCompany.isOpen ? colors.primary : colors.muted}
                 />
               }
             />

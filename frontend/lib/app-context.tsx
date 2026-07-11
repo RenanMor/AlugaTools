@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useThemeContext } from "./theme-provider";
 import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool, Deliverer } from "./types";
 import * as Auth from "./_core/auth";
 import { apiCall } from "./_core/api";
@@ -59,7 +60,7 @@ interface AppState {
   refreshCatalog: () => Promise<void>;
   refreshRentals: () => Promise<void>;
   refreshDeliverers: () => Promise<void>;
-  updateAvatar: (avatarUrl: string) => Promise<void>;
+  updateAvatar: (avatarUrl: string, primaryColor?: string, secondaryColor?: string) => Promise<void>;
   updateCompanyStatus: (isOpen: boolean) => Promise<void>;
   checkSession: () => Promise<void>;
 }
@@ -76,6 +77,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [deliverers, setDeliverers] = useState<Deliverer[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
+
+  const { setPrimaryColor } = useThemeContext();
+
+  useEffect(() => {
+    if (user?.primaryColor) {
+      setPrimaryColor(user.primaryColor);
+    } else {
+      setPrimaryColor(null);
+    }
+  }, [user?.primaryColor, setPrimaryColor]);
 
   // 1. Hydrate cart and user session from storage on load
   useEffect(() => {
@@ -305,15 +316,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateAvatar = useCallback(async (avatarUrl: string) => {
+  const updateAvatar = useCallback(async (avatarUrl: string, primaryColor?: string, secondaryColor?: string) => {
     try {
       const res = await apiCall<{ user: any }>("/api/auth/avatar", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarUrl }),
+        body: JSON.stringify({ avatarUrl, primaryColor, secondaryColor }),
       });
       if (res.user) {
-        setUser((prev) => prev ? { ...prev, avatarUrl: res.user.avatarUrl || res.user.avatar_url } : null);
+        setUser((prev) => prev ? { 
+          ...prev, 
+          avatarUrl: res.user.avatarUrl || res.user.avatar_url,
+          primaryColor: res.user.primaryColor || res.user.primary_color,
+          secondaryColor: res.user.secondaryColor || res.user.secondary_color,
+        } : null);
         await loadCatalog();
       }
     } catch (err) {

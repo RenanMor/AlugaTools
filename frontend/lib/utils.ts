@@ -15,9 +15,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export async function extractPrimaryColor(imageUrl: string): Promise<string> {
+export async function extractPalette(imageUrl: string): Promise<{ primary: string; secondary: string }> {
+  const defaultColors = { primary: "#F97316", secondary: "#FB923C" };
   if (!imageUrl || imageUrl.includes("sem-imagem")) {
-    return "#F97316";
+    return defaultColors;
   }
   
   if (Platform.OS === 'web') {
@@ -30,48 +31,93 @@ export async function extractPrimaryColor(imageUrl: string): Promise<string> {
           canvas.width = 10;
           canvas.height = 10;
           const ctx = canvas.getContext("2d");
-          if (!ctx) return resolve("#F97316");
+          if (!ctx) return resolve(defaultColors);
           ctx.drawImage(img, 0, 0, 10, 10);
           const data = ctx.getImageData(0, 0, 10, 10).data;
           
-          let r = 0, g = 0, b = 0, count = 0;
+          const colorCount: Record<string, number> = {};
           for (let i = 0; i < data.length; i += 4) {
-            const pr = data[i];
-            const pg = data[i+1];
-            const pb = data[i+2];
-            const brightness = (pr + pg + pb) / 3;
-            if (brightness > 240 || brightness < 15) continue;
-            r += pr;
-            g += pg;
-            b += pb;
-            count++;
-          }
-          if (count === 0) {
-            r = data[0];
-            g = data[1];
-            b = data[2];
-            count = 1;
-          }
-          const rgbToHex = (r: number, g: number, b: number) =>
-            "#" + [r, g, b].map(x => {
-              const hex = Math.round(x).toString(16);
-              return hex.length === 1 ? "0" + hex : hex;
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            const a = data[i+3];
+            if (a < 50) continue; // ignore transparent
+            
+            const brightness = (r + g + b) / 3;
+            if (brightness > 240 || brightness < 15) continue; // skip pure white/black
+            
+            const hex = "#" + [r, g, b].map(x => {
+              const h = Math.round(x).toString(16);
+              return h.length === 1 ? "0" + h : h;
             }).join("");
-          resolve(rgbToHex(r / count, g / count, b / count));
+            
+            colorCount[hex] = (colorCount[hex] || 0) + 1;
+          }
+          
+          const sortedColors = Object.entries(colorCount).sort((a, b) => b[1] - a[1]);
+          const primary = sortedColors[0]?.[0] || "#F97316";
+          const secondary = sortedColors[1]?.[0] || "#FB923C";
+          resolve({ primary, secondary });
         } catch {
-          resolve("#F97316");
+          resolve(defaultColors);
         }
       };
-      img.onerror = () => resolve("#F97316");
+      img.onerror = () => resolve(defaultColors);
       img.src = imageUrl;
     });
   } else {
+    // Native fallback using hash to choose a beautiful premium palette pair
     let hash = 0;
     for (let i = 0; i < imageUrl.length; i++) {
       hash = imageUrl.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const colors = ["#F97316", "#3B82F6", "#10B981", "#EF4444", "#8B5CF6", "#EC4899", "#F59E0B"];
-    const index = Math.abs(hash) % colors.length;
-    return colors[index];
+    const palettes = [
+      { primary: "#F97316", secondary: "#FB923C" },
+      { primary: "#3B82F6", secondary: "#60A5FA" },
+      { primary: "#10B981", secondary: "#34D399" },
+      { primary: "#8B5CF6", secondary: "#A78BFA" },
+      { primary: "#EC4899", secondary: "#F472B6" },
+      { primary: "#F59E0B", secondary: "#FBBF24" },
+    ];
+    const index = Math.abs(hash) % palettes.length;
+    return palettes[index];
   }
+}
+
+export async function extractPrimaryColor(imageUrl: string): Promise<string> {
+  const palette = await extractPalette(imageUrl);
+  return palette.primary;
+}
+
+export function adjustContrast(hexColor: string, isDarkTheme: boolean): string {
+  const hex = hexColor.replace("#", "");
+  if (hex.length !== 6) return hexColor;
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Calculate relative luminance: L = 0.2126 * R + 0.7152 * G + 0.0722 * B
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+  const rgbToHex = (r: number, g: number, b: number) =>
+    "#" + [r, g, b].map(x => {
+      const h = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+      return h.length === 1 ? "0" + h : h;
+    }).join("");
+
+  if (isDarkTheme) {
+    // If in Dark Mode and color is too dark (luminance < 0.35), lighten it
+    if (luminance < 0.35) {
+      const factor = 0.45 / (luminance + 0.05);
+      return rgbToHex(r * factor, g * factor, b * factor);
+    }
+  } else {
+    // If in Light Mode and color is too light (luminance > 0.65), darken it
+    if (luminance > 0.65) {
+      const factor = 0.45 / (luminance + 0.05);
+      return rgbToHex(r * factor, g * factor, b * factor);
+    }
+  }
+
+  return hexColor;
 }
