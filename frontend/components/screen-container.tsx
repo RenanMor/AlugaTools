@@ -51,17 +51,16 @@ export function ScreenContainer({
 
   return (
     <View
-      className={cn(
-        "flex-1",
-        "bg-background",
-        containerClassName
-      )}
-      style={{ position: "relative" }}
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        position: "relative",
+      }}
       {...props}
     >
       {primaryColor ? (
         <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: -2 }}>
-          <Svg height="100%" width="100%">
+          <Svg height="100%" width="100%" style={{ width: "100%", height: "100%" }}>
             <Defs>
               <SvgGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <Stop offset="0%" stopColor={colors.background} stopOpacity="1" />
@@ -74,10 +73,10 @@ export function ScreenContainer({
       ) : null}
       <SafeAreaView
         edges={edges}
-        className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[{ flex: 1 }, style]}
+        className={safeAreaClassName}
       >
-        <View className={cn("flex-1", className)}>{children}</View>
+        <View style={{ flex: 1 }} className={className}>{children}</View>
       </SafeAreaView>
     </View>
   );

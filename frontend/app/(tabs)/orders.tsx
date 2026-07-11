@@ -109,8 +109,8 @@ function OrderCard({ rental }: { rental: Rental }) {
             {rental.toolName}
           </Text>
           <Text style={{ fontSize: 13, color: colors.muted }}>{rental.companyName}</Text>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
-            R$ {rental.totalPrice.toFixed(2)}
+          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.success }}>
+            R$ {rental.totalPrice.toFixed(2)} · {rental.days}d
           </Text>
         </View>
         <View style={{ justifyContent: "center", alignItems: "flex-end" }}>
