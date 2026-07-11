@@ -195,16 +195,21 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
     let companyId: string | undefined;
     let companyStatus: string | undefined;
     let delivererCompanyId: string | undefined;
+    let primaryColor = dbUser.primary_color;
+    let secondaryColor = dbUser.secondary_color;
+
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
         .from("companies")
-        .select("id, status")
+        .select("id, status, primary_color, secondary_color")
         .eq("owner_id", dbUser.id)
         .single();
       
       if (companyData) {
         companyId = companyData.id;
         companyStatus = companyData.status;
+        primaryColor = companyData.primary_color || primaryColor;
+        secondaryColor = companyData.secondary_color || secondaryColor;
       } else {
         // Self-healing: create the missing company record!
         const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
@@ -235,6 +240,15 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         .maybeSingle();
       if (delivererData) {
         delivererCompanyId = delivererData.company_id;
+        const { data: comp } = await supabaseAdmin
+          .from("companies")
+          .select("primary_color, secondary_color")
+          .eq("id", delivererCompanyId)
+          .single();
+        if (comp) {
+          primaryColor = comp.primary_color || primaryColor;
+          secondaryColor = comp.secondary_color || secondaryColor;
+        }
       }
     }
 
@@ -251,8 +265,8 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         companyStatus,
         delivererCompanyId,
         avatarUrl: dbUser.avatar_url,
-        primaryColor: dbUser.primary_color,
-        secondaryColor: dbUser.secondary_color,
+        primaryColor,
+        secondaryColor,
       }
     });
   } catch (err) {
@@ -323,16 +337,21 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
     let companyId: string | undefined;
     let companyStatus: string | undefined;
     let delivererCompanyId: string | undefined;
+    let primaryColor = dbUser.primary_color;
+    let secondaryColor = dbUser.secondary_color;
+
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
         .from("companies")
-        .select("id, status")
+        .select("id, status, primary_color, secondary_color")
         .eq("owner_id", dbUser.id)
         .single();
       
       if (companyData) {
         companyId = companyData.id;
         companyStatus = companyData.status;
+        primaryColor = companyData.primary_color || primaryColor;
+        secondaryColor = companyData.secondary_color || secondaryColor;
       } else {
         // Self-healing: create the missing company record!
         const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
@@ -363,6 +382,15 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         .maybeSingle();
       if (delivererData) {
         delivererCompanyId = delivererData.company_id;
+        const { data: comp } = await supabaseAdmin
+          .from("companies")
+          .select("primary_color, secondary_color")
+          .eq("id", delivererCompanyId)
+          .single();
+        if (comp) {
+          primaryColor = comp.primary_color || primaryColor;
+          secondaryColor = comp.secondary_color || secondaryColor;
+        }
       }
     }
 
@@ -378,8 +406,8 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         companyStatus,
         delivererCompanyId,
         avatarUrl: dbUser.avatar_url,
-        primaryColor: dbUser.primary_color,
-        secondaryColor: dbUser.secondary_color,
+        primaryColor,
+        secondaryColor,
       }
     });
   } catch (err) {

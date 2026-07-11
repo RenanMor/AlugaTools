@@ -48,10 +48,15 @@ export default function ProfileScreen() {
     if (isUpdatingAvatar) return;
     setIsUpdatingAvatar(true);
     try {
-      const palette = await extractPalette(urlOrBase64);
-      const isDark = colorScheme === "dark";
-      const primaryAdjusted = adjustContrast(palette.primary, isDark);
-      const secondaryAdjusted = adjustContrast(palette.secondary, isDark);
+      let primaryAdjusted: string | null = null;
+      let secondaryAdjusted: string | null = null;
+
+      if (user?.profile === "company") {
+        const palette = await extractPalette(urlOrBase64);
+        const isDark = colorScheme === "dark";
+        primaryAdjusted = adjustContrast(palette.primary, isDark);
+        secondaryAdjusted = adjustContrast(palette.secondary, isDark);
+      }
 
       await updateAvatar(urlOrBase64, primaryAdjusted, secondaryAdjusted);
       Alert.alert("Sucesso", "Foto de perfil atualizada!");

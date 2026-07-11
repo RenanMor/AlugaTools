@@ -83,7 +83,8 @@ export function ScreenContainer({
           <Defs>
             <SvgGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <Stop offset="0%" stopColor="#000000" stopOpacity="1" />
-              <Stop offset="100%" stopColor={primaryColor || colors.primary} stopOpacity="0.30" />
+              <Stop offset="50%" stopColor="#000000" stopOpacity="1" />
+              <Stop offset="100%" stopColor={primaryColor || colors.primary} stopOpacity="0.65" />
             </SvgGradient>
           </Defs>
           <Rect width="100%" height="100%" fill="url(#bgGrad)" />

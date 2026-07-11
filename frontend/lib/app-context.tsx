@@ -81,14 +81,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const { setPrimaryColor, setSecondaryColor } = useThemeContext();
 
   useEffect(() => {
-    if (user?.primaryColor) {
-      setPrimaryColor(user.primaryColor);
+    if (user && (user.profile === "company" || user.profile === "deliverer")) {
+      setPrimaryColor(user.primaryColor || null);
       setSecondaryColor(user.secondaryColor || null);
     } else {
       setPrimaryColor(null);
       setSecondaryColor(null);
     }
-  }, [user?.primaryColor, user?.secondaryColor, setPrimaryColor, setSecondaryColor]);
+  }, [user, setPrimaryColor, setSecondaryColor]);
 
   // 1. Hydrate cart and user session from storage on load
   useEffect(() => {
