@@ -1,7 +1,6 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useState, useMemo, useEffect } from "react";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -22,7 +21,6 @@ export default function CompanyScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const { setPrimaryColor, setSecondaryColor } = useThemeContext();
   const { user } = useApp();
-  const isFocused = useIsFocused();
 
   const filteredTools = useMemo(() => {
     return companyTools.filter((t) =>
@@ -30,36 +28,30 @@ export default function CompanyScreen() {
     );
   }, [companyTools, searchQuery]);
 
-  useEffect(() => {
-    if (!isFocused) return;
-
-    let active = true;
-    if (company) {
-      if (company.primaryColor) {
-        setPrimaryColor(company.primaryColor);
-        if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
-      } else if (company.logo) {
-        extractPalette(company.logo).then((palette) => {
-          if (active) {
-            setPrimaryColor(palette.primary);
-            setSecondaryColor(palette.secondary);
-          }
-        });
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (company) {
+        if (company.primaryColor) {
+          setPrimaryColor(company.primaryColor);
+          if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
+        } else if (company.logo) {
+          extractPalette(company.logo).then((palette) => {
+            if (active) {
+              setPrimaryColor(palette.primary);
+              setSecondaryColor(palette.secondary);
+            }
+          });
+        }
       }
-    }
-
-    return () => {
-      active = false;
-      // Only restore brand colors if the user is a company or deliverer
-      if (user && (user.profile === "company" || user.profile === "deliverer")) {
-        setPrimaryColor(user.primaryColor || null);
-        setSecondaryColor(user.secondaryColor || null);
-      } else {
-        setPrimaryColor(null);
-        setSecondaryColor(null);
-      }
-    };
-  }, [company, isFocused, user]);
+      return () => {
+        active = false;
+        // Restore user's own brand colors on leave instead of resetting to null
+        setPrimaryColor(user?.primaryColor || null);
+        setSecondaryColor(user?.secondaryColor || null);
+      };
+    }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
+  );
 
   if (!company) {
     return (

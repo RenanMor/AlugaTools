@@ -1,8 +1,7 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Image, Platform, Pressable, ScrollView, Text, View, Modal, TextInput } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
 import { StarRating } from "@/components/star-rating";
 import { getToolReviews } from "@/lib/api/tools";
 import { ScreenContainer } from "@/components/screen-container";
@@ -28,7 +27,6 @@ export default function ToolScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [filterType, setFilterType] = useState<"highest" | "lowest" | "recent">("highest");
   const { setPrimaryColor, setSecondaryColor } = useThemeContext();
-  const isFocused = useIsFocused();
 
   useEffect(() => {
     if (id) {
@@ -36,36 +34,30 @@ export default function ToolScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (!isFocused) return;
-
-    let active = true;
-    if (company) {
-      if (company.primaryColor) {
-        setPrimaryColor(company.primaryColor);
-        if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
-      } else if (company.logo) {
-        extractPalette(company.logo).then((palette) => {
-          if (active) {
-            setPrimaryColor(palette.primary);
-            setSecondaryColor(palette.secondary);
-          }
-        });
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (company) {
+        if (company.primaryColor) {
+          setPrimaryColor(company.primaryColor);
+          if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
+        } else if (company.logo) {
+          extractPalette(company.logo).then((palette) => {
+            if (active) {
+              setPrimaryColor(palette.primary);
+              setSecondaryColor(palette.secondary);
+            }
+          });
+        }
       }
-    }
-
-    return () => {
-      active = false;
-      // Only restore brand colors if the user is a company or deliverer
-      if (user && (user.profile === "company" || user.profile === "deliverer")) {
-        setPrimaryColor(user.primaryColor || null);
-        setSecondaryColor(user.secondaryColor || null);
-      } else {
-        setPrimaryColor(null);
-        setSecondaryColor(null);
-      }
-    };
-  }, [company, isFocused, user]);
+      return () => {
+        active = false;
+        // Restore user's own brand colors on leave instead of resetting to null
+        setPrimaryColor(user?.primaryColor || null);
+        setSecondaryColor(user?.secondaryColor || null);
+      };
+    }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
+  );
 
   const topReviews = useMemo(() => {
     return [...reviews].sort((a, b) => b.rating - a.rating).slice(0, 4);
