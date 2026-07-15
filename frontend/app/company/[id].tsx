@@ -1,26 +1,58 @@
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
+import { FlatList, Image, Pressable, Text, TextInput, View, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
-import { Tool } from "@/lib/types";
+import { Tool, Company } from "@/lib/types";
 import { useThemeContext } from "@/lib/theme-provider";
 import { extractPalette } from "@/lib/utils";
+import { getCompanyById } from "@/lib/api/companies";
 
 export default function CompanyScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { companies, tools } = useApp();
-  const company = companies.find((c) => c.id === id);
+  
+  const [localCompany, setLocalCompany] = useState<Company | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const company = localCompany || companies.find((c) => c.id === id);
   const companyTools = tools.filter((t) => t.companyId === id);
 
   const [searchQuery, setSearchQuery] = useState("");
   const { setPrimaryColor, setSecondaryColor } = useThemeContext();
   const { user } = useApp();
+
+  // Fetch / Refresh company data directly from server when page is accessed (F5 nos elementos)
+  useEffect(() => {
+    async function loadCompany() {
+      if (!id) return;
+      
+      // Stale: Check cache first to display layout instantly
+      const cached = companies.find((c) => c.id === id);
+      if (cached) {
+        setLocalCompany(cached);
+        setIsLoading(false);
+      }
+
+      // Revalidate: Always fetch fresh details from the database API
+      try {
+        const freshData = await getCompanyById(id);
+        if (freshData) {
+          setLocalCompany(freshData);
+        }
+      } catch (err) {
+        console.error("Erro ao revalidar dados da empresa:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadCompany();
+  }, [id, companies]);
 
   const filteredTools = useMemo(() => {
     return companyTools.filter((t) =>
@@ -52,6 +84,14 @@ export default function CompanyScreen() {
       };
     }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
   );
+
+  if (isLoading && !company) {
+    return (
+      <ScreenContainer style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </ScreenContainer>
+    );
+  }
 
   if (!company) {
     return (

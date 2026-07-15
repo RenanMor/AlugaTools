@@ -86,7 +86,7 @@ export function ScreenContainer({
       {...props}
     >
       <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: -2 }}>
-        <Svg height="100%" width="100%" style={{ width: "100%", height: "100%" }}>
+        <Svg key={`${baseColor}-${compColor}`} height="100%" width="100%" style={{ width: "100%", height: "100%" }}>
           <Defs>
             <RadialGradient id="topLeftGrad" cx="0%" cy="10%" r="80%" fx="0%" fy="10%">
               <Stop offset="0%" stopColor={baseColor} stopOpacity="0.55" />
