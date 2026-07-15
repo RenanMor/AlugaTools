@@ -85,7 +85,8 @@ export function ScreenContainer({
       }}
       {...props}
     >
-      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: -2 }}>
+      {/* Background SVG - Render first to sit at the bottom naturally without negative zIndex */}
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
         <Svg key={`${baseColor}-${compColor}`} height="100%" width="100%" style={{ width: "100%", height: "100%" }}>
           <Defs>
             <RadialGradient id="topLeftGrad" cx="0%" cy="10%" r="80%" fx="0%" fy="10%">
@@ -115,6 +116,8 @@ export function ScreenContainer({
           <Rect width="100%" height="100%" fill="url(#bottomGrad)" />
         </Svg>
       </View>
+
+      {/* Watermark centralizada (logo da empresa) - Render second */}
       {watermarkSource ? (
         <Image
           source={{ uri: watermarkSource }}
@@ -126,11 +129,12 @@ export function ScreenContainer({
             height: 320,
             opacity: 0.40,
             resizeMode: "contain",
-            zIndex: -1,
             pointerEvents: "none",
           }}
         />
       ) : null}
+
+      {/* Content layer (SafeAreaView) - Render on top of Svg and watermark */}
       <SafeAreaView
         edges={edges}
         style={[{ flex: 1 }, style]}

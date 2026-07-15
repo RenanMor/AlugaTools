@@ -111,10 +111,19 @@ export default function CompanyScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         ListHeaderComponent={
           <View style={{ padding: 16, gap: 14 }}>
-            <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 6 }]}>
-              <IconSymbol name="arrow.left" size={22} color={colors.foreground} />
-              <Text style={{ color: colors.foreground, fontSize: 15 }}>Voltar</Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 6 }]}>
+                <IconSymbol name="arrow.left" size={22} color={colors.foreground} />
+                <Text style={{ color: colors.foreground, fontSize: 15 }}>Voltar</Text>
+              </Pressable>
+              
+              {isLoading && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ color: colors.muted, fontSize: 12 }}>Atualizando...</Text>
+                </View>
+              )}
+            </View>
 
             <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
               <Image source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")} style={{ width: 76, height: 76, borderRadius: 16, backgroundColor: colors.border }} />
