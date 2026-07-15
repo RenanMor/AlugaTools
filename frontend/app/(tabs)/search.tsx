@@ -1,12 +1,16 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState, useEffect } from "react";
-import { FlatList, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { FlatList, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
 import { Tool } from "@/lib/types";
+import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
 
 export default function SearchScreen() {
   const colors = useColors();
@@ -17,6 +21,7 @@ export default function SearchScreen() {
       router.replace("/orders");
     }
   }, [user]);
+
   const params = useLocalSearchParams<{ category?: string }>();
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(params.category ?? null);
@@ -28,7 +33,7 @@ export default function SearchScreen() {
       return matchQuery && matchCat;
     });
 
-    // Prioritize open stores: "A busca de ferramentas dá prioridade para ferramentas de lojas abertas;"
+    // Prioritize open stores
     return filtered.sort((a, b) => {
       const aComp = companies.find((c) => c.id === a.companyId);
       const bComp = companies.find((c) => c.id === b.companyId);
@@ -41,43 +46,31 @@ export default function SearchScreen() {
   }, [tools, query, activeCat, companies]);
 
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? "";
+  const isCompanyClosed = (id: string) => {
+    const comp = companies.find((c) => c.id === id);
+    return comp ? comp.isOpen === false : false;
+  };
 
   return (
     <ScreenContainer className="p-4">
-      <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
+      <Text style={[pageTitle(colors), { marginBottom: spacing.lg - 2 }]}>
         Buscar ferramentas
       </Text>
 
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-          backgroundColor: colors.surface,
-          borderRadius: 14,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          marginBottom: 14,
-        }}
-      >
-        <IconSymbol name="magnifyingglass" size={20} color={colors.muted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Digite o nome da ferramenta"
-          placeholderTextColor={colors.muted}
-          returnKeyType="search"
-          style={{ flex: 1, color: colors.foreground, fontSize: 15 }}
-        />
-      </View>
+      <Input
+        icon="magnifyingglass"
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Digite o nome da ferramenta"
+        returnKeyType="search"
+        containerStyle={{ marginBottom: spacing.lg - 2 }}
+      />
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, height: 42, marginBottom: 14 }}
-        contentContainerStyle={{ gap: 8, alignItems: "center" }}
+        style={{ flexGrow: 0, height: 42, marginBottom: spacing.lg - 2 }}
+        contentContainerStyle={{ gap: spacing.sm, alignItems: "center" }}
       >
         <CategoryChip label="Todas" active={!activeCat} onPress={() => setActiveCat(null)} />
         {CATEGORIES.map((c) => (
@@ -88,14 +81,16 @@ export default function SearchScreen() {
       <FlatList
         data={results}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
         ListEmptyComponent={
           <Text style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>
             Nenhuma ferramenta encontrada.
           </Text>
         }
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        renderItem={({ item }) => <ToolRow tool={item} company={companyName(item.companyId)} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        renderItem={({ item }) => (
+          <ToolRow tool={item} company={companyName(item.companyId)} closed={isCompanyClosed(item.companyId)} />
+        )}
       />
     </ScreenContainer>
   );
@@ -108,108 +103,91 @@ function CategoryChip({ label, active, onPress }: { label: string; active: boole
       onPress={onPress}
       style={({ pressed }) => [
         {
-          paddingHorizontal: 16,
+          paddingHorizontal: spacing.lg,
           paddingVertical: 9,
-          borderRadius: 20,
+          borderRadius: radius.pill,
           backgroundColor: active ? colors.primary : colors.surface,
-          borderWidth: 1,
+          borderWidth: 0.5,
           borderColor: active ? colors.primary : colors.border,
           opacity: pressed ? 0.8 : 1,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
         },
       ]}
     >
-      <Text style={{ color: active ? "#fff" : colors.foreground, fontWeight: "600", fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: active ? "#fff" : colors.foreground, fontWeight: fontWeight.semibold, fontSize: fontSize.sm }}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-function ToolRow({ tool, company }: { tool: Tool; company: string }) {
+function ToolRow({ tool, company, closed }: { tool: Tool; company: string; closed: boolean }) {
   const colors = useColors();
-  const { companies } = useApp();
-
-  const isCompanyClosed = useMemo(() => {
-    const comp = companies.find((c) => c.name === company);
-    return comp ? comp.isOpen === false : false;
-  }, [companies, company]);
 
   return (
-    <Pressable
+    <Card
       onPress={() => router.push({ pathname: "/tool/[id]", params: { id: tool.id } })}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row",
-          gap: 12,
-          padding: 10,
-          borderRadius: 14,
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-          opacity: pressed ? 0.75 : 1,
-          position: "relative",
-        },
-      ]}
+      style={{ padding: spacing.sm + 2 }}
     >
-      {/* Pop-out rating badge: "No buscar a avaliação é no topo da box, com efeito 'saindo da box'" */}
-      {tool.rating !== undefined && tool.rating > 0 && (
-        <View
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 3,
-            backgroundColor: "#1F2937",
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-            elevation: 5,
-            zIndex: 10,
-          }}
-        >
-          <IconSymbol name="star.fill" size={10} color="#FBBF24" />
-          <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>
-            {tool.rating.toFixed(1)}
-            <Text style={{ fontWeight: "400", color: "#9CA3AF" }}>
-              {` (${tool.ratingCount})`}
+      <View style={{ flexDirection: "row", gap: spacing.md, position: "relative" }}>
+        {/* Pop-out rating badge */}
+        {tool.rating !== undefined && tool.rating > 0 && (
+          <View
+            style={{
+              position: "absolute",
+              top: -2,
+              right: -2,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 3,
+              backgroundColor: "#18181B",
+              borderWidth: 0.5,
+              borderColor: colors.border,
+              borderRadius: radius.md,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              zIndex: 10,
+            }}
+          >
+            <IconSymbol name="star.fill" size={10} color="#FBBF24" />
+            <Text style={{ fontSize: fontSize.xs, fontWeight: fontWeight.black, color: "#fff" }}>
+              {tool.rating.toFixed(1)}
+              <Text style={{ fontWeight: fontWeight.normal, color: "#9CA3AF" }}>
+                {` (${tool.ratingCount})`}
+              </Text>
             </Text>
-          </Text>
-        </View>
-      )}
+          </View>
+        )}
 
-      <Image source={tool.image ? { uri: tool.image } : require("@/assets/images/sem-imagem.png")} style={{ width: 70, height: 70, borderRadius: 12, backgroundColor: colors.border }} />
-      <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
-        <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-          {tool.name}
-        </Text>
-        
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text style={{ fontSize: 12, color: colors.muted }}>{company}</Text>
-          {isCompanyClosed && (
-            <Text style={{ fontSize: 10, fontWeight: "700", color: colors.error }}>
-              • Loja Fechada
+        <Image
+          source={tool.image ? { uri: tool.image } : require("@/assets/images/sem-imagem.png")}
+          style={{ width: 70, height: 70, borderRadius: radius.md, backgroundColor: colors.border }}
+        />
+
+        <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
+          <Text numberOfLines={1} style={{ fontSize: fontSize.md + 1, fontWeight: fontWeight.bold, color: colors.foreground }}>
+            {tool.name}
+          </Text>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>{company}</Text>
+            {closed && (
+              <Text style={{ fontSize: fontSize.xs, fontWeight: fontWeight.bold, color: colors.error }}>
+                • Fechada
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 2 }}>
+            <Text style={{ fontSize: fontSize.md, fontWeight: fontWeight.bold, color: colors.success }}>
+              R$ {tool.pricePerDay}/dia
             </Text>
-          )}
-        </View>
-
-        <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 2 }}>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.success }}>
-            R$ {tool.pricePerDay}/dia
-          </Text>
-          
-          <View style={{ alignItems: "flex-end", gap: 2 }}>
-            <Text style={{ fontSize: 11, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+            <Badge variant={tool.quantity > 0 && tool.available ? "success" : "error"} size="sm">
               {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
-            </Text>
+            </Badge>
           </View>
         </View>
       </View>
-    </Pressable>
+    </Card>
   );
 }

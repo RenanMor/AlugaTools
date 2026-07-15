@@ -1,22 +1,26 @@
-import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { FlatList, Image, Pressable, Text, TextInput, View, ActivityIndicator } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useState, useMemo, useEffect } from "react";
+import { FlatList, Image, Pressable, Text, View, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ToolCardSkeleton } from "@/components/ui/skeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
+import { useCompanyTheme } from "@/hooks/use-company-theme";
 import { CATEGORIES } from "@/lib/data";
 import { Tool, Company } from "@/lib/types";
-import { useThemeContext } from "@/lib/theme-provider";
-import { extractPalette } from "@/lib/utils";
 import { getCompanyById } from "@/lib/api/companies";
+import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
 
 export default function CompanyScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { companies, tools } = useApp();
-  
+
   const [localCompany, setLocalCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -24,27 +28,24 @@ export default function CompanyScreen() {
   const companyTools = tools.filter((t) => t.companyId === id);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const { setPrimaryColor, setSecondaryColor } = useThemeContext();
-  const { user } = useApp();
 
-  // Fetch / Refresh company data directly from server when page is accessed (F5 nos elementos)
+  // Use centralized company theme hook (replaces inline useFocusEffect)
+  useCompanyTheme(company);
+
+  // Stale-while-revalidate: show cached data instantly, fetch fresh from API
   useEffect(() => {
     async function loadCompany() {
       if (!id) return;
-      
-      // Stale: Check cache first to display layout instantly
+
       const cached = companies.find((c) => c.id === id);
       if (cached) {
         setLocalCompany(cached);
         setIsLoading(false);
       }
 
-      // Revalidate: Always fetch fresh details from the database API
       try {
         const freshData = await getCompanyById(id);
-        if (freshData) {
-          setLocalCompany(freshData);
-        }
+        if (freshData) setLocalCompany(freshData);
       } catch (err) {
         console.error("Erro ao revalidar dados da empresa:", err);
       } finally {
@@ -59,31 +60,6 @@ export default function CompanyScreen() {
       t.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [companyTools, searchQuery]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      if (company) {
-        if (company.primaryColor) {
-          setPrimaryColor(company.primaryColor);
-          if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
-        } else if (company.logo) {
-          extractPalette(company.logo).then((palette) => {
-            if (active) {
-              setPrimaryColor(palette.primary);
-              setSecondaryColor(palette.secondary);
-            }
-          });
-        }
-      }
-      return () => {
-        active = false;
-        // Restore user's own brand colors on leave instead of resetting to null
-        setPrimaryColor(user?.primaryColor || null);
-        setSecondaryColor(user?.secondaryColor || null);
-      };
-    }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
-  );
 
   if (isLoading && !company) {
     return (
@@ -107,81 +83,70 @@ export default function CompanyScreen() {
         data={filteredTools}
         keyExtractor={(i) => i.id}
         numColumns={2}
-        columnWrapperStyle={{ gap: 12, paddingHorizontal: 16 }}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        columnWrapperStyle={{ gap: spacing.md, paddingHorizontal: spacing.lg }}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
         ListHeaderComponent={
-          <View style={{ padding: 16, gap: 14 }}>
+          <View style={{ padding: spacing.lg, gap: spacing.lg - 2 }}>
+            {/* Back button + loading indicator */}
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 6 }]}>
                 <IconSymbol name="arrow.left" size={22} color={colors.foreground} />
-                <Text style={{ color: colors.foreground, fontSize: 15 }}>Voltar</Text>
+                <Text style={{ color: colors.foreground, fontSize: fontSize.md + 1 }}>Voltar</Text>
               </Pressable>
-              
               {isLoading && (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={{ color: colors.muted, fontSize: 12 }}>Atualizando...</Text>
+                  <Text style={{ color: colors.muted, fontSize: fontSize.sm }}>Atualizando...</Text>
                 </View>
               )}
             </View>
 
-            <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
-              <Image source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")} style={{ width: 76, height: 76, borderRadius: 16, backgroundColor: colors.border }} />
+            {/* Company header */}
+            <View style={{ flexDirection: "row", gap: spacing.lg - 2, alignItems: "center" }}>
+              <Image
+                source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")}
+                style={{ width: 76, height: 76, borderRadius: radius.lg, backgroundColor: colors.border }}
+              />
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{company.name}</Text>
+                <Text style={{ fontSize: fontSize.xl, fontWeight: fontWeight.black, color: colors.foreground }}>
+                  {company.name}
+                </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <StarRating value={company.rating} size={15} />
-                  <Text style={{ fontSize: 12, color: colors.muted }}>
+                  <StarRating value={company.rating} size={14} />
+                  <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
                     {company.rating.toFixed(1)} ({company.ratingCount})
                   </Text>
-                  <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.muted, marginHorizontal: 2 }} />
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: company.isOpen !== false ? colors.success : colors.error }}>
-                    {company.isOpen !== false ? "Loja Aberta" : "Loja Fechada"}
-                  </Text>
                 </View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <IconSymbol name="location.fill" size={13} color={colors.muted} />
-                  <Text style={{ fontSize: 12, color: colors.muted }}>
-                    {company.city && company.state ? `${company.city}, ${company.state}` : company.location}
-                  </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <Badge variant={company.isOpen !== false ? "success" : "error"}>
+                    {company.isOpen !== false ? "Aberta" : "Fechada"}
+                  </Badge>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                    <IconSymbol name="location.fill" size={12} color={colors.muted} />
+                    <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                      {company.city && company.state ? `${company.city}, ${company.state}` : company.location}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
 
-            <Text style={{ fontSize: 14, color: colors.muted }}>{company.description}</Text>
+            <Text style={{ fontSize: fontSize.md, color: colors.muted }}>{company.description}</Text>
 
-            {/* Search Input */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                borderWidth: 1,
-                borderColor: colors.border,
-                marginTop: 6,
-              }}
-            >
-              <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Buscar ferramentas nesta empresa"
-                placeholderTextColor={colors.muted}
-                style={{ flex: 1, color: colors.foreground, fontSize: 14 }}
-              />
-            </View>
+            <Input
+              icon="magnifyingglass"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Buscar ferramentas nesta empresa"
+            />
 
-            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginTop: 10 }}>
+            <Text style={{ fontSize: 17, fontWeight: fontWeight.bold, color: colors.foreground, marginTop: spacing.sm }}>
               Ferramentas disponíveis
             </Text>
           </View>
         }
         renderItem={({ item }) => <ToolGridCard tool={item} />}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
       />
     </ScreenContainer>
   );
@@ -193,68 +158,56 @@ function ToolGridCard({ tool }: { tool: Tool }) {
   const categoryNames = useMemo(() => {
     if (!tool.categoryId) return [];
     const ids = tool.categoryId.split(",").map((c) => c.trim());
-    return ids
-      .map((id) => CATEGORIES.find((c) => c.id === id)?.name)
-      .filter((n): n is string => !!n);
+    return ids.map((id) => CATEGORIES.find((c) => c.id === id)?.name).filter((n): n is string => !!n);
   }, [tool.categoryId]);
+
   const categoryText = useMemo(() => {
     if (categoryNames.length === 0) return "";
-    if (categoryNames.length <= 2) {
-      return categoryNames.join(", ");
-    }
+    if (categoryNames.length <= 2) return categoryNames.join(", ");
     return `${categoryNames.slice(0, 2).join(", ")} e +${categoryNames.length - 2}`;
   }, [categoryNames]);
 
   return (
-    <Pressable
+    <Card
       onPress={() => router.push({ pathname: "/tool/[id]", params: { id: tool.id } })}
-      style={({ pressed }) => [
-        {
-          flex: 1,
-          maxWidth: "48%",
-          borderRadius: 14,
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-          overflow: "hidden",
-          opacity: pressed ? 0.8 : 1,
-        },
-      ]}
+      noPadding
+      style={{ flex: 1, maxWidth: "48%", overflow: "hidden" }}
     >
-      <Image source={tool.image ? { uri: tool.image } : require("@/assets/images/sem-imagem.png")} style={{ width: "100%", height: 110, backgroundColor: colors.border }} />
-      <View style={{ padding: 10, gap: 4 }}>
-        <View style={{ gap: 2 }}>
-          <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
-            {tool.name}
+      <Image
+        source={tool.image ? { uri: tool.image } : require("@/assets/images/sem-imagem.png")}
+        style={{ width: "100%", height: 110, backgroundColor: colors.border }}
+      />
+      <View style={{ padding: spacing.sm + 2, gap: 4 }}>
+        <Text numberOfLines={2} style={{ fontSize: fontSize.sm, fontWeight: fontWeight.bold, color: colors.foreground }}>
+          {tool.name}
+        </Text>
+        {categoryText ? (
+          <Text numberOfLines={1} style={{ fontSize: fontSize.xs, color: colors.muted }}>
+            {categoryText}
           </Text>
-          {categoryText ? (
-            <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
-              {categoryText}
-            </Text>
-          ) : null}
-        </View>
+        ) : null}
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.success }}>R$ {tool.pricePerDay}/dia</Text>
-          
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: spacing.xs }}>
+          <Text style={{ fontSize: fontSize.md, fontWeight: fontWeight.black, color: colors.success }}>
+            R$ {tool.pricePerDay}/dia
+          </Text>
           <View style={{ alignItems: "flex-end", gap: 2 }}>
             {tool.rating !== undefined && tool.rating > 0 ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
                 <IconSymbol name="star.fill" size={10} color="#FBBF24" />
-                <Text style={{ fontSize: 10, fontWeight: "700", color: colors.foreground }}>
+                <Text style={{ fontSize: fontSize.xs, fontWeight: fontWeight.bold, color: colors.foreground }}>
                   {tool.rating.toFixed(1)}
                 </Text>
               </View>
             ) : (
               <Text style={{ fontSize: 9, color: colors.muted }}>Sem avaliações</Text>
             )}
-
-            <Text style={{ fontSize: 10, fontWeight: "600", color: tool.quantity > 0 && tool.available ? colors.success : colors.error }}>
+            <Badge variant={tool.quantity > 0 && tool.available ? "success" : "error"} size="sm">
               {tool.quantity > 0 && tool.available ? `${tool.quantity} disp.` : "Sem estoque"}
-            </Text>
+            </Badge>
           </View>
         </View>
       </View>
-    </Pressable>
+    </Card>
   );
 }

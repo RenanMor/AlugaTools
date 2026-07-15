@@ -4,7 +4,9 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Platform } from "react-native";
+import { Platform, ActivityIndicator, View } from "react-native";
+import { useColors } from "@/hooks/use-colors";
+import { useApp } from "@/lib/app-context";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -24,6 +26,31 @@ const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+function NavigationWrapper() {
+  const { isHydrated } = useApp();
+  const colors = useColors();
+
+  if (!isHydrated) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="company/[id]" />
+      <Stack.Screen name="tool/[id]" />
+      <Stack.Screen name="auth" options={{ presentation: "modal" }} />
+      <Stack.Screen name="checkout" />
+      <Stack.Screen name="oauth/callback" />
+      <Stack.Screen name="dashboard-owner" />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
@@ -83,15 +110,7 @@ export default function RootLayout() {
         {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
         {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
         <AppProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="company/[id]" />
-            <Stack.Screen name="tool/[id]" />
-            <Stack.Screen name="auth" options={{ presentation: "modal" }} />
-            <Stack.Screen name="checkout" />
-            <Stack.Screen name="oauth/callback" />
-            <Stack.Screen name="dashboard-owner" />
-          </Stack>
+          <NavigationWrapper />
         </AppProvider>
         <StatusBar style="auto" />
       </QueryClientProvider>

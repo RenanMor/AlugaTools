@@ -3,10 +3,14 @@ import * as Haptics from "expo-haptics";
 import { useEffect } from "react";
 import { FlatList, Image, Platform, Pressable, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { CartItem } from "@/lib/types";
+import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
 
 export default function CartScreen() {
   const colors = useColors();
@@ -28,7 +32,7 @@ export default function CartScreen() {
 
     if (closedItems.length > 0) {
       const closedStoreNames = Array.from(new Set(closedItems.map((item) => item.companyName))).join(", ");
-      alert(`Não é possível finalizar o aluguel. A(s) seguinte(s) loja(s) de ferramentas está(ão) fechada(s): ${closedStoreNames}`);
+      alert(`Não é possível finalizar o aluguel. A(s) seguinte(s) loja(s) está(ão) fechada(s): ${closedStoreNames}`);
       return;
     }
 
@@ -41,35 +45,23 @@ export default function CartScreen() {
 
   return (
     <ScreenContainer className="p-4">
-      <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 16 }}>
+      <Text style={[pageTitle(colors), { marginBottom: spacing.lg }]}>
         Carrinho de aluguel
       </Text>
 
       <FlatList
         data={cart}
         keyExtractor={(item) => item.id || item.tool.id}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        contentContainerStyle={{ paddingBottom: 16, flexGrow: 1 }}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        contentContainerStyle={{ paddingBottom: spacing.lg, flexGrow: 1 }}
         ListEmptyComponent={
-          <View style={{ alignItems: "center", marginTop: 80, gap: 12 }}>
-            <IconSymbol name="cart.fill" size={48} color={colors.muted} />
-            <Text style={{ color: colors.muted, fontSize: 15 }}>Seu carrinho está vazio</Text>
-            <Pressable
-              onPress={() => router.push("/")}
-              style={({ pressed }) => [
-                {
-                  marginTop: 6,
-                  paddingHorizontal: 20,
-                  paddingVertical: 11,
-                  borderRadius: 12,
-                  backgroundColor: colors.primary,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Explorar ferramentas</Text>
-            </Pressable>
-          </View>
+          <EmptyState
+            icon="cart.fill"
+            title="Seu carrinho está vazio"
+            description="Explore empresas e ferramentas para começar a alugar."
+            actionLabel="Explorar ferramentas"
+            onAction={() => router.push("/")}
+          />
         }
         renderItem={({ item }) => (
           <CartRow
@@ -82,29 +74,16 @@ export default function CartScreen() {
       />
 
       {cart.length > 0 && (
-        <View style={{ gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <View style={{ gap: spacing.md, paddingTop: spacing.md, borderTopWidth: 0.5, borderTopColor: colors.border }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 16, color: colors.muted }}>Total</Text>
-            <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>
+            <Text style={{ fontSize: fontSize.lg, color: colors.muted }}>Total</Text>
+            <Text style={{ fontSize: 22, fontWeight: fontWeight.black, color: colors.foreground }}>
               R$ {cartTotal.toFixed(2)}
             </Text>
           </View>
-          <Pressable
-            onPress={handleCheckout}
-            style={({ pressed }) => [
-              {
-                backgroundColor: colors.primary,
-                borderRadius: 14,
-                paddingVertical: 16,
-                alignItems: "center",
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              },
-            ]}
-          >
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-              Finalizar aluguel
-            </Text>
-          </Pressable>
+          <Button onPress={handleCheckout} size="lg">
+            Finalizar aluguel
+          </Button>
         </View>
       )}
     </ScreenContainer>
@@ -130,89 +109,63 @@ function CartRow({
   const currentQty = item.quantity || 1;
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        gap: 12,
-        padding: 10,
-        borderRadius: 14,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
-      <Image source={{ uri: item.tool.image }} style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: colors.border }} />
-      <View style={{ flex: 1, gap: 8 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-              {item.tool.name}
-            </Text>
-            <Text style={{ fontSize: 12, color: colors.muted }}>{item.companyName}</Text>
-          </View>
-          <Pressable onPress={() => onRemove(item.id)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-            <IconSymbol name="trash" size={20} color={colors.error} />
-          </Pressable>
-        </View>
-
-        <View style={{ gap: 6 }}>
-          {/* Renting Days Stepper */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>
-              Tempo aluguel:{" "}
-              <Text style={{ fontSize: 11, color: colors.muted }}>({minD}–{maxD} dias)</Text>
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Stepper
-                onPress={() => onDays(item.id, currentDays - 1)}
-                label="−"
-                disabled={currentDays <= minD}
-              />
-              <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 50, textAlign: "center", fontSize: 13 }}>
-                {currentDays} {currentDays > 1 ? "dias" : "dia"}
+    <Card style={{ padding: spacing.sm + 2 }}>
+      <View style={{ flexDirection: "row", gap: spacing.md }}>
+        <Image source={{ uri: item.tool.image }} style={{ width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.border }} />
+        <View style={{ flex: 1, gap: spacing.sm }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <View style={{ flex: 1, marginRight: spacing.sm }}>
+              <Text numberOfLines={1} style={{ fontSize: fontSize.md + 1, fontWeight: fontWeight.bold, color: colors.foreground }}>
+                {item.tool.name}
               </Text>
-              <Stepper
-                onPress={() => onDays(item.id, currentDays + 1)}
-                label="+"
-                disabled={currentDays >= maxD}
-              />
+              <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>{item.companyName}</Text>
+            </View>
+            <Pressable onPress={() => onRemove(item.id)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+              <IconSymbol name="trash" size={20} color={colors.error} />
+            </Pressable>
+          </View>
+
+          <View style={{ gap: 6 }}>
+            {/* Days stepper */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                Dias: <Text style={{ fontSize: fontSize.xs }}>{minD}–{maxD}</Text>
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <Stepper onPress={() => onDays(item.id, currentDays - 1)} label="−" disabled={currentDays <= minD} />
+                <Text style={{ color: colors.foreground, fontWeight: fontWeight.bold, minWidth: 50, textAlign: "center", fontSize: fontSize.sm }}>
+                  {currentDays} {currentDays > 1 ? "dias" : "dia"}
+                </Text>
+                <Stepper onPress={() => onDays(item.id, currentDays + 1)} label="+" disabled={currentDays >= maxD} />
+              </View>
+            </View>
+
+            {/* Qty stepper */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>
+                Qtd: <Text style={{ fontSize: fontSize.xs }}>máx. {maxQty}</Text>
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <Stepper onPress={() => onQuantity(item.id, currentQty - 1)} label="−" disabled={currentQty <= 1} />
+                <Text style={{ color: colors.foreground, fontWeight: fontWeight.bold, minWidth: 50, textAlign: "center", fontSize: fontSize.sm }}>
+                  {currentQty} un.
+                </Text>
+                <Stepper onPress={() => onQuantity(item.id, currentQty + 1)} label="+" disabled={currentQty >= maxQty} />
+              </View>
             </View>
           </View>
 
-          {/* Item Quantity Stepper */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>
-              Quant. itens:{" "}
-              <Text style={{ fontSize: 11, color: colors.muted }}>(máx. {maxQty})</Text>
+          <View style={{ height: 0.5, backgroundColor: colors.border, marginVertical: 2 }} />
+
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>Subtotal:</Text>
+            <Text style={{ fontSize: fontSize.md + 1, fontWeight: fontWeight.black, color: colors.primary }}>
+              R$ {((item.tool.pricePerDay * currentDays) * currentQty).toFixed(2)}
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Stepper
-                onPress={() => onQuantity(item.id, currentQty - 1)}
-                label="−"
-                disabled={currentQty <= 1}
-              />
-              <Text style={{ color: colors.foreground, fontWeight: "700", minWidth: 50, textAlign: "center", fontSize: 13 }}>
-                {currentQty} un.
-              </Text>
-              <Stepper
-                onPress={() => onQuantity(item.id, currentQty + 1)}
-                label="+"
-                disabled={currentQty >= maxQty}
-              />
-            </View>
           </View>
-        </View>
-
-        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 2 }} />
-
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: colors.muted }}>Subtotal:</Text>
-          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary }}>
-            R$ {((item.tool.pricePerDay * currentDays) * currentQty).toFixed(2)}
-          </Text>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -225,17 +178,18 @@ function Stepper({ label, onPress, disabled }: { label: string; onPress: () => v
         {
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: radius.sm,
           backgroundColor: disabled ? colors.border : colors.background,
-          borderWidth: 1,
+          borderWidth: 0.5,
           borderColor: colors.border,
           alignItems: "center",
           justifyContent: "center",
           opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.92 : 1 }],
         },
       ]}
     >
-      <Text style={{ color: disabled ? colors.muted : colors.foreground, fontSize: 18, fontWeight: "700" }}>{label}</Text>
+      <Text style={{ color: disabled ? colors.muted : colors.foreground, fontSize: 18, fontWeight: fontWeight.bold }}>{label}</Text>
     </Pressable>
   );
 }

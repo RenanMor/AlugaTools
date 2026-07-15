@@ -6,6 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Platform, View, Text } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
+import { fontWeight as fw } from "@/lib/design-tokens";
 
 function CartBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -24,7 +25,7 @@ function CartBadge({ count }: { count: number }) {
         paddingHorizontal: 3,
       }}
     >
-      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{count}</Text>
+      <Text style={{ color: "#fff", fontSize: 10, fontWeight: fw.bold }}>{count}</Text>
     </View>
   );
 }
@@ -45,13 +46,22 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.muted,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: fw.semibold,
+        },
         tabBarStyle: {
           paddingTop: 8,
           paddingBottom: bottomPadding,
           height: tabBarHeight,
-          backgroundColor: colors.background,
+          backgroundColor: colors.background + "F2",
           borderTopColor: colors.border,
           borderTopWidth: 0.5,
+          // Glassmorphism-lite on web
+          ...(Platform.OS === "web" ? {
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+          } as any : {}),
         },
       }}
     >
@@ -60,7 +70,7 @@ export default function TabLayout() {
         options={{
           title: "Início",
           href: (isDeliverer ? null : "/") as any,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -68,7 +78,7 @@ export default function TabLayout() {
         options={{
           title: "Buscar",
           href: (isDeliverer ? null : "/search") as any,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="magnifyingglass" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -76,7 +86,7 @@ export default function TabLayout() {
         options={{
           title: "Controle",
           href: (isCompany && !isDeliverer ? "/stats" : null) as any,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="trending.up" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="trending.up" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -86,7 +96,7 @@ export default function TabLayout() {
           href: (isCompany || isDeliverer ? null : "/cart") as any,
           tabBarIcon: ({ color }) => (
             <View>
-              <IconSymbol size={26} name="cart.fill" color={color} />
+              <IconSymbol size={24} name="cart.fill" color={color} />
               <CartBadge count={cart.length} />
             </View>
           ),
@@ -97,22 +107,22 @@ export default function TabLayout() {
         options={{
           title: "Pedidos",
           href: (isCompany ? null : "/orders") as any,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="list.bullet" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="list.bullet" color={color} />,
         }}
       />
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Painel",
-          href: (isCompany && !isDeliverer ? "/dashboard" : null) as any,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="building.2.fill" color={color} />,
+          href: (isCompany ? "/dashboard" : null) as any,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gearshape.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Perfil",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
         }}
       />
     </Tabs>

@@ -63,6 +63,7 @@ interface AppState {
   updateAvatar: (avatarUrl: string, primaryColor?: string, secondaryColor?: string) => Promise<void>;
   updateCompanyStatus: (isOpen: boolean) => Promise<void>;
   checkSession: () => Promise<void>;
+  isHydrated: boolean;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -506,6 +507,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateAvatar,
       updateCompanyStatus,
       checkSession,
+      isHydrated: hydrated,
     }),
     [
       companies,
@@ -537,6 +539,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateAvatar,
       updateCompanyStatus,
       checkSession,
+      hydrated,
     ],
   );
 

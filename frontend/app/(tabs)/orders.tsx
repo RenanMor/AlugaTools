@@ -1,23 +1,21 @@
 import { router } from "expo-router";
 import React from "react";
-import {
-  FlatList,
-  Image,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Image, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Rental, RentalStatus } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
+import { spacing, fontSize, fontWeight, pageTitle } from "@/lib/design-tokens";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
   pending: "Aguardando entrega",
-  accepted: "Entrega antecipada solicitada",
+  accepted: "Entrega solicitada",
   rejected: "Recusado",
   delivering: "Em rota de entrega",
   delivered: "Entregue (Em uso)",
@@ -26,16 +24,16 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
   cancelled: "Cancelado",
 };
 
-const STATUS_COLOR: Record<RentalStatus, string> = {
-  awaiting_payment: "#3B82F6",
-  pending: "#F59E0B",
-  accepted: "#8B5CF6",
-  rejected: "#EF4444",
-  delivering: "#F97316",
-  delivered: "#22C55E",
-  active: "#22C55E",
-  completed: "#64748B",
-  cancelled: "#6B7280",
+const STATUS_VARIANT: Record<RentalStatus, "info" | "warning" | "primary" | "error" | "success" | "muted"> = {
+  awaiting_payment: "info",
+  pending: "warning",
+  accepted: "primary",
+  rejected: "error",
+  delivering: "primary",
+  delivered: "success",
+  active: "success",
+  completed: "muted",
+  cancelled: "muted",
 };
 
 export default function OrdersScreen() {
@@ -45,39 +43,34 @@ export default function OrdersScreen() {
 
   return (
     <ScreenContainer className="p-4">
-      <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 16 }}>
+      <Text style={[pageTitle(colors), { marginBottom: spacing.lg }]}>
         {isDeliverer ? "Entregas da Empresa" : "Meus pedidos"}
       </Text>
 
       {!user ? (
-        <View style={{ alignItems: "center", marginTop: 80, gap: 12 }}>
-          <IconSymbol name="list.bullet" size={48} color={colors.muted} />
-          <Text style={{ color: colors.muted }}>Entre para ver seus pedidos</Text>
-          <Pressable
-            onPress={() => router.push("/auth")}
-            style={({ pressed }) => [
-              { paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
-            ]}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Entrar</Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          icon="list.bullet"
+          title="Faça login para ver seus pedidos"
+          description="Navegue livremente. O login só é necessário ao alugar."
+          actionLabel="Entrar"
+          onAction={() => router.push("/auth")}
+        />
       ) : (
         <FlatList
           data={rentals}
           keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+          contentContainerStyle={{ paddingBottom: spacing.xxl }}
           ListEmptyComponent={
-            <Text style={{ color: colors.muted, textAlign: "center", marginTop: 60 }}>
-              {isDeliverer
-                ? "Nenhum pedido ou entrega registrada para esta empresa."
-                : "Você ainda não fez nenhum aluguel."}
-            </Text>
+            <EmptyState
+              icon={isDeliverer ? "truck.box.fill" : "list.bullet"}
+              title={isDeliverer ? "Nenhuma entrega registrada" : "Nenhum pedido ainda"}
+              description={isDeliverer
+                ? "Os pedidos da empresa aparecerão aqui."
+                : "Explore ferramentas e faça seu primeiro aluguel."}
+            />
           }
-          renderItem={({ item }) => (
-            <OrderCard rental={item} />
-          )}
+          renderItem={({ item }) => <OrderCard rental={item} />}
         />
       )}
     </ScreenContainer>
@@ -86,56 +79,41 @@ export default function OrdersScreen() {
 
 function OrderCard({ rental }: { rental: Rental }) {
   const colors = useColors();
+  const variant = STATUS_VARIANT[rental.status] || "muted";
 
   return (
-    <Pressable
+    <Card
       onPress={() => router.push(`/order/${rental.id}`)}
-      style={({ pressed }) => [
-        {
-          padding: 12,
-          borderRadius: 14,
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-          gap: 12,
-          opacity: pressed ? 0.85 : 1,
-        }
-      ]}
+      style={{ padding: spacing.md, gap: spacing.md }}
     >
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Image source={{ uri: rental.toolImage }} style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: colors.border }} />
+      <View style={{ flexDirection: "row", gap: spacing.md }}>
+        <Image
+          source={{ uri: rental.toolImage }}
+          style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: colors.border }}
+        />
         <View style={{ flex: 1, gap: 4, justifyContent: "center" }}>
-          <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+          <Text numberOfLines={1} style={{ fontSize: fontSize.md + 1, fontWeight: fontWeight.bold, color: colors.foreground }}>
             {rental.toolName}
           </Text>
-          <Text style={{ fontSize: 13, color: colors.muted }}>{rental.companyName}</Text>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.success }}>
+          <Text style={{ fontSize: fontSize.sm, color: colors.muted }}>{rental.companyName}</Text>
+          <Text style={{ fontSize: fontSize.md, fontWeight: fontWeight.bold, color: colors.success }}>
             R$ {rental.totalPrice.toFixed(2)} · {rental.days}d
           </Text>
         </View>
-        <View style={{ justifyContent: "center", alignItems: "flex-end" }}>
-          <View
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 20,
-              backgroundColor: (STATUS_COLOR[rental.status] || colors.muted) + "22",
-            }}
-          >
-            <Text style={{ fontSize: 11, fontWeight: "700", color: STATUS_COLOR[rental.status] || colors.muted }}>
-              {STATUS_LABEL[rental.status] || rental.status}
-            </Text>
-          </View>
-          <IconSymbol name="chevron.right" size={20} color={colors.muted} style={{ marginTop: 8 }} />
+        <View style={{ justifyContent: "center", alignItems: "flex-end", gap: spacing.sm }}>
+          <Badge variant={variant} size="sm">
+            {STATUS_LABEL[rental.status] || rental.status}
+          </Badge>
+          <IconSymbol name="chevron.right" size={18} color={colors.muted} />
         </View>
       </View>
 
       {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active" || rental.status === "accepted") && (
-        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Tempo de Uso Restante:</Text>
+        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: spacing.sm, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ fontSize: fontSize.sm, color: colors.muted, fontWeight: fontWeight.semibold }}>Tempo Restante:</Text>
           <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
         </View>
       )}
-    </Pressable>
+    </Card>
   );
 }

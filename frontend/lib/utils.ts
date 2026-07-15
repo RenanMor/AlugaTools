@@ -45,11 +45,18 @@ function sanitizeColor(hex: string): string | null {
   return hex;
 }
 
+/** Module-level cache for extracted palettes to avoid redundant processing */
+const _paletteCache = new Map<string, { primary: string; secondary: string }>();
+
 export async function extractPalette(imageUrl: string): Promise<{ primary: string; secondary: string }> {
   const defaultColors = { primary: "#F97316", secondary: "#FB923C" };
   if (!imageUrl || imageUrl.includes("sem-imagem")) {
     return defaultColors;
   }
+
+  // Return cached result if available
+  const cached = _paletteCache.get(imageUrl);
+  if (cached) return cached;
   
   if (Platform.OS === 'web') {
     return new Promise((resolve) => {
@@ -110,7 +117,9 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
             }
           }
           
-          resolve({ primary, secondary });
+          const result = { primary, secondary };
+          _paletteCache.set(imageUrl, result);
+          resolve(result);
         } catch {
           resolve(defaultColors);
         }
@@ -133,7 +142,9 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
       { primary: "#06B6D4", secondary: "#22D3EE" },
     ];
     const index = Math.abs(hash) % palettes.length;
-    return palettes[index];
+    const result = palettes[index];
+    _paletteCache.set(imageUrl, result);
+    return result;
   }
 }
 

@@ -1,15 +1,18 @@
-import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Image, Platform, Pressable, ScrollView, Text, View, Modal, TextInput } from "react-native";
 import { StarRating } from "@/components/star-rating";
 import { getToolReviews } from "@/lib/api/tools";
 import { ScreenContainer } from "@/components/screen-container";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
-import { useThemeContext } from "@/lib/theme-provider";
-import { extractPalette } from "@/lib/utils";
+import { useCompanyTheme } from "@/hooks/use-company-theme";
+import { spacing, fontSize, fontWeight, radius } from "@/lib/design-tokens";
 
 export default function ToolScreen() {
   const colors = useColors();
@@ -26,38 +29,15 @@ export default function ToolScreen() {
   const [reviews, setReviews] = useState<import("@/lib/types").ToolReview[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [filterType, setFilterType] = useState<"highest" | "lowest" | "recent">("highest");
-  const { setPrimaryColor, setSecondaryColor } = useThemeContext();
+
+  // Centralized company theme hook (replaces duplicated useFocusEffect)
+  useCompanyTheme(company);
 
   useEffect(() => {
     if (id) {
       getToolReviews(id).then(setReviews).catch(err => console.error(err));
     }
   }, [id]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      if (company) {
-        if (company.primaryColor) {
-          setPrimaryColor(company.primaryColor);
-          if (company.secondaryColor) setSecondaryColor(company.secondaryColor);
-        } else if (company.logo) {
-          extractPalette(company.logo).then((palette) => {
-            if (active) {
-              setPrimaryColor(palette.primary);
-              setSecondaryColor(palette.secondary);
-            }
-          });
-        }
-      }
-      return () => {
-        active = false;
-        // Restore user's own brand colors on leave instead of resetting to null
-        setPrimaryColor(user?.primaryColor || null);
-        setSecondaryColor(user?.secondaryColor || null);
-      };
-    }, [company?.logo, company?.primaryColor, company?.secondaryColor, user?.primaryColor, user?.secondaryColor])
-  );
 
   const topReviews = useMemo(() => {
     return [...reviews].sort((a, b) => b.rating - a.rating).slice(0, 4);
