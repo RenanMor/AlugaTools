@@ -195,8 +195,9 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
     let companyId: string | undefined;
     let companyStatus: string | undefined;
     let delivererCompanyId: string | undefined;
-    let primaryColor = dbUser.primary_color;
-    let secondaryColor = dbUser.secondary_color;
+    const isBrandProfile = dbUser.profile === "company" || dbUser.profile === "deliverer";
+    let primaryColor = isBrandProfile ? dbUser.primary_color : null;
+    let secondaryColor = isBrandProfile ? dbUser.secondary_color : null;
 
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
@@ -337,8 +338,9 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
     let companyId: string | undefined;
     let companyStatus: string | undefined;
     let delivererCompanyId: string | undefined;
-    let primaryColor = dbUser.primary_color;
-    let secondaryColor = dbUser.secondary_color;
+    const isBrandProfile = dbUser.profile === "company" || dbUser.profile === "deliverer";
+    let primaryColor = isBrandProfile ? dbUser.primary_color : null;
+    let secondaryColor = isBrandProfile ? dbUser.secondary_color : null;
 
     if (dbUser.profile === "company") {
       const { data: companyData } = await supabaseAdmin
