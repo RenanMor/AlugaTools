@@ -25,7 +25,7 @@ export interface ScreenContainerProps extends ViewProps {
    */
   safeAreaClassName?: string;
   /**
-   * Optional custom watermark image URI.
+   * Optional custom watermark image URI. .
    */
   watermarkUri?: string;
 }
@@ -36,6 +36,7 @@ export interface ScreenContainerProps extends ViewProps {
  * The outer View extends to full screen (including status bar area) with the background color,
  * while the inner SafeAreaView ensures content is within safe bounds.
  */
+
 export function ScreenContainer({
   children,
   edges = ["top", "left", "right"],
@@ -107,7 +108,7 @@ export function ScreenContainer({
           </Defs>
           {/* Base pure black background */}
           <Rect width="100%" height="100%" fill="#000000" />
-          
+
           {/* Layered glows to form the premium mesh gradient */}
           <Rect width="100%" height="100%" fill="url(#topLeftGrad)" />
           <Rect width="100%" height="100%" fill="url(#rightGrad)" />
