@@ -16,12 +16,39 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Company, Rental } from "@/lib/types";
+import { RentalTimer } from "@/components/rental-timer";
 import {
   getAllCompanies,
   updateCompanyStatus,
   getCompanyRentals,
   cancelCompanyRental,
 } from "@/lib/api/admin";
+
+const ADMIN_STATUS_LABEL: Record<string, string> = {
+  awaiting_payment: "Aguardando pagamento",
+  pending: "Aguardando entrega",
+  accepted: "Entrega ant. solicitada",
+  rejected: "Recusado",
+  delivering: "Em rota de entrega",
+  delivered: "Entregue (Em uso)",
+  active: "Em andamento",
+  completed: "Concluído",
+  cancelled: "Cancelado",
+  return_expired: "Devolução (Expirou)",
+};
+
+const ADMIN_STATUS_COLOR: Record<string, string> = {
+  awaiting_payment: "#3B82F6",
+  pending: "#F59E0B",
+  accepted: "#8B5CF6",
+  rejected: "#EF4444",
+  delivering: "#F97316",
+  delivered: "#22C55E",
+  active: "#22C55E",
+  completed: "#64748B",
+  cancelled: "#6B7280",
+  return_expired: "#EF4444",
+};
 
 export default function DashboardOwnerScreen() {
   const colors = useColors();
@@ -60,23 +87,48 @@ export default function DashboardOwnerScreen() {
   }, []);
 
   const handleApprove = async (companyId: string) => {
-    try {
-      await updateCompanyStatus(companyId, "approved");
-      Alert.alert("Sucesso", "Empresa aprovada com sucesso!");
-      fetchCompanies();
-    } catch (err: any) {
-      Alert.alert("Erro", err.message || "Erro ao aprovar empresa.");
-    }
+    Alert.alert(
+      "Confirmar Aprovação",
+      "Tem certeza que deseja aprovar esta empresa?",
+      [
+        { text: "Não", style: "cancel" },
+        {
+          text: "Sim, Aprovar",
+          onPress: async () => {
+            try {
+              await updateCompanyStatus(companyId, "approved");
+              Alert.alert("Sucesso", "Empresa aprovada com sucesso!");
+              fetchCompanies();
+            } catch (err: any) {
+              Alert.alert("Erro", err.message || "Erro ao aprovar empresa.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleReject = async (companyId: string) => {
-    try {
-      await updateCompanyStatus(companyId, "rejected");
-      Alert.alert("Sucesso", "Empresa recusada.");
-      fetchCompanies();
-    } catch (err: any) {
-      Alert.alert("Erro", err.message || "Erro ao recusar empresa.");
-    }
+    Alert.alert(
+      "Confirmar Recusa",
+      "Tem certeza que deseja recusar esta empresa?",
+      [
+        { text: "Não", style: "cancel" },
+        {
+          text: "Sim, Recusar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await updateCompanyStatus(companyId, "rejected");
+              Alert.alert("Sucesso", "Empresa recusada.");
+              fetchCompanies();
+            } catch (err: any) {
+              Alert.alert("Erro", err.message || "Erro ao recusar empresa.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSelectCompany = async (company: Company) => {
@@ -124,10 +176,14 @@ export default function DashboardOwnerScreen() {
   );
 
   const stats = useMemo(() => {
-    const activeRentals = companyRentals.filter((r) => r.status !== "cancelled");
+    const nonCancelled = companyRentals.filter((r) => r.status !== "cancelled");
     const totalCount = companyRentals.length;
-    const totalRevenue = activeRentals.reduce((sum, r) => sum + r.totalPrice, 0);
-    return { totalCount, totalRevenue };
+    const totalRevenue = nonCancelled.reduce((sum, r) => sum + r.totalPrice, 0);
+    const activeCount = companyRentals.filter(
+      (r) => r.status === "delivered" || r.status === "active"
+    ).length;
+    const completedCount = companyRentals.filter((r) => r.status === "completed").length;
+    return { totalCount, totalRevenue, activeCount, completedCount };
   }, [companyRentals]);
 
   const handleLogout = async () => {
@@ -369,42 +425,23 @@ export default function DashboardOwnerScreen() {
 
             {/* Metrics cards */}
             <View style={{ flexDirection: "row", padding: 16, gap: 12 }}>
-              <View
-                style={{
-                  flex: 1,
-                  padding: 14,
-                  borderRadius: 14,
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  gap: 4,
-                }}
-              >
-                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>
-                  Total de Pedidos
-                </Text>
-                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>
-                  {stats.totalCount}
-                </Text>
+              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
+                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Total de Pedidos</Text>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{stats.totalCount}</Text>
               </View>
-
-              <View
-                style={{
-                  flex: 1,
-                  padding: 14,
-                  borderRadius: 14,
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  gap: 4,
-                }}
-              >
-                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>
-                  Receita Estimada
-                </Text>
-                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>
-                  R$ {stats.totalRevenue.toFixed(2)}
-                </Text>
+              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
+                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Em Uso Agora</Text>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.success }}>{stats.activeCount}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 12 }}>
+              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
+                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Concluídos</Text>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{stats.completedCount}</Text>
+              </View>
+              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
+                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Receita Estimada</Text>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>R$ {stats.totalRevenue.toFixed(2)}</Text>
               </View>
             </View>
 
@@ -434,57 +471,87 @@ export default function DashboardOwnerScreen() {
                     </Text>
                   }
                   renderItem={({ item }) => (
-                    <View
-                      style={{
-                        padding: 12,
-                        borderRadius: 12,
-                        backgroundColor: colors.surface,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                    <Pressable
+                      onPress={() => {
+                        setSelectedCompany(null);
+                        router.push(`/order/${item.id}`);
                       }}
+                      style={({ pressed }) => [
+                        {
+                          padding: 12,
+                          borderRadius: 12,
+                          backgroundColor: colors.surface,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          gap: 8,
+                          opacity: pressed ? 0.85 : 1,
+                        },
+                      ]}
                     >
-                      <View style={{ flex: 1, gap: 4 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
-                          {item.toolName}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: colors.muted }}>
-                          Cliente: {item.customerName} · Valor: R$ {item.totalPrice.toFixed(2)}
-                        </Text>
-                        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: "700",
-                              color: item.status === "cancelled" ? "#EF4444" : colors.primary,
-                            }}
-                          >
-                            {item.status === "cancelled" ? "Cancelado" : "Ativo"}
+                      {/* Header row: tool info + status badge */}
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+                            {item.toolName}
                           </Text>
+                          <Text style={{ fontSize: 12, color: colors.muted }}>
+                            Cliente: {item.customerName}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.muted }}>
+                            {item.days}d · R$ {item.totalPrice.toFixed(2)}
+                            {item.shippingPrice && item.shippingPrice > 0 ? ` (+ R$ ${item.shippingPrice.toFixed(2)} frete)` : " (retirada no local)"}
+                          </Text>
+                          {item.customerNote ? (
+                            <Text style={{ fontSize: 11, color: colors.muted, fontStyle: "italic" }} numberOfLines={1}>
+                              Obs: {item.customerNote}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <View style={{ gap: 6, alignItems: "flex-end" }}>
+                          <View style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                            backgroundColor: (ADMIN_STATUS_COLOR[item.status] || colors.muted) + "20",
+                          }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: ADMIN_STATUS_COLOR[item.status] || colors.muted }}>
+                              {ADMIN_STATUS_LABEL[item.status] || item.status}
+                            </Text>
+                          </View>
+                          <IconSymbol name="chevron.right" size={14} color={colors.muted} />
                         </View>
                       </View>
 
-                      {item.status !== "cancelled" && (
+                      {/* Active timer for delivered/active rentals */}
+                      {item.deliveredAt && (item.status === "delivered" || item.status === "active") && (
+                        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 6, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>Tempo Restante:</Text>
+                          <RentalTimer deliveredAt={item.deliveredAt} days={item.days} />
+                        </View>
+                      )}
+
+                      {/* Cancel button */}
+                      {item.status !== "cancelled" && item.status !== "completed" && (
                         <Pressable
-                          onPress={() => handleCancelRental(item.id)}
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            handleCancelRental(item.id);
+                          }}
                           style={({ pressed }) => [
                             {
+                              alignSelf: "flex-end",
                               paddingHorizontal: 12,
-                              paddingVertical: 8,
+                              paddingVertical: 6,
                               borderRadius: 8,
                               backgroundColor: "#EF444415",
                               opacity: pressed ? 0.7 : 1,
                             },
                           ]}
                         >
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>
-                            Cancelar
-                          </Text>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>Cancelar</Text>
                         </Pressable>
                       )}
-                    </View>
+                    </Pressable>
                   )}
                 />
               )}

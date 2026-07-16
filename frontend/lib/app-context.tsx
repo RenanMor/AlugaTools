@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Alert } from "react-native";
 import { useThemeContext } from "./theme-provider";
 import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool, Deliverer } from "./types";
 import * as Auth from "./_core/auth";
@@ -155,6 +156,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         list = await getMyRentals();
       }
       setRentals(list);
+
+      // Notify company/deliverer of return_expired and near-expiry rentals
+      if (user.profile === "company" || user.profile === "deliverer") {
+        const now = Date.now();
+        const twoHoursMs = 2 * 60 * 60 * 1000;
+
+        const returnExpired = list.filter((r) => r.status === "return_expired");
+        const nearExpiry = list.filter((r) => {
+          if (r.status !== "delivered" && r.status !== "active") return false;
+          if (!r.deliveredAt) return false;
+          const expiresAt = r.deliveredAt + r.days * 24 * 60 * 60 * 1000;
+          const timeLeft = expiresAt - now;
+          return timeLeft > 0 && timeLeft <= twoHoursMs;
+        });
+
+        if (returnExpired.length > 0) {
+          const names = returnExpired.map((r) => r.toolName).join(", ");
+          Alert.alert(
+            "⚠️ Pedidos para Devolução",
+            `${returnExpired.length} pedido(s) aguardando devolução: ${names}. Por favor, confirme o recebimento.`
+          );
+        } else if (nearExpiry.length > 0) {
+          const names = nearExpiry.map((r) => r.toolName).join(", ");
+          Alert.alert(
+            "⏰ Aluguéis próximos de expirar",
+            `${nearExpiry.length} aluguel(is) expira(m) em menos de 2 horas: ${names}.`
+          );
+        }
+      }
     } catch (err) {
       console.error("Erro ao carregar aluguéis:", err);
     }

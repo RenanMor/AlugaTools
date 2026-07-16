@@ -9,7 +9,8 @@ export type RentalStatus =
   | "delivered"
   | "active"
   | "completed"
-  | "cancelled";
+  | "cancelled"
+  | "return_expired";
 
 export interface Category {
   id: string;

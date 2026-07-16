@@ -19,7 +19,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Rental, RentalStatus } from "@/lib/types";
-import { cancelRental, getRentalById } from "@/lib/api/rentals";
+import { cancelRental, getRentalById, payRental } from "@/lib/api/rentals";
 import { RentalTimer } from "@/components/rental-timer";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
@@ -32,6 +32,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
   active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
+  return_expired: "Devolução (Expirou)",
 };
 
 const STATUS_COLOR: Record<RentalStatus, string> = {
@@ -44,6 +45,7 @@ const STATUS_COLOR: Record<RentalStatus, string> = {
   active: "#22C55E",
   completed: "#64748B",
   cancelled: "#6B7280",
+  return_expired: "#EF4444",
 };
 
 export default function OrderDetailsScreen() {
@@ -62,8 +64,18 @@ export default function OrderDetailsScreen() {
   const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
 
   const [showReceiverModal, setShowReceiverModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
   const [receiverName, setReceiverName] = useState("");
   const [receiverCpf, setReceiverCpf] = useState("");
+
+  // Retry payment state
+  const [showRetryModal, setShowRetryModal] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCardNumber, setRetryCardNumber] = useState("");
+  const [retryCardHolder, setRetryCardHolder] = useState("");
+  const [retryCardExpiry, setRetryCardExpiry] = useState("");
+  const [retryCardCvv, setRetryCardCvv] = useState("");
+  const [retryInstallments, setRetryInstallments] = useState("1");
 
   const isDeliverer = user?.profile === "deliverer";
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
@@ -176,6 +188,45 @@ export default function OrderDetailsScreen() {
     }
   };
 
+  const handleRetryPayment = async () => {
+    if (!rental || isRetrying) return;
+    setIsRetrying(true);
+    try {
+      let cardPayload: any = undefined;
+      const method = rental.paymentMethod || "";
+
+      if (method === "CREDIT_CARD" || method === "DEBIT_CARD") {
+        if (!retryCardNumber || !retryCardHolder || !retryCardExpiry || !retryCardCvv) {
+          Alert.alert("Erro", "Por favor, preencha todos os dados do cartão.");
+          setIsRetrying(false);
+          return;
+        }
+        const expParts = retryCardExpiry.split("/");
+        cardPayload = {
+          number: retryCardNumber.replace(/\D/g, ""),
+          exp_month: expParts[0] || "12",
+          exp_year: expParts[1] ? (expParts[1].length === 2 ? "20" + expParts[1] : expParts[1]) : "2027",
+          security_code: retryCardCvv,
+          holder: { name: retryCardHolder },
+        };
+      }
+
+      await payRental(rental.id, {
+        card: cardPayload,
+        installments: method === "CREDIT_CARD" ? Number(retryInstallments) || 1 : undefined,
+      });
+
+      await Promise.all([refreshRentals(), refreshCatalog()]);
+      setShowRetryModal(false);
+      await fetchOrder();
+      Alert.alert("Sucesso", "Pagamento realizado com sucesso!");
+    } catch (err: any) {
+      Alert.alert("Falha no Pagamento", err.message || "Não foi possível processar o pagamento.");
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <ScreenContainer>
@@ -266,13 +317,26 @@ export default function OrderDetailsScreen() {
               </View>
             )}
 
-            {(rental.paymentMethod === "CREDIT_CARD" || rental.paymentMethod === "DEBIT_CARD") && (
-              <View style={{ padding: 12, borderRadius: 8, backgroundColor: colors.error + "11" }}>
-                <Text style={{ fontSize: 13, color: colors.error, fontWeight: "600", textAlign: "center" }}>
-                  Ocorreu um erro no processamento do seu cartão de crédito. Por favor, cancele este pedido e refaça a compra utilizando um cartão válido.
-                </Text>
-              </View>
-            )}
+            {/* Retry payment CTA for awaiting_payment */}
+            <Pressable
+              onPress={() => {
+                setRetryCardNumber("");
+                setRetryCardHolder("");
+                setRetryCardExpiry("");
+                setRetryCardCvv("");
+                setRetryInstallments("1");
+                setShowRetryModal(true);
+              }}
+              style={({ pressed }) => [
+                { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+                {rental.paymentMethod === "CREDIT_CARD" || rental.paymentMethod === "DEBIT_CARD"
+                  ? "Tentar Pagar Novamente"
+                  : "Ver Opção de Pagamento"}
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -463,6 +527,38 @@ export default function OrderDetailsScreen() {
                 </Pressable>
               </View>
             )}
+
+            {/* Deliverer: Receber Devolução (non-pickup only) */}
+            {!isPickup && isDeliverer && rental.status === "return_expired" && (
+              <Pressable
+                onPress={() => {
+                  setReceiverName("");
+                  setReceiverCpf("");
+                  setShowReturnModal(true);
+                }}
+                style={({ pressed }) => [
+                  { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Receber Devolução</Text>
+              </Pressable>
+            )}
+
+            {/* Company: Confirmar Devolução no Balcão (pickup only) */}
+            {isPickup && isCompany && rental.status === "return_expired" && (
+              <Pressable
+                onPress={() => {
+                  setReceiverName("");
+                  setReceiverCpf("");
+                  setShowReturnModal(true);
+                }}
+                style={({ pressed }) => [
+                  { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar Devolução no Balcão</Text>
+              </Pressable>
+            )}
           </>
         )}
 
@@ -549,7 +645,7 @@ export default function OrderDetailsScreen() {
 
       </ScrollView>
 
-      {/* Modal para Dados do Recebedor */}
+      {/* Modal para Dados do Recebedor (Finalizar Entrega) */}
       <Modal visible={showReceiverModal} transparent={true} animationType="slide" onRequestClose={() => setShowReceiverModal(false)}>
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
           <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
@@ -626,6 +722,238 @@ export default function OrderDetailsScreen() {
             >
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Finalizar Entrega</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para Confirmar Devolução */}
+      <Modal visible={showReturnModal} transparent={true} animationType="slide" onRequestClose={() => setShowReturnModal(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Confirmar Devolução</Text>
+              <Pressable onPress={() => setShowReturnModal(false)}>
+                <IconSymbol name="xmark" size={24} color={colors.foreground} />
+              </Pressable>
+            </View>
+
+            <View style={{ padding: 12, borderRadius: 10, backgroundColor: "#EF444422" }}>
+              <Text style={{ fontSize: 13, color: "#EF4444", fontWeight: "600", textAlign: "center" }}>
+                O período de aluguel expirou. Confirme a devolução registrando o nome e CPF de quem está devolvendo.
+              </Text>
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo de Quem Devolve</Text>
+              <TextInput
+                value={receiverName}
+                onChangeText={setReceiverName}
+                placeholder="Ex: João da Silva"
+                placeholderTextColor={colors.muted}
+                style={{
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.foreground,
+                }}
+              />
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF de Quem Devolve</Text>
+              <TextInput
+                value={receiverCpf}
+                onChangeText={(text) => {
+                  const cleaned = text.replace(/\D/g, "");
+                  const limited = cleaned.slice(0, 11);
+                  let formatted = limited;
+                  if (limited.length > 9) {
+                    formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
+                  } else if (limited.length > 6) {
+                    formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
+                  } else if (limited.length > 3) {
+                    formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+                  }
+                  setReceiverCpf(formatted);
+                }}
+                placeholder="000.000.000-00"
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.foreground,
+                }}
+              />
+            </View>
+
+            <Pressable
+              onPress={() => {
+                if (!receiverName.trim() || receiverCpf.replace(/\D/g, "").length !== 11) {
+                  Alert.alert("Erro", "Por favor, preencha o Nome e CPF completo (11 dígitos) de quem está devolvendo.");
+                  return;
+                }
+                setShowReturnModal(false);
+                handleUpdateStatus("completed", receiverName, receiverCpf);
+              }}
+              style={({ pressed }) => [
+                { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar Devolução</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Retry de Pagamento */}
+      <Modal visible={showRetryModal} transparent={true} animationType="slide" onRequestClose={() => setShowRetryModal(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" }}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Tentar Pagar Novamente</Text>
+                <Pressable onPress={() => setShowRetryModal(false)}>
+                  <IconSymbol name="xmark" size={24} color={colors.foreground} />
+                </Pressable>
+              </View>
+
+              {/* Summary */}
+              {rental && (
+                <View style={{ padding: 14, borderRadius: 14, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, gap: 6, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{rental.toolName}</Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>Empresa: {rental.companyName} · {rental.days} dia{rental.days > 1 ? "s" : ""}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: colors.primary }}>Total: R$ {rental.totalPrice.toFixed(2)}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <IconSymbol name="creditcard.fill" size={14} color={colors.muted} />
+                    <Text style={{ fontSize: 12, color: colors.muted }}>
+                      {rental.paymentMethod === "CREDIT_CARD" ? "Cartão de Crédito" :
+                       rental.paymentMethod === "DEBIT_CARD" ? "Cartão de Débito" :
+                       rental.paymentMethod === "PIX" ? "PIX" : "Boleto"}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Card form - shown only for card payments */}
+              {rental && (rental.paymentMethod === "CREDIT_CARD" || rental.paymentMethod === "DEBIT_CARD") && (
+                <View style={{ gap: 12, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>Dados do Cartão</Text>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Número do Cartão</Text>
+                    <TextInput
+                      value={retryCardNumber}
+                      onChangeText={(t) => {
+                        const d = t.replace(/\D/g, "").slice(0, 16);
+                        setRetryCardNumber(d.replace(/(\d{4})(?=\d)/g, "$1 ").trim());
+                      }}
+                      placeholder="0000 0000 0000 0000"
+                      placeholderTextColor={colors.muted}
+                      keyboardType="numeric"
+                      style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.foreground, fontSize: 16, letterSpacing: 2 }}
+                    />
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome no Cartão</Text>
+                    <TextInput
+                      value={retryCardHolder}
+                      onChangeText={(t) => setRetryCardHolder(t.toUpperCase())}
+                      placeholder="NOME SOBRENOME"
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="characters"
+                      style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.foreground }}
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Validade (MM/AA)</Text>
+                      <TextInput
+                        value={retryCardExpiry}
+                        onChangeText={(t) => {
+                          const d = t.replace(/\D/g, "").slice(0, 4);
+                          setRetryCardExpiry(d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d);
+                        }}
+                        placeholder="12/28"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="numeric"
+                        style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.foreground }}
+                      />
+                    </View>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CVV</Text>
+                      <TextInput
+                        value={retryCardCvv}
+                        onChangeText={(t) => setRetryCardCvv(t.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="123"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="numeric"
+                        secureTextEntry
+                        style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.foreground }}
+                      />
+                    </View>
+                  </View>
+
+                  {rental.paymentMethod === "CREDIT_CARD" && (
+                    <View style={{ gap: 6 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Parcelas</Text>
+                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                        {["1", "2", "3", "6", "12"].map((n) => (
+                          <Pressable
+                            key={n}
+                            onPress={() => setRetryInstallments(n)}
+                            style={({ pressed }) => [{
+                              paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10,
+                              backgroundColor: retryInstallments === n ? colors.primary : colors.background,
+                              borderWidth: 1, borderColor: retryInstallments === n ? colors.primary : colors.border,
+                              opacity: pressed ? 0.8 : 1,
+                            }]}
+                          >
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: retryInstallments === n ? "#fff" : colors.foreground }}>{n}x</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* PIX / Boleto notice */}
+              {rental && rental.paymentMethod !== "CREDIT_CARD" && rental.paymentMethod !== "DEBIT_CARD" && (
+                <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.info + "15" ?? colors.border, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 13, color: colors.foreground, textAlign: "center" }}>
+                    Um novo código será gerado para você ao confirmar. Verifique os dados do pedido acima.
+                  </Text>
+                </View>
+              )}
+
+              <Pressable
+                onPress={handleRetryPayment}
+                disabled={isRetrying}
+                style={({ pressed }) => [{
+                  backgroundColor: colors.primary,
+                  borderRadius: 14,
+                  paddingVertical: 16,
+                  alignItems: "center",
+                  opacity: pressed || isRetrying ? 0.75 : 1,
+                  marginBottom: 8,
+                }]}
+              >
+                {isRetrying
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>Confirmar Pagamento</Text>
+                }
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>

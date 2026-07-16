@@ -242,7 +242,20 @@ export default function DashboardScreen() {
             </Pressable>
           }
           renderItem={({ item }) => (
-            <ToolManageRow tool={item} onEdit={() => openEditTool(item)} onDelete={() => deleteTool(item.id)} />
+            <ToolManageRow
+              tool={item}
+              onEdit={() => openEditTool(item)}
+              onDelete={() => {
+                Alert.alert(
+                  "Excluir Ferramenta",
+                  `Tem certeza que deseja excluir "${item.name}"? Esta ação não pode ser desfeita.`,
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    { text: "Excluir", style: "destructive", onPress: () => deleteTool(item.id) },
+                  ]
+                );
+              }}
+            />
           )}
         />
       )}
@@ -278,7 +291,16 @@ export default function DashboardScreen() {
             <DelivererManageRow
               deliverer={item}
               onEdit={() => openEditDeliverer(item)}
-              onDelete={() => deleteDeliverer(item.id)}
+              onDelete={() => {
+                Alert.alert(
+                  "Remover Entregador",
+                  `Tem certeza que deseja remover o entregador "${item.name}"?`,
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    { text: "Remover", style: "destructive", onPress: () => deleteDeliverer(item.id) },
+                  ]
+                );
+              }}
             />
           )}
         />
@@ -346,6 +368,7 @@ const STATUS_LABEL_BACK: Record<string, string> = {
   active: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",
+  return_expired: "Devolução (Expirou)",
 };
 
 const STATUS_COLOR_BACK: Record<string, string> = {
@@ -358,6 +381,7 @@ const STATUS_COLOR_BACK: Record<string, string> = {
   active: "#22C55E",
   completed: "#64748B",
   cancelled: "#6B7280",
+  return_expired: "#EF4444",
 };
 
 function RequestCard({ rental }: { rental: Rental }) {

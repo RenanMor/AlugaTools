@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from "express";
 import { CompanyModel } from "../models/company.model";
 import { RentalModel } from "../models/rental.model";
 import { verifySupabaseToken, verifyOwner } from "../middlewares/auth.middleware";
-import { supabaseAdmin } from "../config/supabase";
 
 const router = Router();
 
@@ -51,30 +50,8 @@ router.get("/companies/:companyId/rentals", async (req: Request, res: Response, 
 router.post("/companies/:companyId/rentals/:rentalId/cancel", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { rentalId } = req.params;
-    
-    const rental = await RentalModel.findById(rentalId);
-    if (!rental) {
-      return res.status(404).json({ error: "Pedido não encontrado" });
-    }
-
-    // Restore stock if the rental is not already cancelled
-    if (rental.status !== "cancelled") {
-      const { data: toolData } = await supabaseAdmin
-        .from("tools")
-        .select("quantity")
-        .eq("id", rental.tool_id)
-        .single();
-
-      if (toolData) {
-        const newQty = (toolData.quantity || 0) + 1;
-        await supabaseAdmin
-          .from("tools")
-          .update({ quantity: newQty, available: true })
-          .eq("id", rental.tool_id);
-      }
-    }
-
-    const updated = await RentalModel.updateStatus(rentalId, "cancelled");
+    // Delegate entirely to cancelAndRestore which handles stock restoration correctly
+    const updated = await RentalModel.cancelAndRestore(rentalId);
     res.json({ data: updated });
   } catch (err) {
     next(err);

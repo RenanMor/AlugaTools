@@ -344,10 +344,12 @@ export const RentalController = {
       // Return all rentals for the company this deliverer belongs to
       const rentals = await RentalModel.findByCompany(deliverer.company_id);
       
-      // Filter: show deliveries that need a courier (not pickup, and status is pending, delivering, delivered, or completed)
+      // Filter: show deliveries that need a courier (not pickup, and status is pending, delivering, delivered, completed, or return_expired)
       const filtered = rentals.filter((r) => {
         const isPickup = !r.address || Number(r.shipping_price) === 0;
-        const isRelevantStatus = r.status === "pending" || r.status === "delivering" || r.status === "delivered" || r.status === "completed";
+        const isRelevantStatus = r.status === "pending" || r.status === "delivering" || r.status === "delivered" || r.status === "completed" || r.status === "return_expired";
+        // For return_expired: entregadores só veem pedidos NÃO pickup (pickup é devolvido no balcão pela empresa)
+        if (r.status === "return_expired" && isPickup) return false;
         return !isPickup && isRelevantStatus;
       });
 

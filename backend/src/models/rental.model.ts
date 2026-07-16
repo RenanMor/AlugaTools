@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 
-export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "delivering" | "delivered" | "active" | "completed" | "cancelled";
+export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "delivering" | "delivered" | "active" | "completed" | "cancelled" | "return_expired";
 
 const SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name), deliverer:deliverers(name)";
 
@@ -152,14 +152,14 @@ export const RentalModel = {
     status: RentalStatus,
     extras?: { deliverer_id?: string; receiver_name?: string; receiver_cpf?: string }
   ): Promise<Rental> {
+    const rental = await this.findById(id);
+    if (!rental) throw new Error("Pedido não encontrado");
+
+    const oldStatus = rental.status;
     const updateData: any = { status };
+
     if (status === "delivered") {
-      const { data: current } = await supabaseAdmin
-        .from("rentals")
-        .select("delivered_at")
-        .eq("id", id)
-        .single();
-      if (!current?.delivered_at) {
+      if (!rental.delivered_at) {
         updateData.delivered_at = new Date().toISOString();
       }
       if (extras?.receiver_name) {
@@ -172,6 +172,7 @@ export const RentalModel = {
     if (extras?.deliverer_id) {
       updateData.deliverer_id = extras.deliverer_id;
     }
+
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .update(updateData)
@@ -179,6 +180,27 @@ export const RentalModel = {
       .select(SELECT_FIELDS)
       .single();
     if (error) throw new Error(error.message);
+
+    // Only restore units when transitioning to "completed" from an active or return_expired state
+    // (i.e. if the user had the tool out and is now returning it)
+    const wasActive = ["accepted", "delivering", "delivered", "active", "return_expired"].includes(oldStatus);
+    if (status === "completed" && wasActive) {
+      const { data: toolData } = await supabaseAdmin
+        .from("tools")
+        .select("quantity")
+        .eq("id", rental.tool_id)
+        .single();
+
+      if (toolData) {
+        const newQty = (toolData.quantity || 0) + 1;
+        await supabaseAdmin
+          .from("tools")
+          .update({ quantity: newQty, available: true })
+          .eq("id", rental.tool_id);
+        console.log(`[Stock] Restored 1 unit for tool ${rental.tool_id} (Rental ${rental.id} completed).`);
+      }
+    }
+
     return data as Rental;
   },
 
@@ -211,6 +233,7 @@ export const RentalModel = {
 
   /**
    * Cancel expired rentals (awaiting_payment past expires_at) and restore stock.
+   * Groups by tool_id so that multiple rentals of the same tool restore the correct total.
    */
   async cancelExpired(): Promise<number> {
     // Find all expired awaiting_payment rentals
@@ -222,16 +245,107 @@ export const RentalModel = {
 
     if (error || !expired || expired.length === 0) return 0;
 
-    let cancelledCount = 0;
+    // Cancel all expired rentals at once
+    const expiredIds = expired.map((r) => r.id);
+    await supabaseAdmin
+      .from("rentals")
+      .update({ status: "cancelled" })
+      .in("id", expiredIds);
 
+    // Group by tool_id and restore the exact total count for each tool
+    const toolCounts: Record<string, number> = {};
     for (const rental of expired) {
-      // Cancel the rental
-      await supabaseAdmin
-        .from("rentals")
-        .update({ status: "cancelled" })
-        .eq("id", rental.id);
+      toolCounts[rental.tool_id] = (toolCounts[rental.tool_id] || 0) + 1;
+    }
 
-      // Restore tool quantity
+    for (const [toolId, count] of Object.entries(toolCounts)) {
+      // Use atomic RPC increment so concurrent operations don't race
+      const { data: toolData } = await supabaseAdmin
+        .from("tools")
+        .select("quantity")
+        .eq("id", toolId)
+        .single();
+
+      if (toolData) {
+        const newQty = (toolData.quantity || 0) + count;
+        await supabaseAdmin
+          .from("tools")
+          .update({ quantity: newQty, available: true })
+          .eq("id", toolId);
+      }
+    }
+
+    const cancelledCount = expired.length;
+
+    if (cancelledCount > 0) {
+      console.log(`[Cleanup] Cancelled ${cancelledCount} expired rental(s) and restored stock.`);
+    }
+
+    return cancelledCount;
+  },
+
+  /**
+   * Detect active rentals (delivered/active) whose usage period has expired
+   * and transition them to return_expired status.
+   * Returns the list of updated rentals so callers can send notifications.
+   */
+  async checkExpiredActiveRentals(): Promise<Rental[]> {
+    // Fetch all delivered/active rentals that have a delivered_at set
+    const { data: candidates, error } = await supabaseAdmin
+      .from("rentals")
+      .select(SELECT_FIELDS)
+      .in("status", ["delivered", "active"])
+      .not("delivered_at", "is", null);
+
+    if (error || !candidates || candidates.length === 0) return [];
+
+    const now = Date.now();
+    const expired: Rental[] = [];
+
+    for (const rental of candidates as Rental[]) {
+      if (!rental.delivered_at) continue;
+      const deliveredMs = new Date(rental.delivered_at).getTime();
+      const usageLimitMs = deliveredMs + (rental.days || 1) * 24 * 60 * 60 * 1000;
+      if (now >= usageLimitMs) {
+        // Transition to return_expired
+        const { data: updated, error: updateErr } = await supabaseAdmin
+          .from("rentals")
+          .update({ status: "return_expired" })
+          .eq("id", rental.id)
+          .select(SELECT_FIELDS)
+          .single();
+        if (!updateErr && updated) {
+          expired.push(updated as Rental);
+        }
+      }
+    }
+
+    if (expired.length > 0) {
+      console.log(`[Cleanup] Marked ${expired.length} rental(s) as return_expired.`);
+    }
+
+    return expired;
+  },
+
+  /**
+   * Cancel a specific rental and restore stock.
+   * Works for any status that is not already cancelled.
+   * Stock is restored only if the rental was not yet completed/returned (tool still allocated).
+   */
+  async cancelAndRestore(id: string): Promise<Rental> {
+    const rental = await this.findById(id);
+    if (!rental) throw new Error("Pedido não encontrado");
+
+    if (rental.status === "cancelled") {
+      throw new Error("Este pedido já está cancelado");
+    }
+
+    // Only restore stock if the tool hasn't been returned yet
+    // (completed means tool was already returned and stock restored;
+    // but return_expired means the return is pending, so stock is still out and must be restored upon cancel)
+    const shouldRestoreStock = rental.status !== "completed";
+
+    if (shouldRestoreStock) {
       const { data: toolData } = await supabaseAdmin
         .from("tools")
         .select("quantity")
@@ -245,41 +359,6 @@ export const RentalModel = {
           .update({ quantity: newQty, available: true })
           .eq("id", rental.tool_id);
       }
-
-      cancelledCount++;
-    }
-
-    if (cancelledCount > 0) {
-      console.log(`[Cleanup] Cancelled ${cancelledCount} expired rental(s) and restored stock.`);
-    }
-
-    return cancelledCount;
-  },
-
-  /**
-   * Cancel a specific rental and restore stock.
-   */
-  async cancelAndRestore(id: string): Promise<Rental> {
-    const rental = await this.findById(id);
-    if (!rental) throw new Error("Pedido não encontrado");
-
-    if (rental.status !== "awaiting_payment") {
-      throw new Error("Apenas pedidos aguardando pagamento podem ser cancelados");
-    }
-
-    // Restore tool quantity
-    const { data: toolData } = await supabaseAdmin
-      .from("tools")
-      .select("quantity")
-      .eq("id", rental.tool_id)
-      .single();
-
-    if (toolData) {
-      const newQty = (toolData.quantity || 0) + 1;
-      await supabaseAdmin
-        .from("tools")
-        .update({ quantity: newQty, available: true })
-        .eq("id", rental.tool_id);
     }
 
     // Update rental status

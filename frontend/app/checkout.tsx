@@ -245,12 +245,29 @@ export default function CheckoutScreen() {
       ]);
     } catch (error: any) {
       console.error("[Checkout] Payment process error:", error);
-      Alert.alert(
-        "Falha no Pagamento",
-        error.message || "Não foi possível concluir o pagamento. Seu pedido foi salvo em 'Meus Pedidos', mas você precisará cancelar e refazer a compra."
-      );
-      // We still redirect to orders so they see it
-      router.replace("/orders");
+
+      // If the rentals were created but payment failed, keep createdRentals so the user can retry
+      // Only redirect to orders automatically if the rental was never created (pre-creation error)
+      if (createdRentals || rentalsToPay) {
+        // Rentals exist — refresh so they appear in orders, but don't clear state (allow retry)
+        await refreshRentals();
+        Alert.alert(
+          "Falha no Pagamento",
+          error.message || "Não foi possível concluir o pagamento. Seu pedido foi salvo em 'Meus Pedidos'. Você pode tentar pagar novamente ou cancelar o pedido.",
+          [
+            { text: "Tentar novamente", style: "cancel" },
+            {
+              text: "Ver Meus Pedidos",
+              onPress: () => router.replace("/orders"),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Erro",
+          error.message || "Não foi possível criar o pedido. Por favor, tente novamente."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }

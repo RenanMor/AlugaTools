@@ -35,12 +35,29 @@ export function createApp() {
   app.use(notFound);
   app.use(errorHandler);
 
-  // Background task to clean up expired rentals and restore stock
+  // Background task to clean up expired awaiting_payment rentals and restore stock (every 2 minutes)
   setInterval(() => {
     RentalModel.cancelExpired().catch((err) => {
       console.error("[Cleanup] error in cancelExpired:", err);
     });
-  }, 120000); // 2 minutes
+  }, 120000);
+
+  // Background task to detect active rentals whose usage period expired → mark as return_expired (every 5 minutes)
+  setInterval(() => {
+    RentalModel.checkExpiredActiveRentals()
+      .then((expired) => {
+        if (expired.length > 0) {
+          expired.forEach((r) => {
+            console.log(
+              `[Return] Pedido ${r.id} (${r.tool?.name || r.tool_id}) da empresa ${r.company?.name || r.company_id} marcado como return_expired. Cliente: ${r.customer?.name || r.customer_id}.`
+            );
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("[Cleanup] error in checkExpiredActiveRentals:", err);
+      });
+  }, 5 * 60 * 1000); // 5 minutes
 
   return app;
 }

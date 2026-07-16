@@ -16,6 +16,8 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // Always start with dark — on web we never follow the system theme because
+  // the color palette is calibrated for dark backgrounds only.
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("dark");
   const [primaryColor, setPrimaryColor] = useState<string | null>(null);
   const [secondaryColor, setSecondaryColor] = useState<string | null>(null);
@@ -37,12 +39,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (secondaryColor) {
         root.style.setProperty("--color-secondary", secondaryColor);
       }
+      // Always force color-scheme: dark on web to prevent browser from applying
+      // light-mode overrides when the OS is in light mode.
+      root.style.colorScheme = "dark";
     }
   }, [primaryColor, secondaryColor]);
 
   const setColorScheme = useCallback((scheme: ColorScheme) => {
-    setColorSchemeState(scheme);
-    applyScheme(scheme);
+    // On web, always force dark regardless of what the caller requests
+    const effectiveScheme: ColorScheme = typeof document !== "undefined" ? "dark" : scheme;
+    setColorSchemeState(effectiveScheme);
+    applyScheme(effectiveScheme);
   }, [applyScheme]);
 
   useEffect(() => {
