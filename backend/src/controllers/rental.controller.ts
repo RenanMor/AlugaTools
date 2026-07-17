@@ -374,6 +374,16 @@ export const RentalController = {
         return res.json({ data: rental });
       }
 
+      // Check if user is a system admin (owner)
+      const { data: adminUser } = await supabaseAdmin
+        .from("users")
+        .select("is_owner")
+        .eq("id", userId)
+        .single();
+      if (adminUser?.is_owner) {
+        return res.json({ data: rental });
+      }
+
       // Check if user is the company owner
       const { data: company } = await supabaseAdmin
         .from("companies")

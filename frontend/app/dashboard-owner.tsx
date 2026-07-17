@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -61,6 +61,9 @@ export default function DashboardOwnerScreen() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyRentals, setCompanyRentals] = useState<Rental[]>([]);
   const [isLoadingRentals, setIsLoadingRentals] = useState(false);
+
+  // Flag to prevent parent Pressable from navigating when cancel button is tapped
+  const cancelTappedRef = useRef(false);
 
   // Check permissions: must be owner
   useEffect(() => {
@@ -473,6 +476,10 @@ export default function DashboardOwnerScreen() {
                   renderItem={({ item }) => (
                     <Pressable
                       onPress={() => {
+                        if (cancelTappedRef.current) {
+                          cancelTappedRef.current = false;
+                          return;
+                        }
                         setSelectedCompany(null);
                         router.push(`/order/${item.id}`);
                       }}
@@ -533,8 +540,8 @@ export default function DashboardOwnerScreen() {
                       {/* Cancel button */}
                       {item.status !== "cancelled" && item.status !== "completed" && (
                         <Pressable
-                          onPress={(e) => {
-                            e.stopPropagation?.();
+                          onPress={() => {
+                            cancelTappedRef.current = true;
                             handleCancelRental(item.id);
                           }}
                           style={({ pressed }) => [

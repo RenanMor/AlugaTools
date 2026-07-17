@@ -1,8 +1,10 @@
 import { useLocalSearchParams, router } from "expo-router";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   Image,
   Linking,
   Platform,
@@ -77,9 +79,58 @@ export default function OrderDetailsScreen() {
   const [retryCardCvv, setRetryCardCvv] = useState("");
   const [retryInstallments, setRetryInstallments] = useState("1");
 
+  // Payment loading modal state
+  const [paymentLoadingVisible, setPaymentLoadingVisible] = useState(false);
+  const [paymentLoadingStatus, setPaymentLoadingStatus] = useState<"processing" | "success" | "failed">("processing");
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (paymentLoadingVisible && paymentLoadingStatus === "processing") {
+      Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.08, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      spinAnim.stopAnimation();
+      pulseAnim.stopAnimation();
+      spinAnim.setValue(0);
+      pulseAnim.setValue(1);
+    }
+  }, [paymentLoadingVisible, paymentLoadingStatus]);
+
   const isDeliverer = user?.profile === "deliverer";
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
+
+  // CPF validation helper: checks digit verification algorithm
+  const isCpfValid = useMemo(() => {
+    const digits = receiverCpf.replace(/\D/g, "");
+    if (digits.length !== 11) return false;
+    // Reject all same digits
+    if (/^(\d)\1{10}$/.test(digits)) return false;
+    // Verify check digits
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
+    let rem = (sum * 10) % 11;
+    if (rem === 10) rem = 0;
+    if (rem !== parseInt(digits[9])) return false;
+    sum = 0;
+    for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
+    rem = (sum * 10) % 11;
+    if (rem === 10) rem = 0;
+    return rem === parseInt(digits[10]);
+  }, [receiverCpf]);
 
   const fetchOrder = async () => {
     try {
@@ -191,12 +242,15 @@ export default function OrderDetailsScreen() {
   const handleRetryPayment = async () => {
     if (!rental || isRetrying) return;
     setIsRetrying(true);
+    setPaymentLoadingStatus("processing");
+    setPaymentLoadingVisible(true);
     try {
       let cardPayload: any = undefined;
       const method = rental.paymentMethod || "";
 
       if (method === "CREDIT_CARD" || method === "DEBIT_CARD") {
         if (!retryCardNumber || !retryCardHolder || !retryCardExpiry || !retryCardCvv) {
+          setPaymentLoadingVisible(false);
           Alert.alert("Erro", "Por favor, preencha todos os dados do cartão.");
           setIsRetrying(false);
           return;
@@ -217,11 +271,21 @@ export default function OrderDetailsScreen() {
       });
 
       await Promise.all([refreshRentals(), refreshCatalog()]);
-      setShowRetryModal(false);
-      await fetchOrder();
-      Alert.alert("Sucesso", "Pagamento realizado com sucesso!");
+      setPaymentLoadingStatus("success");
+      setTimeout(async () => {
+        setPaymentLoadingVisible(false);
+        setShowRetryModal(false);
+        await fetchOrder();
+      }, 1800);
     } catch (err: any) {
-      Alert.alert("Falha no Pagamento", err.message || "Não foi possível processar o pagamento.");
+      setPaymentLoadingStatus("failed");
+      await new Promise((r) => setTimeout(r, 900));
+      setPaymentLoadingVisible(false);
+      Alert.alert(
+        "Pagamento Recusado",
+        "Seu pagamento foi recusado. Tente com outro método de pagamento.",
+        [{ text: "Tentar Novamente", style: "cancel" }]
+      );
     } finally {
       setIsRetrying(false);
     }
@@ -266,6 +330,19 @@ export default function OrderDetailsScreen() {
           <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8, alignItems: "center" }}>
             <Text style={{ fontSize: 14, color: colors.muted, fontWeight: "700" }}>Tempo de Uso Restante</Text>
             <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
+          </View>
+        )}
+
+        {/* Deliverer banner when in transit */}
+        {rental.status === "delivering" && rental.delivererName && (
+          <View style={{ padding: 14, borderRadius: 14, backgroundColor: "#F9731622", borderWidth: 1, borderColor: "#F9731644", flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F97316", justifyContent: "center", alignItems: "center" }}>
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}>{rental.delivererName.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Entregador responsável</Text>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#F97316" }}>{rental.delivererName}</Text>
+            </View>
           </View>
         )}
 
@@ -656,25 +733,7 @@ export default function OrderDetailsScreen() {
               </Pressable>
             </View>
 
-            <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo do Recebedor</Text>
-              <TextInput
-                value={receiverName}
-                onChangeText={setReceiverName}
-                placeholder="Ex: João da Silva"
-                placeholderTextColor={colors.muted}
-                style={{
-                  backgroundColor: colors.background,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  color: colors.foreground,
-                }}
-              />
-            </View>
-
+            {/* CPF field first */}
             <View style={{ gap: 6 }}>
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF do Recebedor</Text>
               <TextInput
@@ -691,12 +750,41 @@ export default function OrderDetailsScreen() {
                     formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
                   }
                   setReceiverCpf(formatted);
+                  // Clear name if CPF becomes invalid
+                  if (limited.length !== 11) setReceiverName("");
                 }}
                 placeholder="000.000.000-00"
                 placeholderTextColor={colors.muted}
                 keyboardType="numeric"
                 style={{
                   backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: isCpfValid ? colors.success : colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.foreground,
+                }}
+              />
+              {receiverCpf.replace(/\D/g, "").length === 11 && !isCpfValid && (
+                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600" }}>CPF inválido. Verifique os dígitos.</Text>
+              )}
+              {isCpfValid && (
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>✓ CPF válido</Text>
+              )}
+            </View>
+
+            {/* Name field - only enabled when CPF is valid */}
+            <View style={{ gap: 6, opacity: isCpfValid ? 1 : 0.4 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo do Recebedor</Text>
+              <TextInput
+                value={receiverName}
+                onChangeText={setReceiverName}
+                placeholder="Ex: João da Silva"
+                placeholderTextColor={colors.muted}
+                editable={isCpfValid}
+                style={{
+                  backgroundColor: isCpfValid ? colors.background : colors.border + "44",
                   borderWidth: 1,
                   borderColor: colors.border,
                   borderRadius: 12,
@@ -709,15 +797,18 @@ export default function OrderDetailsScreen() {
 
             <Pressable
               onPress={() => {
-                if (!receiverName.trim() || receiverCpf.replace(/\D/g, "").length !== 11) {
-                  Alert.alert("Erro", "Por favor, preencha o Nome e CPF completo (11 dígitos) do recebedor.");
-                  return;
-                }
                 setShowReceiverModal(false);
                 handleUpdateStatus("delivered", receiverName, receiverCpf);
               }}
+              disabled={!isCpfValid || !receiverName.trim()}
               style={({ pressed }) => [
-                { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                {
+                  backgroundColor: colors.success,
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  opacity: (!isCpfValid || !receiverName.trim()) ? 0.4 : pressed ? 0.85 : 1,
+                },
               ]}
             >
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Finalizar Entrega</Text>
@@ -739,29 +830,11 @@ export default function OrderDetailsScreen() {
 
             <View style={{ padding: 12, borderRadius: 10, backgroundColor: "#EF444422" }}>
               <Text style={{ fontSize: 13, color: "#EF4444", fontWeight: "600", textAlign: "center" }}>
-                O período de aluguel expirou. Confirme a devolução registrando o nome e CPF de quem está devolvendo.
+                O período de aluguel expirou. Confirme a devolução registrando o CPF e nome de quem está devolvendo.
               </Text>
             </View>
 
-            <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo de Quem Devolve</Text>
-              <TextInput
-                value={receiverName}
-                onChangeText={setReceiverName}
-                placeholder="Ex: João da Silva"
-                placeholderTextColor={colors.muted}
-                style={{
-                  backgroundColor: colors.background,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  color: colors.foreground,
-                }}
-              />
-            </View>
-
+            {/* CPF field first */}
             <View style={{ gap: 6 }}>
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF de Quem Devolve</Text>
               <TextInput
@@ -778,12 +851,40 @@ export default function OrderDetailsScreen() {
                     formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
                   }
                   setReceiverCpf(formatted);
+                  if (limited.length !== 11) setReceiverName("");
                 }}
                 placeholder="000.000.000-00"
                 placeholderTextColor={colors.muted}
                 keyboardType="numeric"
                 style={{
                   backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: isCpfValid ? colors.success : colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.foreground,
+                }}
+              />
+              {receiverCpf.replace(/\D/g, "").length === 11 && !isCpfValid && (
+                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600" }}>CPF inválido. Verifique os dígitos.</Text>
+              )}
+              {isCpfValid && (
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>✓ CPF válido</Text>
+              )}
+            </View>
+
+            {/* Name field - only enabled when CPF is valid */}
+            <View style={{ gap: 6, opacity: isCpfValid ? 1 : 0.4 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo de Quem Devolve</Text>
+              <TextInput
+                value={receiverName}
+                onChangeText={setReceiverName}
+                placeholder="Ex: João da Silva"
+                placeholderTextColor={colors.muted}
+                editable={isCpfValid}
+                style={{
+                  backgroundColor: isCpfValid ? colors.background : colors.border + "44",
                   borderWidth: 1,
                   borderColor: colors.border,
                   borderRadius: 12,
@@ -796,15 +897,18 @@ export default function OrderDetailsScreen() {
 
             <Pressable
               onPress={() => {
-                if (!receiverName.trim() || receiverCpf.replace(/\D/g, "").length !== 11) {
-                  Alert.alert("Erro", "Por favor, preencha o Nome e CPF completo (11 dígitos) de quem está devolvendo.");
-                  return;
-                }
                 setShowReturnModal(false);
                 handleUpdateStatus("completed", receiverName, receiverCpf);
               }}
+              disabled={!isCpfValid || !receiverName.trim()}
               style={({ pressed }) => [
-                { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                {
+                  backgroundColor: "#EF4444",
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  opacity: (!isCpfValid || !receiverName.trim()) ? 0.4 : pressed ? 0.85 : 1,
+                },
               ]}
             >
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar Devolução</Text>
@@ -955,6 +1059,107 @@ export default function OrderDetailsScreen() {
               </Pressable>
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* Payment Processing Loading Modal */}
+      <Modal visible={paymentLoadingVisible} transparent animationType="fade" statusBarTranslucent>
+        <View style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.75)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 32,
+        }}>
+          <Animated.View style={{
+            backgroundColor: colors.surface,
+            borderRadius: 24,
+            padding: 36,
+            alignItems: "center",
+            gap: 20,
+            width: "100%",
+            maxWidth: 340,
+            transform: [{ scale: pulseAnim }],
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 20,
+          }}>
+            {paymentLoadingStatus === "processing" && (
+              <>
+                <Animated.View style={{
+                  transform: [{
+                    rotate: spinAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "360deg"],
+                    }),
+                  }],
+                }}>
+                  <View style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    borderWidth: 5,
+                    borderColor: colors.primary + "33",
+                    borderTopColor: colors.primary,
+                  }} />
+                </Animated.View>
+                <View style={{ alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Verificando Pagamento</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                    Aguarde enquanto processamos o seu pagamento...
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {paymentLoadingStatus === "success" && (
+              <>
+                <View style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: "#22C55E22",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderWidth: 3,
+                  borderColor: "#22C55E",
+                }}>
+                  <Text style={{ fontSize: 36 }}>✓</Text>
+                </View>
+                <View style={{ alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#22C55E" }}>Pagamento Aprovado!</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                    Pedido atualizado. Redirecionando...
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {paymentLoadingStatus === "failed" && (
+              <>
+                <View style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: "#EF444422",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderWidth: 3,
+                  borderColor: "#EF4444",
+                }}>
+                  <Text style={{ fontSize: 36 }}>✗</Text>
+                </View>
+                <View style={{ alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#EF4444" }}>Pagamento Recusado</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                    Tente com outro método de pagamento.
+                  </Text>
+                </View>
+              </>
+            )}
+          </Animated.View>
         </View>
       </Modal>
     </ScreenContainer>

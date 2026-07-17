@@ -8,7 +8,7 @@ export function mapRental(data: any): Rental {
     toolName: data.tool?.name || "Ferramenta",
     toolImage: data.tool?.image || "",
     companyId: data.company_id,
-    companyName: data.company?.name || "Empresa",
+    companyName: (data.company?.name || "Empresa").replace(/\s*(locações|locacoes|Locações|Locacoes)\s*$/i, "").trim() || "Empresa",
     customerName: data.customer?.name || "Cliente",
     days: Number(data.days) || 1,
     totalPrice: Number(data.total_price) || 0,

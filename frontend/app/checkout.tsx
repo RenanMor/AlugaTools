@@ -1,11 +1,14 @@
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -62,7 +65,37 @@ export default function CheckoutScreen() {
   const [installments, setInstallments] = useState("1");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentLoadingVisible, setPaymentLoadingVisible] = useState(false);
+  const [paymentLoadingStatus, setPaymentLoadingStatus] = useState<"processing" | "success" | "failed">("processing");
   const [customerNote, setCustomerNote] = useState("");
+
+  // Rotation animation for loading spinner
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (paymentLoadingVisible && paymentLoadingStatus === "processing") {
+      Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.08, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      spinAnim.stopAnimation();
+      pulseAnim.stopAnimation();
+      spinAnim.setValue(0);
+      pulseAnim.setValue(1);
+    }
+  }, [paymentLoadingVisible, paymentLoadingStatus]);
 
   // CEP Lookup trigger
   const handleCepChange = async (val: string) => {
@@ -153,6 +186,8 @@ export default function CheckoutScreen() {
     }
 
     setIsSubmitting(true);
+    setPaymentLoadingStatus("processing");
+    setPaymentLoadingVisible(true);
 
     try {
       const address = shippingId === "pickup" ? null : {
@@ -237,35 +272,37 @@ export default function CheckoutScreen() {
       setCreatedRentals(null);
       await Promise.all([refreshCatalog(), refreshRentals()]);
 
-      Alert.alert("Sucesso", "Pedido realizado! Você pode acompanhar o pagamento em Meus Pedidos.", [
-        {
-          text: "Ir para Meus Pedidos",
-          onPress: () => router.replace("/orders"),
-        },
-      ]);
+      // Show success state then redirect to the first created rental order
+      setPaymentLoadingStatus("success");
+      const firstRentalId = rentalsToPay[0]?.id;
+      setTimeout(() => {
+        setPaymentLoadingVisible(false);
+        if (firstRentalId) {
+          router.replace(`/order/${firstRentalId}`);
+        } else {
+          router.replace("/orders");
+        }
+      }, 1800);
     } catch (error: any) {
       console.error("[Checkout] Payment process error:", error);
 
       // If the rentals were created but payment failed, keep createdRentals so the user can retry
-      // Only redirect to orders automatically if the rental was never created (pre-creation error)
+      setPaymentLoadingStatus("failed");
+      await new Promise((r) => setTimeout(r, 900));
+      setPaymentLoadingVisible(false);
+
       if (createdRentals || rentalsToPay) {
-        // Rentals exist — refresh so they appear in orders, but don't clear state (allow retry)
         await refreshRentals();
         Alert.alert(
-          "Falha no Pagamento",
-          error.message || "Não foi possível concluir o pagamento. Seu pedido foi salvo em 'Meus Pedidos'. Você pode tentar pagar novamente ou cancelar o pedido.",
-          [
-            { text: "Tentar novamente", style: "cancel" },
-            {
-              text: "Ver Meus Pedidos",
-              onPress: () => router.replace("/orders"),
-            },
-          ]
+          "Pagamento Recusado",
+          "Seu pagamento foi recusado. Tente com outro método de pagamento.",
+          [{ text: "Tentar Novamente", style: "cancel" }]
         );
       } else {
         Alert.alert(
-          "Erro",
-          error.message || "Não foi possível criar o pedido. Por favor, tente novamente."
+          "Pagamento Recusado",
+          "Não foi possível processar o pagamento. Verifique os dados e tente com outro método.",
+          [{ text: "OK" }]
         );
       }
     } finally {
@@ -757,6 +794,109 @@ export default function CheckoutScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Payment Processing Modal */}
+      <Modal visible={paymentLoadingVisible} transparent animationType="fade" statusBarTranslucent>
+        <View style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.75)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 32,
+        }}>
+          <Animated.View style={{
+            backgroundColor: colors.surface,
+            borderRadius: 24,
+            padding: 36,
+            alignItems: "center",
+            gap: 20,
+            width: "100%",
+            maxWidth: 340,
+            transform: [{ scale: pulseAnim }],
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 20,
+          }}>
+            {paymentLoadingStatus === "processing" && (
+              <>
+                <Animated.View style={{
+                  transform: [{
+                    rotate: spinAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "360deg"],
+                    }),
+                  }],
+                }}>
+                  <View style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    borderWidth: 5,
+                    borderColor: colors.primary + "33",
+                    borderTopColor: colors.primary,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }} />
+                </Animated.View>
+                <View style={{ alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Verificando Pagamento</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                    Aguarde enquanto processamos o seu pagamento...
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {paymentLoadingStatus === "success" && (
+              <>
+                <View style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: "#22C55E22",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderWidth: 3,
+                  borderColor: "#22C55E",
+                }}>
+                  <Text style={{ fontSize: 36 }}>✓</Text>
+                </View>
+                <View style={{ alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#22C55E" }}>Pagamento Aprovado!</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                    Seu pedido foi confirmado. Redirecionando...
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {paymentLoadingStatus === "failed" && (
+              <>
+                <View style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: "#EF444422",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderWidth: 3,
+                  borderColor: "#EF4444",
+                }}>
+                  <Text style={{ fontSize: 36 }}>✗</Text>
+                </View>
+                <View style={{ alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#EF4444" }}>Pagamento Recusado</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                    Tente com outro método de pagamento.
+                  </Text>
+                </View>
+              </>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
