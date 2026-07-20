@@ -495,7 +495,7 @@ export default function DashboardOwnerScreen() {
                         },
                       ]}
                     >
-                      {/* Header row: tool info + status badge */}
+                      {/* Header row: tool info + status badge + cancel button */}
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <View style={{ flex: 1, gap: 3 }}>
                           <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
@@ -525,7 +525,28 @@ export default function DashboardOwnerScreen() {
                               {ADMIN_STATUS_LABEL[item.status] || item.status}
                             </Text>
                           </View>
-                          <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+                          {/* Cancel button — replaces the early-delivery slot, sits where that action would be */}
+                          {item.status !== "cancelled" && item.status !== "completed" ? (
+                            <Pressable
+                              onPress={() => {
+                                cancelTappedRef.current = true;
+                                handleCancelRental(item.id);
+                              }}
+                              style={({ pressed }) => [
+                                {
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 5,
+                                  borderRadius: 8,
+                                  backgroundColor: "#EF444415",
+                                  opacity: pressed ? 0.7 : 1,
+                                },
+                              ]}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: "#EF4444" }}>Cancelar</Text>
+                            </Pressable>
+                          ) : (
+                            <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+                          )}
                         </View>
                       </View>
 
@@ -535,28 +556,6 @@ export default function DashboardOwnerScreen() {
                           <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>Tempo Restante:</Text>
                           <RentalTimer deliveredAt={item.deliveredAt} days={item.days} />
                         </View>
-                      )}
-
-                      {/* Cancel button */}
-                      {item.status !== "cancelled" && item.status !== "completed" && (
-                        <Pressable
-                          onPress={() => {
-                            cancelTappedRef.current = true;
-                            handleCancelRental(item.id);
-                          }}
-                          style={({ pressed }) => [
-                            {
-                              alignSelf: "flex-end",
-                              paddingHorizontal: 12,
-                              paddingVertical: 6,
-                              borderRadius: 8,
-                              backgroundColor: "#EF444415",
-                              opacity: pressed ? 0.7 : 1,
-                            },
-                          ]}
-                        >
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>Cancelar</Text>
-                        </Pressable>
                       )}
                     </Pressable>
                   )}
