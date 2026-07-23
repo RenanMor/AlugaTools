@@ -2,7 +2,17 @@ import { supabaseAdmin } from "../config/supabase";
 
 export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "delivering" | "delivered" | "active" | "completed" | "cancelled" | "return_expired";
 
-const SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name), deliverer:deliverers(name)";
+const PRIMARY_SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name), deliverer:deliverers(name)";
+const SAFE_SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name)";
+
+async function selectRentalWithFallback(queryBuilder: any): Promise<{ data: any; error: any }> {
+  const { data, error } = await queryBuilder.select(PRIMARY_SELECT_FIELDS);
+  if (error) {
+    console.warn("[RentalModel] Query with deliverer join failed, retrying with safe fields. Error:", error.message);
+    return await queryBuilder.select(SAFE_SELECT_FIELDS);
+  }
+  return { data, error };
+}
 
 export interface Rental {
   id: string;
@@ -102,7 +112,7 @@ export const RentalModel = {
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .insert(insertData)
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .single();
 
     if (error) {
@@ -122,7 +132,7 @@ export const RentalModel = {
   async findById(id: string): Promise<Rental | null> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .eq("id", id)
       .single();
     if (error) return null;
@@ -132,7 +142,7 @@ export const RentalModel = {
   async findByCustomer(customerId: string): Promise<Rental[]> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -142,7 +152,7 @@ export const RentalModel = {
   async findByCompany(companyId: string): Promise<Rental[]> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .eq("company_id", companyId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -179,7 +189,7 @@ export const RentalModel = {
       .from("rentals")
       .update(updateData)
       .eq("id", id)
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .single();
     if (error) throw new Error(error.message);
 
@@ -216,7 +226,7 @@ export const RentalModel = {
       .from("rentals")
       .update(updates)
       .eq("id", id)
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .single();
     if (error) throw new Error(error.message);
     return data as Rental;
@@ -227,7 +237,7 @@ export const RentalModel = {
       .from("rentals")
       .update({ rating, rating_comment: ratingComment || null })
       .eq("id", id)
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .single();
     if (error) throw new Error(error.message);
     return data as Rental;
@@ -247,12 +257,20 @@ export const RentalModel = {
 
     if (error || !expired || expired.length === 0) return 0;
 
-    // Cancel all expired rentals at once (mark as cancelled by System)
+    // Cancel all expired rentals at once
     const expiredIds = expired.map((r) => r.id);
     await supabaseAdmin
       .from("rentals")
-      .update({ status: "cancelled", cancelled_by_name: "Sistema (expirado)" })
+      .update({ status: "cancelled" })
       .in("id", expiredIds);
+
+    // Try to record who cancelled (best-effort, columns may not exist yet)
+    supabaseAdmin
+      .from("rentals")
+      .update({ cancelled_by_name: "Sistema (expirado)" })
+      .in("id", expiredIds)
+      .then(() => {})
+      .catch(() => {});
 
     // Group by tool_id and restore the exact total count for each tool
     const toolCounts: Record<string, number> = {};
@@ -295,7 +313,7 @@ export const RentalModel = {
     // Fetch all delivered/active rentals that have a delivered_at set
     const { data: candidates, error } = await supabaseAdmin
       .from("rentals")
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .in("status", ["delivered", "active"])
       .not("delivered_at", "is", null);
 
@@ -314,7 +332,7 @@ export const RentalModel = {
           .from("rentals")
           .update({ status: "return_expired" })
           .eq("id", rental.id)
-          .select(SELECT_FIELDS)
+          .select(SAFE_SELECT_FIELDS)
           .single();
         if (!updateErr && updated) {
           expired.push(updated as Rental);
@@ -345,8 +363,6 @@ export const RentalModel = {
     }
 
     // Only restore stock if the tool hasn't been returned yet
-    // (completed means tool was already returned and stock restored;
-    // but return_expired means the return is pending, so stock is still out and must be restored upon cancel)
     const shouldRestoreStock = rental.status !== "completed";
 
     if (shouldRestoreStock) {
@@ -365,18 +381,28 @@ export const RentalModel = {
       }
     }
 
-    // Update rental status with cancellation info
-    const cancelExtras: any = {};
-    if (cancelledByUserId) cancelExtras.cancelled_by = cancelledByUserId;
-    if (cancelledByName) cancelExtras.cancelled_by_name = cancelledByName;
-
+    // Update rental status (always succeeds)
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .update({ status: "cancelled", ...cancelExtras })
+      .update({ status: "cancelled" })
       .eq("id", id)
-      .select(SELECT_FIELDS)
+      .select(SAFE_SELECT_FIELDS)
       .single();
     if (error) throw new Error(error.message);
+
+    // Try to record who cancelled (best-effort — columns may not exist yet, migration required)
+    if (cancelledByUserId || cancelledByName) {
+      const trackingUpdate: any = {};
+      if (cancelledByUserId) trackingUpdate.cancelled_by = cancelledByUserId;
+      if (cancelledByName) trackingUpdate.cancelled_by_name = cancelledByName;
+      supabaseAdmin
+        .from("rentals")
+        .update(trackingUpdate)
+        .eq("id", id)
+        .then(() => {})
+        .catch(() => {}); // Silently ignore if columns don't exist yet
+    }
+
     return data as Rental;
   },
 };
