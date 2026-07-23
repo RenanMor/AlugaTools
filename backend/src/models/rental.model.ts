@@ -2,18 +2,6 @@ import { supabaseAdmin } from "../config/supabase";
 
 export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "delivering" | "delivered" | "active" | "completed" | "cancelled" | "return_expired";
 
-const PRIMARY_SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name), deliverer:deliverers(name)";
-const SAFE_SELECT_FIELDS = "*, tool:tools(name, image), company:companies(name), customer:users(name)";
-
-async function selectRentalWithFallback(queryBuilder: any): Promise<{ data: any; error: any }> {
-  const { data, error } = await queryBuilder.select(PRIMARY_SELECT_FIELDS);
-  if (error) {
-    console.warn("[RentalModel] Query with deliverer join failed, retrying with safe fields. Error:", error.message);
-    return await queryBuilder.select(SAFE_SELECT_FIELDS);
-  }
-  return { data, error };
-}
-
 export interface Rental {
   id: string;
   tool_id: string;
@@ -61,6 +49,50 @@ export interface CreateRentalInput {
   coupon_discount?: number;
   expires_at?: string;
   customer_note?: string;
+}
+
+/**
+ * Safely enriches rental objects with tool, company, customer, and deliverer details
+ * without depending on PostgREST foreign key joins, preventing schema cache crashes.
+ */
+async function enrichRentals(rentals: any | any[]): Promise<any> {
+  const isArray = Array.isArray(rentals);
+  const list = isArray ? rentals : rentals ? [rentals] : [];
+  if (list.length === 0) return isArray ? [] : null;
+
+  const toolIds = Array.from(new Set(list.map((r: any) => r.tool_id).filter(Boolean)));
+  const companyIds = Array.from(new Set(list.map((r: any) => r.company_id).filter(Boolean)));
+  const customerIds = Array.from(new Set(list.map((r: any) => r.customer_id).filter(Boolean)));
+  const delivererIds = Array.from(new Set(list.map((r: any) => r.deliverer_id).filter(Boolean)));
+
+  const [toolsRes, companiesRes, usersRes, deliverersRes] = await Promise.all([
+    toolIds.length ? supabaseAdmin.from("tools").select("id, name, image").in("id", toolIds) : Promise.resolve({ data: [] }),
+    companyIds.length ? supabaseAdmin.from("companies").select("id, name").in("id", companyIds) : Promise.resolve({ data: [] }),
+    customerIds.length ? supabaseAdmin.from("users").select("id, name").in("id", customerIds) : Promise.resolve({ data: [] }),
+    delivererIds.length ? supabaseAdmin.from("deliverers").select("id, name").in("id", delivererIds) : Promise.resolve({ data: [] }),
+  ]);
+
+  const toolMap: Record<string, { name: string; image: string }> = {};
+  (toolsRes.data || []).forEach((t: any) => { toolMap[t.id] = { name: t.name, image: t.image }; });
+
+  const companyMap: Record<string, { name: string }> = {};
+  (companiesRes.data || []).forEach((c: any) => { companyMap[c.id] = { name: c.name }; });
+
+  const userMap: Record<string, { name: string }> = {};
+  (usersRes.data || []).forEach((u: any) => { userMap[u.id] = { name: u.name }; });
+
+  const delivererMap: Record<string, { name: string }> = {};
+  (deliverersRes.data || []).forEach((d: any) => { delivererMap[d.id] = { name: d.name }; });
+
+  const enriched = list.map((r: any) => ({
+    ...r,
+    tool: r.tool || toolMap[r.tool_id] || undefined,
+    company: r.company || companyMap[r.company_id] || undefined,
+    customer: r.customer || userMap[r.customer_id] || undefined,
+    deliverer: r.deliverer || delivererMap[r.deliverer_id] || undefined,
+  }));
+
+  return isArray ? enriched : enriched[0];
 }
 
 export const RentalModel = {
@@ -112,7 +144,7 @@ export const RentalModel = {
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .insert(insertData)
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .single();
 
     if (error) {
@@ -126,37 +158,37 @@ export const RentalModel = {
     }
 
     console.log("[RentalModel.create] Rental created successfully:", data?.id);
-    return data as Rental;
+    return (await enrichRentals(data)) as Rental;
   },
 
   async findById(id: string): Promise<Rental | null> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .eq("id", id)
       .single();
-    if (error) return null;
-    return data as Rental;
+    if (error || !data) return null;
+    return (await enrichRentals(data)) as Rental;
   },
 
   async findByCustomer(customerId: string): Promise<Rental[]> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return data as Rental[];
+    return (await enrichRentals(data || [])) as Rental[];
   },
 
   async findByCompany(companyId: string): Promise<Rental[]> {
     const { data, error } = await supabaseAdmin
       .from("rentals")
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return data as Rental[];
+    return (await enrichRentals(data || [])) as Rental[];
   },
 
   async updateStatus(
@@ -189,12 +221,11 @@ export const RentalModel = {
       .from("rentals")
       .update(updateData)
       .eq("id", id)
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .single();
     if (error) throw new Error(error.message);
 
     // Only restore units when transitioning to "completed" from an active or return_expired state
-    // (i.e. if the user had the tool out and is now returning it)
     const wasActive = ["accepted", "delivering", "delivered", "active", "return_expired"].includes(oldStatus);
     if (status === "completed" && wasActive) {
       const { data: toolData } = await supabaseAdmin
@@ -213,7 +244,7 @@ export const RentalModel = {
       }
     }
 
-    return data as Rental;
+    return (await enrichRentals(data)) as Rental;
   },
 
   async updatePayment(id: string, updates: {
@@ -226,10 +257,10 @@ export const RentalModel = {
       .from("rentals")
       .update(updates)
       .eq("id", id)
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return data as Rental;
+    return (await enrichRentals(data)) as Rental;
   },
 
   async setRating(id: string, rating: number, ratingComment?: string): Promise<Rental> {
@@ -237,18 +268,16 @@ export const RentalModel = {
       .from("rentals")
       .update({ rating, rating_comment: ratingComment || null })
       .eq("id", id)
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return data as Rental;
+    return (await enrichRentals(data)) as Rental;
   },
 
   /**
    * Cancel expired rentals (awaiting_payment past expires_at) and restore stock.
-   * Groups by tool_id so that multiple rentals of the same tool restore the correct total.
    */
   async cancelExpired(): Promise<number> {
-    // Find all expired awaiting_payment rentals
     const { data: expired, error } = await supabaseAdmin
       .from("rentals")
       .select("id, tool_id")
@@ -257,14 +286,12 @@ export const RentalModel = {
 
     if (error || !expired || expired.length === 0) return 0;
 
-    // Cancel all expired rentals at once
     const expiredIds = expired.map((r) => r.id);
     await supabaseAdmin
       .from("rentals")
       .update({ status: "cancelled" })
       .in("id", expiredIds);
 
-    // Try to record who cancelled (best-effort, columns may not exist yet)
     try {
       await supabaseAdmin
         .from("rentals")
@@ -272,14 +299,12 @@ export const RentalModel = {
         .in("id", expiredIds);
     } catch (_) {}
 
-    // Group by tool_id and restore the exact total count for each tool
     const toolCounts: Record<string, number> = {};
     for (const rental of expired) {
       toolCounts[rental.tool_id] = (toolCounts[rental.tool_id] || 0) + 1;
     }
 
     for (const [toolId, count] of Object.entries(toolCounts)) {
-      // Use atomic RPC increment so concurrent operations don't race
       const { data: toolData } = await supabaseAdmin
         .from("tools")
         .select("quantity")
@@ -296,24 +321,19 @@ export const RentalModel = {
     }
 
     const cancelledCount = expired.length;
-
     if (cancelledCount > 0) {
       console.log(`[Cleanup] Cancelled ${cancelledCount} expired rental(s) and restored stock.`);
     }
-
     return cancelledCount;
   },
 
   /**
    * Detect active rentals (delivered/active) whose usage period has expired
-   * and transition them to return_expired status.
-   * Returns the list of updated rentals so callers can send notifications.
    */
   async checkExpiredActiveRentals(): Promise<Rental[]> {
-    // Fetch all delivered/active rentals that have a delivered_at set
     const { data: candidates, error } = await supabaseAdmin
       .from("rentals")
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .in("status", ["delivered", "active"])
       .not("delivered_at", "is", null);
 
@@ -327,15 +347,15 @@ export const RentalModel = {
       const deliveredMs = new Date(rental.delivered_at).getTime();
       const usageLimitMs = deliveredMs + (rental.days || 1) * 24 * 60 * 60 * 1000;
       if (now >= usageLimitMs) {
-        // Transition to return_expired
         const { data: updated, error: updateErr } = await supabaseAdmin
           .from("rentals")
           .update({ status: "return_expired" })
           .eq("id", rental.id)
-          .select(SAFE_SELECT_FIELDS)
+          .select("*")
           .single();
         if (!updateErr && updated) {
-          expired.push(updated as Rental);
+          const enriched = await enrichRentals(updated);
+          expired.push(enriched as Rental);
         }
       }
     }
@@ -349,10 +369,6 @@ export const RentalModel = {
 
   /**
    * Cancel a specific rental and restore stock.
-   * Works for any status that is not already cancelled.
-   * Stock is restored only if the rental was not yet completed/returned (tool still allocated).
-   * @param cancelledByUserId - The user ID of whoever cancelled (optional)
-   * @param cancelledByName - Display name of whoever cancelled (optional)
    */
   async cancelAndRestore(id: string, cancelledByUserId?: string, cancelledByName?: string): Promise<Rental> {
     const rental = await this.findById(id);
@@ -362,7 +378,6 @@ export const RentalModel = {
       throw new Error("Este pedido já está cancelado");
     }
 
-    // Only restore stock if the tool hasn't been returned yet
     const shouldRestoreStock = rental.status !== "completed";
 
     if (shouldRestoreStock) {
@@ -381,16 +396,14 @@ export const RentalModel = {
       }
     }
 
-    // Update rental status (always succeeds)
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .update({ status: "cancelled" })
       .eq("id", id)
-      .select(SAFE_SELECT_FIELDS)
+      .select("*")
       .single();
     if (error) throw new Error(error.message);
 
-    // Try to record who cancelled (best-effort — columns may not exist yet, migration required)
     if (cancelledByUserId || cancelledByName) {
       const trackingUpdate: any = {};
       if (cancelledByUserId) trackingUpdate.cancelled_by = cancelledByUserId;
@@ -403,6 +416,7 @@ export const RentalModel = {
       } catch (_) {}
     }
 
-    return data as Rental;
+    return (await enrichRentals(data)) as Rental;
   },
 };
+

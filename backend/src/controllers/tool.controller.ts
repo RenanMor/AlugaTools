@@ -66,18 +66,26 @@ export const ToolController = {
       const { id } = req.params;
       const { data, error } = await supabaseAdmin
         .from("rentals")
-        .select("id, rating, rating_comment, created_at, customer:users(name)")
+        .select("id, rating, rating_comment, created_at, customer_id")
         .eq("tool_id", id)
         .not("rating", "is", null)
         .order("created_at", { ascending: false });
+
       if (error) throw new Error(error.message);
+
+      const customerIds = Array.from(new Set((data || []).map((r: any) => r.customer_id).filter(Boolean)));
+      let userMap: Record<string, string> = {};
+      if (customerIds.length > 0) {
+        const { data: users } = await supabaseAdmin.from("users").select("id, name").in("id", customerIds);
+        (users || []).forEach((u: any) => { userMap[u.id] = u.name; });
+      }
 
       const reviews = (data || []).map((r: any) => ({
         id: r.id,
         rating: r.rating,
         comment: r.rating_comment || "",
         createdAt: new Date(r.created_at).getTime(),
-        customerName: r.customer?.name || "Cliente Anônimo",
+        customerName: userMap[r.customer_id] || "Cliente Anônimo",
       }));
 
       res.json({ data: reviews });

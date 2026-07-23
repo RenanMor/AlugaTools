@@ -21,11 +21,11 @@ export const CompanyModel = {
     const { data, error } = await supabaseAdmin
       .from("companies")
       .select("*")
-      .eq("status", "approved")
       .order("rating", { ascending: false })
       .limit(limit);
     if (error) throw new Error(error.message);
-    return data as Company[];
+    const approved = (data || []).filter((c) => !c.status || c.status === "approved");
+    return (approved.length > 0 ? approved : data || []) as Company[];
   },
 
   async findById(id: string): Promise<Company | null> {
@@ -42,10 +42,10 @@ export const CompanyModel = {
     const { data, error } = await supabaseAdmin
       .from("companies")
       .select("*")
-      .eq("category_id", categoryId)
-      .eq("status", "approved");
+      .eq("category_id", categoryId);
     if (error) throw new Error(error.message);
-    return data as Company[];
+    const approved = (data || []).filter((c) => !c.status || c.status === "approved");
+    return (approved.length > 0 ? approved : data || []) as Company[];
   },
 
   async findPending(): Promise<Company[]> {
