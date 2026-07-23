@@ -18,6 +18,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Company, Rental } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
+import { formatOrderId } from "@/lib/utils";
 import {
   getAllCompanies,
   updateCompanyStatus,
@@ -510,9 +511,14 @@ export default function DashboardOwnerScreen() {
                           }}
                           style={({ pressed }) => [{ flex: 1, gap: 3, opacity: pressed ? 0.7 : 1 }]}
                         >
-                          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
-                            {item.toolName}
-                          </Text>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+                              {item.toolName}
+                            </Text>
+                            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 0.5, borderColor: colors.primary + "33" }}>
+                              <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary }}>{formatOrderId(item.id)}</Text>
+                            </View>
+                          </View>
                           <Text style={{ fontSize: 12, color: colors.muted }}>
                             Cliente: {item.customerName}
                           </Text>

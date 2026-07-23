@@ -8,6 +8,7 @@ import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
 import { Rental, Tool, Deliverer } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
+import { formatOrderId } from "@/lib/utils";
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -386,13 +387,14 @@ const STATUS_COLOR_BACK: Record<string, string> = {
 
 function RequestCard({ rental }: { rental: Rental }) {
   const colors = useColors();
+  const statusColor = STATUS_COLOR_BACK[rental.status] || colors.muted;
 
   return (
     <Pressable
       onPress={() => router.push(`/order/${rental.id}`)}
       style={({ pressed }) => [
         {
-          padding: 12,
+          padding: 14,
           borderRadius: 14,
           backgroundColor: colors.surface,
           borderWidth: 1,
@@ -402,35 +404,48 @@ function RequestCard({ rental }: { rental: Rental }) {
         }
       ]}
     >
-      <View style={{ flexDirection: "row", gap: 12 }}>
+      {/* Tool info row */}
+      <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
         <Image source={{ uri: rental.toolImage }} style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: colors.border }} />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-            {rental.toolName}
-          </Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+              {rental.toolName}
+            </Text>
+            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 0.5, borderColor: colors.primary + "33" }}>
+              <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary }}>{formatOrderId(rental.id)}</Text>
+            </View>
+          </View>
           <Text style={{ fontSize: 12, color: colors.muted }}>Cliente: {rental.customerName}</Text>
           <Text style={{ fontSize: 13, fontWeight: "700", color: colors.success }}>
             R$ {rental.totalPrice.toFixed(2)} · {rental.days}d
           </Text>
         </View>
+      </View>
+
+      {/* Status Badge row */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8 }}>
         <View
           style={{
-            paddingHorizontal: 8,
+            paddingHorizontal: 10,
             paddingVertical: 4,
             borderRadius: 8,
-            backgroundColor: (STATUS_COLOR_BACK[rental.status] || colors.muted) + "15",
-            alignSelf: "flex-start",
+            backgroundColor: statusColor + "15",
+            borderWidth: 0.5,
+            borderColor: statusColor + "33",
+            flexShrink: 1,
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: "700", color: STATUS_COLOR_BACK[rental.status] || colors.muted }}>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor }}>
             {STATUS_LABEL_BACK[rental.status] || rental.status}
           </Text>
         </View>
+        <IconSymbol name="chevron.right" size={14} color={colors.muted} />
       </View>
 
       {/* Show Rental Countdown Timer if rental is delivered and active */}
       {rental.deliveredAt && (rental.status === "delivered" || rental.status === "active" || rental.status === "accepted") && (
-        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, gap: 4 }}>
+        <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8, gap: 4, alignItems: "center" }}>
           <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Tempo Restante:</Text>
           <RentalTimer deliveredAt={rental.deliveredAt} days={rental.days} />
         </View>

@@ -24,6 +24,7 @@ import { Rental, RentalStatus } from "@/lib/types";
 import { cancelRental, getRentalById, payRental } from "@/lib/api/rentals";
 import { cancelCompanyRental } from "@/lib/api/admin";
 import { RentalTimer } from "@/components/rental-timer";
+import { formatOrderId } from "@/lib/utils";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -327,11 +328,16 @@ export default function OrderDetailsScreen() {
 
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-          <IconSymbol name="arrow.left" size={24} color={colors.foreground} />
-        </Pressable>
-        <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>Detalhes do Pedido</Text>
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+            <IconSymbol name="arrow.left" size={24} color={colors.foreground} />
+          </Pressable>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>Detalhes do Pedido</Text>
+        </View>
+        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 0.5, borderColor: colors.primary + "33" }}>
+          <Text style={{ fontSize: 13, fontWeight: "800", color: colors.primary }}>{formatOrderId(rental.id)}</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }} showsVerticalScrollIndicator={false}>
@@ -483,12 +489,18 @@ export default function OrderDetailsScreen() {
               </View>
             ) : null}
 
-            {/* Receiver Name / CPF */}
+            {/* Receiver / Return Name & CPF */}
             {rental.receiverName ? (
-              <View style={{ marginTop: 4, gap: 2 }}>
-                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>Recebido por: <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.receiverName}</Text></Text>
+              <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: colors.border, gap: 2 }}>
+                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>
+                  {rental.status === "completed" ? "Devolvido por: " : "Recebido por: "}
+                  <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.receiverName}</Text>
+                </Text>
                 {rental.receiverCpf ? (
-                  <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>CPF do Recebedor: <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.receiverCpf}</Text></Text>
+                  <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>
+                    {rental.status === "completed" ? "CPF de quem devolveu: " : "CPF do Recebedor: "}
+                    <Text style={{ fontWeight: "400", color: colors.muted }}>{rental.receiverCpf}</Text>
+                  </Text>
                 ) : null}
               </View>
             ) : null}

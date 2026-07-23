@@ -7,6 +7,7 @@ import { useApp } from "@/lib/app-context";
 import { Rental } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
 import { router } from "expo-router";
+import { formatOrderId } from "@/lib/utils";
 
 const STATUS_LABEL_BACK: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -216,9 +217,14 @@ export default function StatsScreen() {
             <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
               <Image source={{ uri: item.toolImage }} style={{ width: 48, height: 48, borderRadius: 10, backgroundColor: colors.border }} />
               <View style={{ flex: 1, gap: 2 }}>
-                <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
-                  {item.toolName}
-                </Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+                    {item.toolName}
+                  </Text>
+                  <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 0.5, borderColor: colors.primary + "33" }}>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary }}>{formatOrderId(item.id)}</Text>
+                  </View>
+                </View>
                 <Text style={{ fontSize: 12, color: colors.muted }}>Cliente: {item.customerName}</Text>
                 <Text style={{ fontSize: 12, fontWeight: "700", color: colors.success }}>
                   R$ {item.totalPrice.toFixed(2)} · {item.days}d

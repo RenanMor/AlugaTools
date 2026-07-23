@@ -15,6 +15,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Formats a rental ID into a friendly, safe public identifier string.
+ * Example: "466b66c9-4bde-4b73-b489-514b977767e6" -> "Pedido#466B66C9"
+ */
+export function formatOrderId(id: string): string {
+  if (!id) return "Pedido#00000000";
+  const clean = id.replace(/-/g, "").toUpperCase();
+  return `Pedido#${clean.slice(0, 8)}`;
+}
+
 /** Returns true when the color is too close to gray (saturation < threshold) */
 function isGrayish(r: number, g: number, b: number): boolean {
   const max = Math.max(r, g, b);
