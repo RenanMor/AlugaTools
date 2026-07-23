@@ -265,12 +265,12 @@ export const RentalModel = {
       .in("id", expiredIds);
 
     // Try to record who cancelled (best-effort, columns may not exist yet)
-    supabaseAdmin
-      .from("rentals")
-      .update({ cancelled_by_name: "Sistema (expirado)" })
-      .in("id", expiredIds)
-      .then(() => {})
-      .catch(() => {});
+    try {
+      await supabaseAdmin
+        .from("rentals")
+        .update({ cancelled_by_name: "Sistema (expirado)" })
+        .in("id", expiredIds);
+    } catch (_) {}
 
     // Group by tool_id and restore the exact total count for each tool
     const toolCounts: Record<string, number> = {};
@@ -395,12 +395,12 @@ export const RentalModel = {
       const trackingUpdate: any = {};
       if (cancelledByUserId) trackingUpdate.cancelled_by = cancelledByUserId;
       if (cancelledByName) trackingUpdate.cancelled_by_name = cancelledByName;
-      supabaseAdmin
-        .from("rentals")
-        .update(trackingUpdate)
-        .eq("id", id)
-        .then(() => {})
-        .catch(() => {}); // Silently ignore if columns don't exist yet
+      try {
+        await supabaseAdmin
+          .from("rentals")
+          .update(trackingUpdate)
+          .eq("id", id);
+      } catch (_) {}
     }
 
     return data as Rental;
