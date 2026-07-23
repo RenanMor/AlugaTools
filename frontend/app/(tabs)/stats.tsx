@@ -30,7 +30,7 @@ const STATUS_COLOR_BACK: Record<string, string> = {
   delivered: "#22C55E",
   active: "#22C55E",
   completed: "#64748B",
-  cancelled: "#6B7280",
+  cancelled: "#EF4444",
 };
 
 export default function StatsScreen() {

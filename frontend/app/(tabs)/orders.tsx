@@ -35,7 +35,7 @@ const STATUS_VARIANT: Record<RentalStatus, "info" | "warning" | "primary" | "err
   delivered: "success",
   active: "success",
   completed: "muted",
-  cancelled: "muted",
+  cancelled: "error",
   return_expired: "error",
 };
 
@@ -93,6 +93,7 @@ export default function OrdersScreen() {
               paddingVertical: 8,
               marginBottom: spacing.md,
               gap: 8,
+              flexShrink: 0,
             }}
           >
             <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
@@ -121,6 +122,7 @@ export default function OrdersScreen() {
           <FlatList
             data={filteredRentals}
             keyExtractor={(item) => item.id}
+            style={{ flex: 1 }}
             ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
             contentContainerStyle={{ paddingBottom: spacing.xxl }}
             ListEmptyComponent={

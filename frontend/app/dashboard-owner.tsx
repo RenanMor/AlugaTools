@@ -48,7 +48,7 @@ const ADMIN_STATUS_COLOR: Record<string, string> = {
   delivered: "#22C55E",
   active: "#22C55E",
   completed: "#64748B",
-  cancelled: "#6B7280",
+  cancelled: "#EF4444",
   return_expired: "#EF4444",
 };
 

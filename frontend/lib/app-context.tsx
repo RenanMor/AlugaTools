@@ -401,35 +401,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const handleRateRental = useCallback(async (rentalId: string, rating: number, comment?: string) => {
     try {
       await rateRental(rentalId, rating, comment);
-
-      // Refresh rentals and company ratings
-      const [comps, rents] = await Promise.all([
-        getFeaturedCompanies(),
-        user?.profile === "company" && user.companyId ? getRentalsByCompany(user.companyId) : getMyRentals(),
-      ]);
-      setCompanies(comps);
-      setRentals(rents);
+      await Promise.all([loadCatalog(), loadRentals()]);
     } catch (err) {
       console.error("Erro ao avaliar aluguel:", err);
     }
-  }, [user]);
+  }, [loadCatalog, loadRentals]);
 
   const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string) => {
     try {
       await updateRentalStatus(rentalId, status, receiverName, receiverCpf);
-
-      // Refresh rentals
-      let list: Rental[] = [];
-      if (user?.profile === "company" && user.companyId) {
-        list = await getRentalsByCompany(user.companyId);
-      } else {
-        list = await getMyRentals();
-      }
-      setRentals(list);
+      await loadRentals();
     } catch (err) {
       console.error("Erro ao atualizar status:", err);
     }
-  }, [user]);
+  }, [loadRentals]);
 
   // Tool management
   const handleAddTool = useCallback(async (tool: Omit<Tool, "id">) => {
