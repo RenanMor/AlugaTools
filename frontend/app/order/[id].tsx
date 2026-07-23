@@ -186,31 +186,46 @@ export default function OrderDetailsScreen() {
   };
 
   const handleManualCancel = () => {
-    Alert.alert("Cancelar Aluguel", "Tem certeza que deseja cancelar esta reserva?", [
-      { text: "Não", style: "cancel" },
-      {
-        text: "Sim, Cancelar",
-        style: "destructive",
-        onPress: async () => {
-          setIsCancelling(true);
-          try {
-            if (isOwner && rental) {
-              // Owner uses admin cancel endpoint
-              await cancelCompanyRental(rental.companyId, rental.id);
-            } else {
-              await cancelRental(rental!.id);
-            }
-            await Promise.all([refreshRentals(), refreshCatalog()]);
-            await fetchOrder();
-            Alert.alert("Sucesso", "Reserva cancelada com sucesso!");
-          } catch (err: any) {
-            Alert.alert("Erro", err.message || "Falha ao cancelar reserva.");
-          } finally {
-            setIsCancelling(false);
-          }
+    const doCancel = async () => {
+      setIsCancelling(true);
+      try {
+        if (isOwner && rental) {
+          await cancelCompanyRental(rental.companyId, rental.id);
+        } else {
+          await cancelRental(rental!.id);
+        }
+        await Promise.all([refreshRentals(), refreshCatalog()]);
+        await fetchOrder();
+        if (Platform.OS === "web") {
+          window.alert("Reserva cancelada com sucesso!");
+        } else {
+          Alert.alert("Sucesso", "Reserva cancelada com sucesso!");
+        }
+      } catch (err: any) {
+        if (Platform.OS === "web") {
+          window.alert(err.message || "Falha ao cancelar reserva.");
+        } else {
+          Alert.alert("Erro", err.message || "Falha ao cancelar reserva.");
+        }
+      } finally {
+        setIsCancelling(false);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Cancelar Aluguel\n\nTem certeza que deseja cancelar esta reserva?")) {
+        doCancel();
+      }
+    } else {
+      Alert.alert("Cancelar Aluguel", "Tem certeza que deseja cancelar esta reserva?", [
+        { text: "Não", style: "cancel" },
+        {
+          text: "Sim, Cancelar",
+          style: "destructive",
+          onPress: doCancel,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const formatTime = (seconds: number) => {

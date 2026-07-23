@@ -109,6 +109,7 @@ function CompanyCard({ company }: { company: Company }) {
             borderRadius: radius.lg,
             backgroundColor: colors.border,
           }}
+          resizeMode="contain"
         />
 
         <View style={{ flex: 1, gap: 4 }}>

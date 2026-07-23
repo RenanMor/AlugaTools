@@ -106,6 +106,7 @@ export default function CompanyScreen() {
               <Image
                 source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")}
                 style={{ width: 76, height: 76, borderRadius: radius.lg, backgroundColor: colors.border }}
+                resizeMode="contain"
               />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={{ fontSize: fontSize.xl, fontWeight: fontWeight.black, color: colors.foreground }}>

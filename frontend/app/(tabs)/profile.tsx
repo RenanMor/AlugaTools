@@ -88,7 +88,7 @@ export default function ProfileScreen() {
                 ]}
               >
                 {user.avatarUrl || myCompany?.logo ? (
-                  <Image source={{ uri: user.avatarUrl || myCompany?.logo }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <Image source={{ uri: user.avatarUrl || myCompany?.logo }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                 ) : (
                   <Text style={{ color: "#fff", fontSize: 22, fontWeight: fontWeight.black }}>
                     {user.name.charAt(0).toUpperCase()}

@@ -88,7 +88,7 @@ export default function ToolScreen() {
             onPress={() => router.push({ pathname: "/company/[id]", params: { id: company.id } })}
             style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, opacity: pressed ? 0.7 : 1 }]}
           >
-            <Image source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.border }} />
+            <Image source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.border }} resizeMode="contain" />
             <Text style={{ fontSize: 14, color: colors.muted }}>{company.name}</Text>
           </Pressable>
 

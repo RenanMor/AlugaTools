@@ -25,7 +25,7 @@ export function RentalTimer({ deliveredAt, days }: RentalTimerProps) {
       const diff = expiryTime - Date.now();
 
       if (diff <= 0) {
-        setTimeLeft("Tempo expirado");
+        setTimeLeft("Tempo expirado, entregador a caminho");
         setIsWarning(true);
         return;
       }
@@ -71,6 +71,7 @@ export function RentalTimer({ deliveredAt, days }: RentalTimerProps) {
       style={{
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center",
         gap: 6,
         paddingHorizontal: 10,
         paddingVertical: 5,
@@ -78,7 +79,7 @@ export function RentalTimer({ deliveredAt, days }: RentalTimerProps) {
         backgroundColor: badgeBg,
         borderWidth: 0.5,
         borderColor: textColor + "33",
-        alignSelf: "flex-start",
+        alignSelf: "center",
       }}
     >
       <IconSymbol name="clock" size={14} color={textColor} />

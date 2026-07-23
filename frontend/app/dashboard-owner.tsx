@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -62,9 +63,6 @@ export default function DashboardOwnerScreen() {
   const [companyRentals, setCompanyRentals] = useState<Rental[]>([]);
   const [isLoadingRentals, setIsLoadingRentals] = useState(false);
 
-  // Flag to prevent parent Pressable from navigating when cancel button is tapped
-  const cancelTappedRef = useRef(false);
-
   // Check permissions: must be owner
   useEffect(() => {
     if (user && !user.isOwner) {
@@ -91,7 +89,7 @@ export default function DashboardOwnerScreen() {
 
   const handleApprove = async (companyId: string) => {
     Alert.alert(
-      "Confirmar Aprovação",
+      "Confirmar Aprovação",
       "Tem certeza que deseja aprovar esta empresa?",
       [
         { text: "Não", style: "cancel" },
@@ -149,28 +147,45 @@ export default function DashboardOwnerScreen() {
 
   const handleCancelRental = async (rentalId: string) => {
     if (!selectedCompany) return;
-    Alert.alert(
-      "Confirmar Cancelamento",
-      "Tem certeza que deseja cancelar este aluguel de forma administrativa?",
-      [
-        { text: "Não", style: "cancel" },
-        {
-          text: "Sim, Cancelar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await cancelCompanyRental(selectedCompany.id, rentalId);
-              Alert.alert("Sucesso", "Pedido cancelado com sucesso!");
-              // Refresh rentals list
-              const rentalsData = await getCompanyRentals(selectedCompany.id);
-              setCompanyRentals(rentalsData);
-            } catch (err: any) {
-              Alert.alert("Erro", err.message || "Não foi possível cancelar o pedido.");
-            }
+
+    const performCancel = async () => {
+      try {
+        await cancelCompanyRental(selectedCompany.id, rentalId);
+        if (Platform.OS === "web") {
+          window.alert("Pedido cancelado com sucesso!");
+        } else {
+          Alert.alert("Sucesso", "Pedido cancelado com sucesso!");
+        }
+        // Refresh rentals list
+        const rentalsData = await getCompanyRentals(selectedCompany.id);
+        setCompanyRentals(rentalsData);
+      } catch (err: any) {
+        if (Platform.OS === "web") {
+          window.alert(err.message || "Não foi possível cancelar o pedido.");
+        } else {
+          Alert.alert("Erro", err.message || "Não foi possível cancelar o pedido.");
+        }
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Confirmar Cancelamento\n\nTem certeza que deseja cancelar este aluguel de forma administrativa?")) {
+        performCancel();
+      }
+    } else {
+      Alert.alert(
+        "Confirmar Cancelamento",
+        "Tem certeza que deseja cancelar este aluguel de forma administrativa?",
+        [
+          { text: "Não", style: "cancel" },
+          {
+            text: "Sim, Cancelar",
+            style: "destructive",
+            onPress: performCancel,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const pendingCompanies = useMemo(
@@ -312,6 +327,7 @@ export default function DashboardOwnerScreen() {
                 <Image
                   source={{ uri: item.logo || "sem-imagem" }}
                   style={{ width: 48, height: 48, borderRadius: 10, backgroundColor: colors.border }}
+                  resizeMode="contain"
                 />
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
@@ -413,6 +429,7 @@ export default function DashboardOwnerScreen() {
                 <Image
                   source={{ uri: selectedCompany.logo }}
                   style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: colors.border }}
+                  resizeMode="contain"
                 />
                 <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
                   {selectedCompany.name}
@@ -474,30 +491,25 @@ export default function DashboardOwnerScreen() {
                     </Text>
                   }
                   renderItem={({ item }) => (
-                    <Pressable
-                      onPress={() => {
-                        if (cancelTappedRef.current) {
-                          cancelTappedRef.current = false;
-                          return;
-                        }
-                        setSelectedCompany(null);
-                        router.push(`/order/${item.id}`);
+                    <View
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        backgroundColor: colors.surface,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        gap: 8,
                       }}
-                      style={({ pressed }) => [
-                        {
-                          padding: 12,
-                          borderRadius: 12,
-                          backgroundColor: colors.surface,
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                          gap: 8,
-                          opacity: pressed ? 0.85 : 1,
-                        },
-                      ]}
                     >
                       {/* Header row: tool info + status badge + cancel button */}
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <View style={{ flex: 1, gap: 3 }}>
+                        <Pressable
+                          onPress={() => {
+                            setSelectedCompany(null);
+                            router.push(`/order/${item.id}`);
+                          }}
+                          style={({ pressed }) => [{ flex: 1, gap: 3, opacity: pressed ? 0.7 : 1 }]}
+                        >
                           <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
                             {item.toolName}
                           </Text>
@@ -513,7 +525,7 @@ export default function DashboardOwnerScreen() {
                               Obs: {item.customerNote}
                             </Text>
                           ) : null}
-                        </View>
+                        </Pressable>
                         <View style={{ gap: 6, alignItems: "flex-end" }}>
                           <View style={{
                             paddingHorizontal: 8,
@@ -531,14 +543,10 @@ export default function DashboardOwnerScreen() {
                               Por: {item.cancelledByName}
                             </Text>
                           ) : null}
-                          {/* Cancel button — uses stopPropagation to prevent parent card navigation */}
+                          {/* Cancel button */}
                           {item.status !== "cancelled" && item.status !== "completed" ? (
                             <Pressable
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                cancelTappedRef.current = true;
-                                handleCancelRental(item.id);
-                              }}
+                              onPress={() => handleCancelRental(item.id)}
                               style={({ pressed }) => [
                                 {
                                   paddingHorizontal: 10,
@@ -564,7 +572,7 @@ export default function DashboardOwnerScreen() {
                           <RentalTimer deliveredAt={item.deliveredAt} days={item.days} />
                         </View>
                       )}
-                    </Pressable>
+                    </View>
                   )}
                 />
               )}
