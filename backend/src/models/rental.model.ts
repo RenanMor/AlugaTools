@@ -29,6 +29,8 @@ export interface Rental {
   customer_note: string | null;
   receiver_name: string | null;
   receiver_cpf: string | null;
+  cancelled_by: string | null;
+  cancelled_by_name: string | null;
   tool?: { name: string; image: string };
   company?: { name: string };
   customer?: { name: string };
@@ -245,11 +247,11 @@ export const RentalModel = {
 
     if (error || !expired || expired.length === 0) return 0;
 
-    // Cancel all expired rentals at once
+    // Cancel all expired rentals at once (mark as cancelled by System)
     const expiredIds = expired.map((r) => r.id);
     await supabaseAdmin
       .from("rentals")
-      .update({ status: "cancelled" })
+      .update({ status: "cancelled", cancelled_by_name: "Sistema (expirado)" })
       .in("id", expiredIds);
 
     // Group by tool_id and restore the exact total count for each tool
@@ -331,8 +333,10 @@ export const RentalModel = {
    * Cancel a specific rental and restore stock.
    * Works for any status that is not already cancelled.
    * Stock is restored only if the rental was not yet completed/returned (tool still allocated).
+   * @param cancelledByUserId - The user ID of whoever cancelled (optional)
+   * @param cancelledByName - Display name of whoever cancelled (optional)
    */
-  async cancelAndRestore(id: string): Promise<Rental> {
+  async cancelAndRestore(id: string, cancelledByUserId?: string, cancelledByName?: string): Promise<Rental> {
     const rental = await this.findById(id);
     if (!rental) throw new Error("Pedido não encontrado");
 
@@ -361,7 +365,18 @@ export const RentalModel = {
       }
     }
 
-    // Update rental status
-    return this.updateStatus(id, "cancelled");
+    // Update rental status with cancellation info
+    const cancelExtras: any = {};
+    if (cancelledByUserId) cancelExtras.cancelled_by = cancelledByUserId;
+    if (cancelledByName) cancelExtras.cancelled_by_name = cancelledByName;
+
+    const { data, error } = await supabaseAdmin
+      .from("rentals")
+      .update({ status: "cancelled", ...cancelExtras })
+      .eq("id", id)
+      .select(SELECT_FIELDS)
+      .single();
+    if (error) throw new Error(error.message);
+    return data as Rental;
   },
 };

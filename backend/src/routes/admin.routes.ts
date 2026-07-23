@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { CompanyModel } from "../models/company.model";
 import { RentalModel } from "../models/rental.model";
 import { verifySupabaseToken, verifyOwner } from "../middlewares/auth.middleware";
+import { supabaseAdmin } from "../config/supabase";
 
 const router = Router();
 
@@ -50,8 +51,20 @@ router.get("/companies/:companyId/rentals", async (req: Request, res: Response, 
 router.post("/companies/:companyId/rentals/:rentalId/cancel", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { rentalId } = req.params;
-    // Delegate entirely to cancelAndRestore which handles stock restoration correctly
-    const updated = await RentalModel.cancelAndRestore(rentalId);
+    const adminUserId = (req as any).userId as string;
+
+    // Fetch admin name for cancellation tracking
+    const { data: adminUser } = await supabaseAdmin
+      .from("users")
+      .select("name")
+      .eq("id", adminUserId)
+      .single();
+
+    const updated = await RentalModel.cancelAndRestore(
+      rentalId,
+      adminUserId,
+      `Admin: ${adminUser?.name || "Administrador"}`
+    );
     res.json({ data: updated });
   } catch (err) {
     next(err);

@@ -22,7 +22,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
   active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
-  return_expired: "Devolução (Expirou)",
+  return_expired: "Tempo expirado, entregador a caminho",
 };
 
 const STATUS_VARIANT: Record<RentalStatus, "info" | "warning" | "primary" | "error" | "success" | "muted"> = {

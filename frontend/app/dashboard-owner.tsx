@@ -34,7 +34,7 @@ const ADMIN_STATUS_LABEL: Record<string, string> = {
   active: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",
-  return_expired: "Devolução (Expirou)",
+  return_expired: "Tempo expirado, entregador a caminho",
 };
 
 const ADMIN_STATUS_COLOR: Record<string, string> = {
@@ -525,10 +525,17 @@ export default function DashboardOwnerScreen() {
                               {ADMIN_STATUS_LABEL[item.status] || item.status}
                             </Text>
                           </View>
-                          {/* Cancel button — replaces the early-delivery slot, sits where that action would be */}
+                          {/* Show who cancelled for cancelled orders */}
+                          {item.status === "cancelled" && item.cancelledByName ? (
+                            <Text style={{ fontSize: 10, color: colors.muted, fontStyle: "italic" }} numberOfLines={1}>
+                              Por: {item.cancelledByName}
+                            </Text>
+                          ) : null}
+                          {/* Cancel button — uses stopPropagation to prevent parent card navigation */}
                           {item.status !== "cancelled" && item.status !== "completed" ? (
                             <Pressable
-                              onPress={() => {
+                              onPress={(e) => {
+                                e.stopPropagation();
                                 cancelTappedRef.current = true;
                                 handleCancelRental(item.id);
                               }}

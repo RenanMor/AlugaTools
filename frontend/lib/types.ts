@@ -107,6 +107,8 @@ export interface Rental {
   receiverName?: string;
   receiverCpf?: string;
   delivererName?: string;
+  cancelledBy?: string;
+  cancelledByName?: string;
 }
 
 export interface SessionUser {

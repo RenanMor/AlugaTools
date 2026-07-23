@@ -269,7 +269,18 @@ export const RentalController = {
         return res.status(403).json({ error: "Não autorizado" });
       }
 
-      const updatedRental = await RentalModel.cancelAndRestore(id);
+      // Fetch user name for cancellation tracking
+      const { data: cancelUser } = await supabaseAdmin
+        .from("users")
+        .select("name")
+        .eq("id", customerId)
+        .single();
+
+      const updatedRental = await RentalModel.cancelAndRestore(
+        id,
+        customerId,
+        cancelUser?.name || "Cliente"
+      );
       res.json({ data: updatedRental });
     } catch (err) {
       next(err);

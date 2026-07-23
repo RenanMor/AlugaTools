@@ -160,7 +160,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Notify company/deliverer of return_expired and near-expiry rentals
       if (user.profile === "company" || user.profile === "deliverer") {
         const now = Date.now();
-        const twoHoursMs = 2 * 60 * 60 * 1000;
+        const oneHourMs = 1 * 60 * 60 * 1000;
 
         const returnExpired = list.filter((r) => r.status === "return_expired");
         const nearExpiry = list.filter((r) => {
@@ -168,20 +168,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (!r.deliveredAt) return false;
           const expiresAt = r.deliveredAt + r.days * 24 * 60 * 60 * 1000;
           const timeLeft = expiresAt - now;
-          return timeLeft > 0 && timeLeft <= twoHoursMs;
+          return timeLeft > 0 && timeLeft <= oneHourMs;
         });
 
         if (returnExpired.length > 0) {
           const names = returnExpired.map((r) => r.toolName).join(", ");
           Alert.alert(
-            "⚠️ Pedidos para Devolução",
-            `${returnExpired.length} pedido(s) aguardando devolução: ${names}. Por favor, confirme o recebimento.`
+            "⚠️ Pedidos para Devolução",
+            `${returnExpired.length} pedido(s) aguardando devolução: ${names}. Por favor, confirme o recebimento.`
           );
         } else if (nearExpiry.length > 0) {
           const names = nearExpiry.map((r) => r.toolName).join(", ");
           Alert.alert(
-            "⏰ Aluguéis próximos de expirar",
-            `${nearExpiry.length} aluguel(is) expira(m) em menos de 2 horas: ${names}.`
+            "⏰ Aluguéis próximos de expirar",
+            `${nearExpiry.length} aluguel(is) expira(m) em menos de 1 hora: ${names}.`
           );
         }
       }

@@ -368,7 +368,7 @@ const STATUS_LABEL_BACK: Record<string, string> = {
   active: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",
-  return_expired: "Devolução (Expirou)",
+  return_expired: "Tempo expirado, entregador a caminho",
 };
 
 const STATUS_COLOR_BACK: Record<string, string> = {

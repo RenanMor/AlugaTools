@@ -31,6 +31,8 @@ export function mapRental(data: any): Rental {
     receiverName: data.receiver_name || undefined,
     receiverCpf: data.receiver_cpf || undefined,
     delivererName: data.deliverer?.name || undefined,
+    cancelledBy: data.cancelled_by || undefined,
+    cancelledByName: data.cancelled_by_name || undefined,
   };
 }
 

@@ -22,6 +22,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Rental, RentalStatus } from "@/lib/types";
 import { cancelRental, getRentalById, payRental } from "@/lib/api/rentals";
+import { cancelCompanyRental } from "@/lib/api/admin";
 import { RentalTimer } from "@/components/rental-timer";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
@@ -34,7 +35,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
   active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
-  return_expired: "Devolução (Expirou)",
+  return_expired: "Tempo expirado, entregador a caminho",
 };
 
 const STATUS_COLOR: Record<RentalStatus, string> = {
@@ -111,6 +112,7 @@ export default function OrderDetailsScreen() {
 
   const isDeliverer = user?.profile === "deliverer";
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
+  const isOwner = !!user?.isOwner;
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
 
   // CPF validation helper: checks digit verification algorithm
@@ -192,7 +194,12 @@ export default function OrderDetailsScreen() {
         onPress: async () => {
           setIsCancelling(true);
           try {
-            await cancelRental(rental!.id);
+            if (isOwner && rental) {
+              // Owner uses admin cancel endpoint
+              await cancelCompanyRental(rental.companyId, rental.id);
+            } else {
+              await cancelRental(rental!.id);
+            }
             await Promise.all([refreshRentals(), refreshCatalog()]);
             await fetchOrder();
             Alert.alert("Sucesso", "Reserva cancelada com sucesso!");
@@ -323,6 +330,11 @@ export default function OrderDetailsScreen() {
           <Text style={{ fontSize: 12, color: colors.muted }}>
             Realizado em: {new Date(rental.createdAt).toLocaleString("pt-BR")}
           </Text>
+          {rental.status === "cancelled" && rental.cancelledByName ? (
+            <Text style={{ fontSize: 12, color: colors.muted, fontStyle: "italic" }}>
+              Cancelado por: {rental.cancelledByName}
+            </Text>
+          ) : null}
         </View>
 
         {/* Timer de uso do aluguel */}
@@ -559,8 +571,8 @@ export default function OrderDetailsScreen() {
               </Pressable>
             )}
 
-            {/* Customer Actions: Entregar Antecipadamente */}
-            {!isDeliverer && !isCompany && (rental.status === "delivered" || rental.status === "active") && (
+            {/* Customer Actions: Entregar Antecipadamente (not for owner or company) */}
+            {!isDeliverer && !isCompany && !isOwner && (rental.status === "delivered" || rental.status === "active") && (
               <Pressable
                 onPress={() => handleUpdateStatus("accepted")}
                 style={({ pressed }) => [
@@ -568,6 +580,22 @@ export default function OrderDetailsScreen() {
                 ]}
               >
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Entregar antecipadamente</Text>
+              </Pressable>
+            )}
+
+            {/* Owner Actions: Cancelar Pedido */}
+            {isOwner && rental.status !== "cancelled" && rental.status !== "completed" && (
+              <Pressable
+                onPress={handleManualCancel}
+                disabled={isCancelling}
+                style={({ pressed }) => [
+                  { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: isCancelling ? 0.5 : pressed ? 0.85 : 1 },
+                ]}
+              >
+                {isCancelling
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Cancelar Pedido</Text>
+                }
               </Pressable>
             )}
 
@@ -605,7 +633,7 @@ export default function OrderDetailsScreen() {
               </View>
             )}
 
-            {/* Deliverer: Receber Devolução (non-pickup only) */}
+            {/* Deliverer: Confirmar Devolução (non-pickup only) */}
             {!isPickup && isDeliverer && rental.status === "return_expired" && (
               <Pressable
                 onPress={() => {
@@ -617,7 +645,7 @@ export default function OrderDetailsScreen() {
                   { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}
               >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Receber Devolução</Text>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar Devolução</Text>
               </Pressable>
             )}
 
