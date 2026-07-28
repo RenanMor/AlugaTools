@@ -14,14 +14,8 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   };
 
   const sessionToken = await Auth.getSessionToken();
-  console.log("[API] apiCall:", {
-    endpoint,
-    hasToken: !!sessionToken,
-    method: options.method || "GET",
-  });
   if (sessionToken) {
     headers["Authorization"] = `Bearer ${sessionToken}`;
-    console.log("[API] Authorization header added");
   }
 
   const baseUrl = getApiBaseUrl();
@@ -38,22 +32,11 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   console.log("[API] Full URL:", url);
 
   try {
-    console.log("[API] Making request...");
     const response = await fetch(url, {
       ...options,
       headers,
       credentials: "include",
     });
-
-    console.log("[API] Response status:", response.status, response.statusText);
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-    console.log("[API] Response headers:", responseHeaders);
-
-    // Check if Set-Cookie header is present (cookies are automatically handled in React Native)
-    const setCookie = response.headers.get("Set-Cookie");
-    if (setCookie) {
-      console.log("[API] Set-Cookie header received:", setCookie);
-    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -71,12 +54,10 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       const data = await response.json();
-      console.log("[API] JSON response received");
       return data as T;
     }
 
     const text = await response.text();
-    console.log("[API] Text response received");
     return (text ? JSON.parse(text) : {}) as T;
   } catch (error) {
     console.error("[API] Request failed:", error);

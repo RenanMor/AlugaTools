@@ -18,12 +18,46 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
       }
     }
 
+    // SECURITY FIX (MED-01): Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Formato de e-mail inválido" });
+    }
+
+    // SECURITY FIX (MED-01): Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres" });
+    }
+
+    // SECURITY FIX (MED-01): Sanitize name — strip HTML tags to prevent stored XSS
+    const sanitizedName = name.replace(/<[^>]*>/g, "").trim();
+    if (!sanitizedName || sanitizedName.length < 2) {
+      return res.status(400).json({ error: "Nome deve ter pelo menos 2 caracteres" });
+    }
+    if (sanitizedName.length > 100) {
+      return res.status(400).json({ error: "Nome não pode ter mais de 100 caracteres" });
+    }
+
+    // SECURITY FIX (MED-01): Validate CPF/CNPJ format
+    if (cpf) {
+      const cleanCpf = cpf.replace(/\D/g, "");
+      if (cleanCpf.length !== 11) {
+        return res.status(400).json({ error: "CPF deve ter 11 dígitos" });
+      }
+    }
+    if (cnpj) {
+      const cleanCnpj = cnpj.replace(/\D/g, "");
+      if (cleanCnpj.length !== 14) {
+        return res.status(400).json({ error: "CNPJ deve ter 14 dígitos" });
+      }
+    }
+
     // 1. Create user in Supabase Auth (confirmed immediately using admin key)
     const { data: userData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { name, profile, cpf: cpf || null, cnpj: cnpj || null, phone, role: "user" },
+      user_metadata: { name: sanitizedName, profile, cpf: cpf || null, cnpj: cnpj || null, phone, role: "user" },
     });
 
     if (authError || !userData.user) {
@@ -35,7 +69,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
       .from("users")
       .insert({
         id: userData.user.id,
-        name,
+        name: sanitizedName,
         email,
         profile,
         cpf: cpf ? cpf.replace(/\D/g, "") : null,
@@ -112,7 +146,16 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-router.post("/signin", async (req: Request, res: Response, next: NextFunction) => {
+// SECURITY FIX (HIGH-01b): Dedicated rate limiter for signin to prevent brute-force
+const signinLimiter = rateLimit({
+  windowMs: 60000, // 1 minute
+  max: 5, // max 5 signin attempts per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas tentativas de login. Tente novamente em 1 minuto." },
+});
+
+router.post("/signin", signinLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, cpf, cnpj, password, profile } = req.body;
     // Sensitive payload logging removed for security
@@ -153,8 +196,10 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
       // Search result logging removed for security
 
       if (!dbUser) {
+        // SECURITY FIX (HIGH-01): Use generic message to prevent CPF/CNPJ enumeration.
+        // Do NOT reveal whether the document exists or not.
         return res.status(401).json({ 
-          error: "Documento não encontrado. Verifique o CPF/CNPJ digitado." 
+          error: "Credenciais inválidas. Verifique seus dados e tente novamente." 
         });
       }
 
@@ -176,7 +221,8 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
     });
 
     if (authError || !sessionData.session) {
-      return res.status(401).json({ error: "Senha incorreta ou credenciais inválidas" });
+      // SECURITY FIX (HIGH-01): Same generic message as document-not-found
+      return res.status(401).json({ error: "Credenciais inválidas. Verifique seus dados e tente novamente." });
     }
 
     // 2. Fetch public user profile

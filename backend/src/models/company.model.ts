@@ -24,8 +24,9 @@ export const CompanyModel = {
       .order("rating", { ascending: false })
       .limit(limit);
     if (error) throw new Error(error.message);
+    // SECURITY FIX (LOW-01): Never expose non-approved companies as fallback
     const approved = (data || []).filter((c) => !c.status || c.status === "approved");
-    return (approved.length > 0 ? approved : data || []) as Company[];
+    return approved as Company[];
   },
 
   async findById(id: string): Promise<Company | null> {
@@ -44,8 +45,9 @@ export const CompanyModel = {
       .select("*")
       .eq("category_id", categoryId);
     if (error) throw new Error(error.message);
+    // SECURITY FIX (LOW-01): Never expose non-approved companies as fallback
     const approved = (data || []).filter((c) => !c.status || c.status === "approved");
-    return (approved.length > 0 ? approved : data || []) as Company[];
+    return approved as Company[];
   },
 
   async findPending(): Promise<Company[]> {

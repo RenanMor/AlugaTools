@@ -42,6 +42,71 @@ async function getToolColumns(): Promise<string[]> {
   return ["id", "company_id", "name", "description", "category_id", "image", "price_per_day", "available", "quantity", "min_days", "max_days"];
 }
 
+// SECURITY FIX (HIGH-04): SSRF Protection — allowlist of trusted image hosting domains
+const ALLOWED_IMAGE_DOMAINS = [
+  "imgur.com", "i.imgur.com",
+  "unsplash.com", "images.unsplash.com",
+  "cloudinary.com", "res.cloudinary.com",
+  "firebasestorage.googleapis.com",
+  "supabase.co", "supabase.com",
+  "gravatar.com",
+  "picsum.photos",
+  "pexels.com", "images.pexels.com",
+  "pixabay.com",
+];
+
+/**
+ * SECURITY FIX (HIGH-04): Check if a URL's hostname is in the allowlist.
+ * Blocks private/reserved IPs and only allows trusted image domains.
+ */
+function isUrlAllowed(urlString: string): boolean {
+  try {
+    const parsed = new URL(urlString);
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block private/reserved IP ranges (SSRF protection)
+    const privatePatterns = [
+      /^127\./,                          // Loopback
+      /^10\./,                           // Class A private
+      /^172\.(1[6-9]|2\d|3[01])\./,     // Class B private
+      /^192\.168\./,                     // Class C private
+      /^169\.254\./,                     // Link-local (AWS metadata!)
+      /^0\./,                            // Current network
+      /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // Shared address space
+      /^::1$/,                           // IPv6 loopback
+      /^fc00:/i, /^fd00:/i,             // IPv6 private
+      /^fe80:/i,                         // IPv6 link-local
+    ];
+    if (privatePatterns.some(p => p.test(hostname))) {
+      console.warn(`[Security] SSRF blocked: private/reserved IP "${hostname}"`);
+      return false;
+    }
+
+    // Block localhost variants
+    if (hostname === "localhost" || hostname === "0.0.0.0" || hostname === "[::1]") {
+      console.warn(`[Security] SSRF blocked: localhost "${hostname}"`);
+      return false;
+    }
+
+    // Only allow HTTPS (no HTTP fetches from server)
+    if (parsed.protocol !== "https:") {
+      console.warn(`[Security] SSRF blocked: non-HTTPS protocol "${parsed.protocol}"`);
+      return false;
+    }
+
+    // Check domain allowlist
+    const isAllowed = ALLOWED_IMAGE_DOMAINS.some(domain => 
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+    if (!isAllowed) {
+      console.warn(`[Security] SSRF blocked: domain "${hostname}" not in allowlist`);
+    }
+    return isAllowed;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveImageUrl(url: string): Promise<string> {
   if (!url) return url;
   
@@ -50,60 +115,75 @@ async function resolveImageUrl(url: string): Promise<string> {
     cleanUrl = `https://${cleanUrl}`;
   }
 
-  // If already a direct image link, return it
+  // If already a direct image link, return it (no fetch needed)
   const isDirectImage = /\.(png|jpe?g|gif|webp|svg)(?:\?.*)?$/i.test(cleanUrl);
   if (isDirectImage) {
     return cleanUrl;
   }
 
-  // Special resolver for Imgur pages and albums using fetch and parsing meta og:image
-  if (/imgur\.com/i.test(cleanUrl)) {
-    try {
-      const response = await fetch(cleanUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-      });
-      if (response.ok) {
-        const html = await response.text();
-        const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || 
-                            html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-        if (ogImageMatch && ogImageMatch[1]) {
-          let ogUrl = ogImageMatch[1];
-          ogUrl = ogUrl.replace(/\?fb$/, ""); // remove Facebook tracker
-          return ogUrl;
-        }
-
-        const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) || 
-                                  html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
-        if (twitterImageMatch && twitterImageMatch[1]) {
-          return twitterImageMatch[1];
-        }
-      }
-    } catch (err) {
-      console.error("[resolveImageUrl] Error fetching Imgur URL:", err);
-    }
+  // SECURITY FIX (HIGH-04): Only fetch URLs from allowed domains
+  if (!isUrlAllowed(cleanUrl)) {
+    return cleanUrl; // Return as-is without fetching
   }
 
-  // General resolver for other webpages
-  if (/^https?:\/\//i.test(cleanUrl)) {
-    try {
-      const response = await fetch(cleanUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  // Fetch with timeout to prevent slow-loris attacks
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
+  try {
+    // Special resolver for Imgur pages and albums using fetch and parsing meta og:image
+    if (/imgur\.com/i.test(cleanUrl)) {
+      try {
+        const response = await fetch(cleanUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          },
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const html = await response.text();
+          const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || 
+                              html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+          if (ogImageMatch && ogImageMatch[1]) {
+            let ogUrl = ogImageMatch[1];
+            ogUrl = ogUrl.replace(/\?fb$/, ""); // remove Facebook tracker
+            return ogUrl;
+          }
+
+          const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) || 
+                                    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
+          if (twitterImageMatch && twitterImageMatch[1]) {
+            return twitterImageMatch[1];
+          }
         }
-      });
-      if (response.ok) {
-        const html = await response.text();
-        const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || 
-                            html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-        if (ogImageMatch && ogImageMatch[1]) {
-          return ogImageMatch[1];
-        }
+      } catch (err) {
+        console.error("[resolveImageUrl] Error fetching Imgur URL:", err);
       }
-    } catch (err) {
-      console.error("[resolveImageUrl] Error resolving general URL:", err);
     }
+
+    // General resolver for other allowed webpages
+    if (/^https?:\/\//i.test(cleanUrl)) {
+      try {
+        const response = await fetch(cleanUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          },
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const html = await response.text();
+          const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || 
+                              html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+          if (ogImageMatch && ogImageMatch[1]) {
+            return ogImageMatch[1];
+          }
+        }
+      } catch (err) {
+        console.error("[resolveImageUrl] Error resolving general URL:", err);
+      }
+    }
+  } finally {
+    clearTimeout(timeout);
   }
 
   return cleanUrl;

@@ -51,9 +51,24 @@ export const RentalController = {
       // Calculate price server-side (never trust client-provided price)
       const toolPrice = Number(tool.price_per_day) || 0;
       const safeShipping = Math.max(0, Number(shipping_price) || 0);
-      const safeDiscount = Math.max(0, Number(coupon_discount) || 0);
+
+      // SECURITY FIX (CRIT-01): Never trust coupon_discount from client.
+      // Coupons must be validated server-side against a coupons table.
+      // Until coupon validation is implemented, discount is always 0.
+      // TODO: Implement coupon validation: lookup coupon_code in DB,
+      //       verify expiry/usage limits, compute discount server-side.
+      const safeDiscount = 0;
+      if (coupon_code) {
+        console.warn(`[Security] Coupon code "${coupon_code}" provided but server-side validation not yet implemented. Discount forced to 0.`);
+      }
+
       const subtotal = toolPrice * safeDays;
       const calculatedTotal = Math.max(0, subtotal + safeShipping - safeDiscount);
+
+      // SECURITY FIX (MED-05): Reject orders with zero total to prevent inventory drain
+      if (calculatedTotal <= 0) {
+        return res.status(400).json({ error: "O valor total do pedido deve ser maior que zero" });
+      }
 
       // Set expiration to 30 minutes from now
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -373,6 +388,35 @@ export const RentalController = {
       const rental = await RentalModel.findById(req.params.id);
       if (!rental) {
         return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // SECURITY FIX (CRIT-04): Enforce valid status transitions via state machine
+      const allowedTransitions: Record<string, string[]> = {
+        awaiting_payment: ["pending", "cancelled"],
+        pending:          ["accepted", "rejected", "cancelled"],
+        accepted:         ["delivering", "delivered", "cancelled"],  // "delivered" for pickup orders
+        rejected:         [],  // Terminal state — no further transitions allowed
+        delivering:       ["delivered", "cancelled"],
+        delivered:        ["active", "cancelled"],
+        active:           ["completed", "return_expired"],
+        completed:        [],  // Terminal state
+        cancelled:        [],  // Terminal state
+        return_expired:   ["completed"],  // Can only be resolved by completing
+      };
+
+      const currentStatus = rental.status;
+      const allowed = allowedTransitions[currentStatus] || [];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({
+          error: `Transição de status inválida: "${currentStatus}" → "${status}". Transições permitidas: ${allowed.length > 0 ? allowed.join(", ") : "nenhuma (status terminal)"}`,
+        });
+      }
+
+      // SECURITY FIX (HIGH-03): Require delivery proof for "delivered" status
+      if (status === "delivered") {
+        if (!receiver_name || !receiver_name.trim()) {
+          return res.status(400).json({ error: "Nome do recebedor é obrigatório para confirmar a entrega" });
+        }
       }
 
       // Check if user is company owner
