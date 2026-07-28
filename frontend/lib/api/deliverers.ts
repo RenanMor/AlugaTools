@@ -33,7 +33,7 @@ export async function createDeliverer(deliverer: {
       name: deliverer.name,
       email: deliverer.email,
       phone: deliverer.phone,
-      password: deliverer.password || "123456",
+      password: deliverer.password,
     }),
   });
   return mapDeliverer(response.data);

@@ -97,29 +97,41 @@ async function enrichRentals(rentals: any | any[]): Promise<any> {
 
 export const RentalModel = {
   async create(rental: CreateRentalInput): Promise<Rental> {
-    // 1. Decrement tool quantity in database (reserve stock)
+    // 1. Atomically decrement tool quantity (prevents race condition)
+    // Uses optimistic locking: read quantity, then conditional update only if unchanged
     const { data: toolData, error: toolFetchError } = await supabaseAdmin
       .from("tools")
       .select("quantity, available")
       .eq("id", rental.tool_id)
       .single();
 
-    if (toolFetchError) {
+    if (toolFetchError || !toolData) {
       console.error("[RentalModel.create] Tool fetch error:", toolFetchError);
       throw new Error("Ferramenta não encontrada");
     }
 
-    if (!toolData || (toolData.quantity || 0) <= 0) {
+    if ((toolData.quantity || 0) <= 0) {
       throw new Error("Ferramenta sem estoque disponível");
     }
 
     const originalQuantity = toolData.quantity || 1;
     const newQuantity = Math.max(0, originalQuantity - 1);
     const isAvailable = newQuantity > 0;
-    await supabaseAdmin
+
+    // Atomic conditional update: only update if quantity still matches what we read
+    // This prevents two concurrent requests from both succeeding
+    const { data: stockUpdate, error: stockUpdateError, count: stockCount } = await supabaseAdmin
       .from("tools")
       .update({ quantity: newQuantity, available: isAvailable })
-      .eq("id", rental.tool_id);
+      .eq("id", rental.tool_id)
+      .eq("quantity", originalQuantity) // Optimistic lock: only update if quantity hasn't changed
+      .select("quantity")
+      .single();
+
+    if (stockUpdateError || !stockUpdate) {
+      // Another request modified the stock between our read and write
+      throw new Error("Estoque foi modificado por outra operação. Tente novamente.");
+    }
 
     // 2. Create the rental record
     const insertData: any = {
@@ -139,7 +151,7 @@ export const RentalModel = {
       customer_note: rental.customer_note || null,
     };
 
-    console.log("[RentalModel.create] Inserting rental:", JSON.stringify(insertData));
+
 
     const { data, error } = await supabaseAdmin
       .from("rentals")

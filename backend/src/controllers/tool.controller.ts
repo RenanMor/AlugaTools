@@ -2,6 +2,38 @@ import { Request, Response, NextFunction } from "express";
 import { ToolModel } from "../models/tool.model";
 import { supabaseAdmin } from "../config/supabase";
 
+/**
+ * Helper: verify that the authenticated user owns the company that owns the tool.
+ * Returns true if authorized, false otherwise.
+ */
+async function verifyToolOwnership(userId: string, toolId: string): Promise<boolean> {
+  const tool = await ToolModel.findById(toolId);
+  if (!tool) return false;
+
+  const { data: company } = await supabaseAdmin
+    .from("companies")
+    .select("id")
+    .eq("id", tool.company_id)
+    .eq("owner_id", userId)
+    .maybeSingle();
+
+  return !!company;
+}
+
+/**
+ * Helper: verify that the authenticated user owns a given company.
+ */
+async function verifyCompanyOwnership(userId: string, companyId: string): Promise<boolean> {
+  const { data: company } = await supabaseAdmin
+    .from("companies")
+    .select("id")
+    .eq("id", companyId)
+    .eq("owner_id", userId)
+    .maybeSingle();
+
+  return !!company;
+}
+
 export const ToolController = {
   async listAll(_req: Request, res: Response, next: NextFunction) {
     try {
@@ -33,9 +65,15 @@ export const ToolController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log("[ToolController] create body:", req.body);
+      const userId = (req as any).userId as string;
+      const { company_id } = req.body;
+
+      // Security: verify user owns this company
+      if (!company_id || !(await verifyCompanyOwnership(userId, company_id))) {
+        return res.status(403).json({ error: "Não autorizado: você não é dono desta empresa" });
+      }
+
       const tool = await ToolModel.create(req.body);
-      console.log("[ToolController] create success:", tool);
       res.status(201).json({ data: tool });
     } catch (err) {
       console.error("[ToolController] create error:", err);
@@ -45,6 +83,13 @@ export const ToolController = {
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
+      const userId = (req as any).userId as string;
+
+      // Security: verify user owns the company that owns this tool
+      if (!(await verifyToolOwnership(userId, req.params.id))) {
+        return res.status(403).json({ error: "Não autorizado: você não é dono desta ferramenta" });
+      }
+
       const tool = await ToolModel.update(req.params.id, req.body);
       res.json({ data: tool });
     } catch (err) {
@@ -54,6 +99,13 @@ export const ToolController = {
 
   async remove(req: Request, res: Response, next: NextFunction) {
     try {
+      const userId = (req as any).userId as string;
+
+      // Security: verify user owns the company that owns this tool
+      if (!(await verifyToolOwnership(userId, req.params.id))) {
+        return res.status(403).json({ error: "Não autorizado: você não é dono desta ferramenta" });
+      }
+
       await ToolModel.remove(req.params.id);
       res.status(204).send();
     } catch (err) {

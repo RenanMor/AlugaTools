@@ -6,7 +6,7 @@ const router = Router();
 
 router.post("/signup", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, profile, cpf, cnpj, phone, role, state, city } = req.body;
+    const { email, password, name, profile, cpf, cnpj, phone, state, city } = req.body;
 
     if (profile === "company") {
       if (!email || !password || !name || !cnpj || !phone) {
@@ -23,7 +23,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
       email,
       password,
       email_confirm: true,
-      user_metadata: { name, profile, cpf: cpf || null, cnpj: cnpj || null, phone, role: role || "user" },
+      user_metadata: { name, profile, cpf: cpf || null, cnpj: cnpj || null, phone, role: "user" },
     });
 
     if (authError || !userData.user) {
@@ -41,8 +41,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
         cpf: cpf ? cpf.replace(/\D/g, "") : null,
         cnpj: cnpj ? cnpj.replace(/\D/g, "") : null,
         phone,
-        password,
-        role: role || "user",
+        role: "user",
       });
 
     if (dbError) {
@@ -91,7 +90,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
           name,
           email,
           profile,
-          role: role || "user",
+          role: "user",
           companyId,
         }
       });
@@ -104,7 +103,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
         name,
         email,
         profile,
-        role: role || "user",
+        role: "user",
         companyId,
       }
     });
@@ -116,7 +115,7 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
 router.post("/signin", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, cpf, cnpj, password, profile } = req.body;
-    console.log("[Backend Auth] Incoming signin payload:", { email, cpf, cnpj, profile });
+    // Sensitive payload logging removed for security
 
     if (!password) {
       return res.status(400).json({ error: "Senha é obrigatória" });
@@ -126,7 +125,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
 
     if (cpf || cnpj) {
       const cleanDoc = (cpf || cnpj)!.replace(/\D/g, "");
-      console.log("[Auth] Searching for document:", cleanDoc);
+      // Document search logging removed for security
 
       // Query direta pelo campo — evita varredura total da tabela (sujeita a RLS)
       let dbUser: { email: string; profile: string } | null = null;
@@ -151,7 +150,7 @@ router.post("/signin", async (req: Request, res: Response, next: NextFunction) =
         dbUser = data;
       }
 
-      console.log("[Auth] Search result:", dbUser);
+      // Search result logging removed for security
 
       if (!dbUser) {
         return res.status(401).json({ 
@@ -306,7 +305,18 @@ function backendValidateCPF(cpf: string): boolean {
 const firstNames = ["Renan", "Ana", "Carlos", "Maria", "João", "Juliana", "Marcos", "Patrícia", "Lucas", "Sandra"];
 const lastNames = ["Morais", "Silva", "Santos", "Souza", "Oliveira", "Pereira", "Lima", "Costa", "Rodrigues", "Almeida"];
 
-router.get("/cpf-lookup/:cpf", async (req: Request, res: Response) => {
+import rateLimit from "express-rate-limit";
+
+// Rate limiter specific to CPF lookup to prevent brute-force enumeration
+const cpfLookupLimiter = rateLimit({
+  windowMs: 60000, // 1 minute
+  max: 10, // max 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas consultas de CPF. Tente novamente em 1 minuto." },
+});
+
+router.get("/cpf-lookup/:cpf", verifySupabaseToken, cpfLookupLimiter, async (req: Request, res: Response) => {
   const { cpf } = req.params;
   const cleanCpf = cpf.replace(/\D/g, "");
 

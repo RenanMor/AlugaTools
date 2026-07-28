@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { RentalModel } from "../models/rental.model";
 import { CompanyModel } from "../models/company.model";
 import { DelivererModel } from "../models/deliverer.model";
+import { ToolModel } from "../models/tool.model";
 import { supabaseAdmin } from "../config/supabase";
 import {
   createPagBankOrder,
@@ -18,7 +19,6 @@ export const RentalController = {
         tool_id,
         company_id,
         days,
-        total_price,
         address,
         shipping_price,
         payment_method,
@@ -27,6 +27,34 @@ export const RentalController = {
       } = req.body;
       const customerId = (req as any).userId as string;
 
+      // Security: Recalculate total_price server-side
+      const tool = await ToolModel.findById(tool_id);
+      if (!tool) {
+        return res.status(404).json({ error: "Ferramenta não encontrada" });
+      }
+
+      // Validate days within tool limits
+      const minDays = tool.min_days || 1;
+      const maxDays = tool.max_days || 30;
+      const safeDays = Number(days) || 1;
+      if (safeDays < minDays || safeDays > maxDays) {
+        return res.status(400).json({
+          error: `Quantidade de dias deve ser entre ${minDays} e ${maxDays}`,
+        });
+      }
+
+      // Validate company_id matches tool
+      if (tool.company_id !== company_id) {
+        return res.status(400).json({ error: "Ferramenta não pertence a esta empresa" });
+      }
+
+      // Calculate price server-side (never trust client-provided price)
+      const toolPrice = Number(tool.price_per_day) || 0;
+      const safeShipping = Math.max(0, Number(shipping_price) || 0);
+      const safeDiscount = Math.max(0, Number(coupon_discount) || 0);
+      const subtotal = toolPrice * safeDays;
+      const calculatedTotal = Math.max(0, subtotal + safeShipping - safeDiscount);
+
       // Set expiration to 30 minutes from now
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
@@ -34,14 +62,14 @@ export const RentalController = {
         tool_id,
         company_id,
         customer_id: customerId,
-        days,
-        total_price,
+        days: safeDays,
+        total_price: calculatedTotal,
         status: "awaiting_payment",
         payment_method,
-        shipping_price: Number(shipping_price) || 0,
+        shipping_price: safeShipping,
         address,
         coupon_code,
-        coupon_discount: Number(coupon_discount) || 0,
+        coupon_discount: safeDiscount,
         expires_at: expiresAt,
       });
 
@@ -299,7 +327,31 @@ export const RentalController = {
 
   async listByCompany(req: Request, res: Response, next: NextFunction) {
     try {
-      const rentals = await RentalModel.findByCompany(req.params.companyId);
+      const userId = (req as any).userId as string;
+      const { companyId } = req.params;
+
+      // Security: verify user is company owner, admin, or deliverer of this company
+      const { data: company } = await supabaseAdmin
+        .from("companies")
+        .select("id")
+        .eq("id", companyId)
+        .eq("owner_id", userId)
+        .maybeSingle();
+
+      if (!company) {
+        // Check if admin
+        const { data: adminUser } = await supabaseAdmin
+          .from("users")
+          .select("is_owner")
+          .eq("id", userId)
+          .single();
+
+        if (!adminUser?.is_owner) {
+          return res.status(403).json({ error: "Não autorizado: acesso restrito ao dono da empresa" });
+        }
+      }
+
+      const rentals = await RentalModel.findByCompany(companyId);
       res.json({ data: rentals });
     } catch (err) {
       next(err);
@@ -310,15 +362,39 @@ export const RentalController = {
     try {
       const { status, receiver_name, receiver_cpf } = req.body;
       const userId = (req as any).userId as string;
-      
-      let delivererId: string | undefined = req.body.deliverer_id;
-      
-      // If the user updating is a deliverer, auto-assign their deliverer ID
-      if (userId) {
-        const deliverer = await DelivererModel.findByUserId(userId);
-        if (deliverer) {
-          delivererId = deliverer.id;
-        }
+
+      // Input validation: only allow valid status values
+      const validStatuses = ["pending", "accepted", "rejected", "delivering", "delivered", "active", "completed", "cancelled", "return_expired"];
+      if (!status || !validStatuses.includes(status)) {
+        return res.status(400).json({ error: `Status inválido. Valores permitidos: ${validStatuses.join(", ")}` });
+      }
+
+      // Security: verify user has permission to update this rental's status
+      const rental = await RentalModel.findById(req.params.id);
+      if (!rental) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Check if user is company owner
+      const { data: company } = await supabaseAdmin
+        .from("companies")
+        .select("id")
+        .eq("id", rental.company_id)
+        .eq("owner_id", userId)
+        .maybeSingle();
+
+      // Check if user is a deliverer for this company
+      let delivererId: string | undefined;
+      const deliverer = await DelivererModel.findByUserId(userId);
+      if (deliverer) {
+        delivererId = deliverer.id;
+      }
+
+      const isCompanyOwner = !!company;
+      const isCompanyDeliverer = deliverer && deliverer.company_id === rental.company_id;
+
+      if (!isCompanyOwner && !isCompanyDeliverer) {
+        return res.status(403).json({ error: "Não autorizado: apenas a empresa ou entregador podem atualizar o status" });
       }
 
       const extras: any = {};
@@ -326,8 +402,8 @@ export const RentalController = {
       if (receiver_name) extras.receiver_name = receiver_name;
       if (receiver_cpf) extras.receiver_cpf = receiver_cpf;
 
-      const rental = await RentalModel.updateStatus(req.params.id, status, extras);
-      res.json({ data: rental });
+      const updatedRental = await RentalModel.updateStatus(req.params.id, status, extras);
+      res.json({ data: updatedRental });
     } catch (err) {
       next(err);
     }
@@ -335,8 +411,28 @@ export const RentalController = {
 
   async rate(req: Request, res: Response, next: NextFunction) {
     try {
+      const userId = (req as any).userId as string;
       const { rating, comment } = req.body;
-      const rental = await RentalModel.setRating(req.params.id, rating, comment);
+
+      // Input validation
+      const numRating = Number(rating);
+      if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
+        return res.status(400).json({ error: "Avaliação deve ser um número inteiro entre 1 e 5" });
+      }
+
+      // Security: verify user is the customer who made this rental
+      const existingRental = await RentalModel.findById(req.params.id);
+      if (!existingRental) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+      if (existingRental.customer_id !== userId) {
+        return res.status(403).json({ error: "Não autorizado: apenas o cliente pode avaliar" });
+      }
+
+      // Sanitize comment (limit length)
+      const safeComment = comment ? String(comment).substring(0, 500) : undefined;
+
+      const rental = await RentalModel.setRating(req.params.id, numRating, safeComment);
       await CompanyModel.recalcRating(rental.company_id);
       res.json({ data: rental });
     } catch (err) {

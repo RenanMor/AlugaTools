@@ -285,7 +285,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
-            password: password || "123456",
+            password,
             name,
             profile,
             cpf: cpf ? cpf.replace(/\D/g, "") : undefined,
@@ -301,7 +301,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
-            password: password || "123456",
+            password,
             cpf: cpf ? cpf.replace(/\D/g, "") : undefined,
             cnpj: cnpj ? cnpj.replace(/\D/g, "") : undefined,
             profile,

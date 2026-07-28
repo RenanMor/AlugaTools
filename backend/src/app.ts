@@ -6,6 +6,7 @@ import routes from "./routes";
 import { apiRateLimiter } from "./middlewares/rateLimit.middleware";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 import { RentalModel } from "./models/rental.model";
+import { env } from "./config/env";
 
 export function createApp() {
   const app = express();
@@ -15,10 +16,33 @@ export function createApp() {
       crossOriginResourcePolicy: false, // Allows images to be fetched by frontend
     })
   );
+  // CORS: restrict to allowed origins
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  // Default allowed origins for development
+  const defaultOrigins = [
+    "http://localhost:8081",
+    "http://localhost:3000",
+    "http://localhost:4000",
+    "http://10.0.2.2:4000",
+  ];
+  if (env.nodeEnv === "production" && allowedOrigins.length === 0) {
+    console.warn("[Security] CORS_ALLOWED_ORIGINS not set in production. Only default origins will be allowed.");
+  }
+  const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+
   app.use(
     cors({
       origin: (origin, callback) => {
-        callback(null, true);
+        // Allow requests with no origin (mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
+        if (origins.includes(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
       },
       credentials: true,
     })
