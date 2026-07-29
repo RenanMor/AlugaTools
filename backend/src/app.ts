@@ -22,15 +22,16 @@ export function createApp() {
     .map((o) => o.trim())
     .filter(Boolean);
 
-  // Default allowed origins for development
+  // Default allowed origins for development and production
   const defaultOrigins = [
     "http://localhost:8081",
     "http://localhost:3000",
     "http://localhost:4000",
     "http://10.0.2.2:4000",
+    "https://aluga-tools.vercel.app",
   ];
   if (env.nodeEnv === "production" && allowedOrigins.length === 0) {
-    console.warn("[Security] CORS_ALLOWED_ORIGINS not set in production. Only default origins will be allowed.");
+    console.warn("[Security] CORS_ALLOWED_ORIGINS not set in production. Using default allowed origins.");
   }
   const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
 
@@ -39,7 +40,7 @@ export function createApp() {
       origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, Postman, curl)
         if (!origin) return callback(null, true);
-        if (origins.includes(origin)) {
+        if (origins.includes(origin) || origin.endsWith(".vercel.app")) {
           return callback(null, true);
         }
         return callback(new Error(`Origin ${origin} not allowed by CORS`));
