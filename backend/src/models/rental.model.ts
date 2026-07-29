@@ -178,16 +178,44 @@ export const RentalModel = {
     const cleanId = id.replace(/^(pedido#)/i, "").trim().toLowerCase();
     const isFullUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
 
-    let query = supabaseAdmin.from("rentals").select("*");
-    if (isFullUuid) {
-      query = query.eq("id", cleanId);
-    } else {
-      query = query.ilike("id", `${cleanId}%`);
-    }
+    try {
+      if (isFullUuid) {
+        const { data, error } = await supabaseAdmin
+          .from("rentals")
+          .select("*")
+          .eq("id", cleanId)
+          .maybeSingle();
+        if (!error && data) return (await enrichRentals(data)) as Rental;
+      }
 
-    const { data, error } = await query.maybeSingle();
-    if (error || !data) return null;
-    return (await enrichRentals(data)) as Rental;
+      // Try casting id::text for short 8-char ID prefix
+      const { data: filterData, error: filterErr } = await supabaseAdmin
+        .from("rentals")
+        .select("*")
+        .filter("id::text", "ilike", `${cleanId}%`)
+        .maybeSingle();
+
+      if (!filterErr && filterData) {
+        return (await enrichRentals(filterData)) as Rental;
+      }
+
+      // Fallback search matching cleanId prefix
+      const { data: list } = await supabaseAdmin
+        .from("rentals")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      const matched = (list || []).find((r) => r.id.replace(/-/g, "").toLowerCase().startsWith(cleanId));
+      if (matched) {
+        return (await enrichRentals(matched)) as Rental;
+      }
+
+      return null;
+    } catch (err) {
+      console.error("[RentalModel.findById] Error finding rental by id:", id, err);
+      return null;
+    }
   },
 
   async findByCustomer(customerId: string): Promise<Rental[]> {

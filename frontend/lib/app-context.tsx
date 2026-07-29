@@ -273,6 +273,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isRegister?: boolean,
     cpf?: string,
     phone?: string,
+    cnpj?: string,
     state?: string,
     city?: string,
     companyName?: string
