@@ -426,18 +426,16 @@ function RequestCard({ rental }: { rental: Rental }) {
       {/* Tool info row */}
       <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
         <Image source={{ uri: rental.toolImage }} style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: colors.border }} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-              {rental.toolName}
-            </Text>
-            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 0.5, borderColor: colors.primary + "33" }}>
-              <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary }}>{formatOrderId(rental.id)}</Text>
-            </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <View style={{ alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 0.5, borderColor: colors.primary + "33" }}>
+            <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary }}>{formatOrderId(rental.id)}</Text>
           </View>
+          <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+            {rental.toolName}
+          </Text>
           <Text style={{ fontSize: 12, color: colors.muted }}>Cliente: {rental.customerName}</Text>
           <Text style={{ fontSize: 13, fontWeight: "700", color: colors.success }}>
-            R$ {rental.totalPrice.toFixed(2)} · {rental.days}d
+            {rental.days}d · R$ {rental.totalPrice.toFixed(2)}
           </Text>
         </View>
       </View>

@@ -3,8 +3,8 @@ import { Company } from "../types";
 
 export function mapCompany(data: any): Company {
   const cleanName = (data.name || "")
-    .replace(/^Locações\s+/i, "")
-    .replace(/\s+Locações$/i, "");
+    .replace(/^ \s+/i, "")
+    .replace(/\s+ $/i, "");
 
   return {
     id: data.id,

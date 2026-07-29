@@ -13,7 +13,7 @@ router.put("/:id", verifySupabaseToken, async (req: Request, res: Response, next
   try {
     const { id } = req.params;
     const { name, logo, description, category_id, location, state, city, is_open } = req.body;
-    
+
     // Check if user owns this company
     const userId = (req as any).userId;
     const { data: company, error: fetchError } = await supabaseAdmin
@@ -31,7 +31,7 @@ router.put("/:id", verifySupabaseToken, async (req: Request, res: Response, next
     }
 
     const updates: any = {};
-    if (name !== undefined) updates.name = name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
+    if (name !== undefined) updates.name = name.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
     if (logo !== undefined) updates.logo = logo;
     if (description !== undefined) updates.description = description;
     if (category_id !== undefined) updates.category_id = category_id;

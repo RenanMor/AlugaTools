@@ -88,14 +88,14 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
     // 3. Create default company if profile is 'company'
     let companyId: string | undefined;
     if (profile === "company") {
-      const cleanName = name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
+      const cleanName = name.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
       const { data: companyData, error: companyError } = await supabaseAdmin
         .from("companies")
         .insert({
           owner_id: userData.user.id,
           name: cleanName,
           logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-          description: "Locações de ferramentas e serviços",
+          description: " ",
           category_id: "c1",
           location: `${city || "São Paulo"}, ${state || "SP"}`,
           state: state || "SP",
@@ -199,8 +199,8 @@ router.post("/signin", signinLimiter, async (req: Request, res: Response, next: 
       if (!dbUser) {
         // SECURITY FIX (HIGH-01): Use generic message to prevent CPF/CNPJ enumeration.
         // Do NOT reveal whether the document exists or not.
-        return res.status(401).json({ 
-          error: "Credenciais inválidas. Verifique seus dados e tente novamente." 
+        return res.status(401).json({
+          error: "Credenciais inválidas. Verifique seus dados e tente novamente."
         });
       }
 
@@ -251,7 +251,7 @@ router.post("/signin", signinLimiter, async (req: Request, res: Response, next: 
         .select("id, status, primary_color, secondary_color")
         .eq("owner_id", dbUser.id)
         .single();
-      
+
       if (companyData) {
         companyId = companyData.id;
         companyStatus = companyData.status;
@@ -259,14 +259,14 @@ router.post("/signin", signinLimiter, async (req: Request, res: Response, next: 
         secondaryColor = companyData.secondary_color || secondaryColor;
       } else {
         // Self-healing: create the missing company record!
-        const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
+        const cleanCompName = dbUser.name.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
         const { data: newCompany } = await supabaseAdmin
           .from("companies")
           .insert({
             owner_id: dbUser.id,
             name: cleanCompName,
             logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-            description: "Locações de ferramentas e serviços",
+            description: " ",
             category_id: "c1",
             location: "São Paulo, SP",
             state: "SP",
@@ -403,7 +403,7 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         .select("id, status, primary_color, secondary_color")
         .eq("owner_id", dbUser.id)
         .single();
-      
+
       if (companyData) {
         companyId = companyData.id;
         companyStatus = companyData.status;
@@ -411,14 +411,14 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
         secondaryColor = companyData.secondary_color || secondaryColor;
       } else {
         // Self-healing: create the missing company record!
-        const cleanCompName = dbUser.name.replace(/^Locações\s+/i, "").replace(/\s+Locações$/i, "");
+        const cleanCompName = dbUser.name.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
         const { data: newCompany } = await supabaseAdmin
           .from("companies")
           .insert({
             owner_id: dbUser.id,
             name: cleanCompName,
             logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-            description: "Locações de ferramentas e serviços",
+            description: " ",
             category_id: "c1",
             location: "São Paulo, SP",
             state: "SP",
