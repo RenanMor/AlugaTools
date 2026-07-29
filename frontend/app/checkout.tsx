@@ -891,7 +891,7 @@ export default function CheckoutScreen() {
                 </View>
               </>
             )}
-          </Animated.View>
+          </View>
         </View>
       </Modal>
     </ScreenContainer>
