@@ -486,6 +486,8 @@ export default function DashboardOwnerScreen() {
         <Modal
           visible={true}
           animationType="slide"
+          onRequestClose={handleCloseModal}
+        >
           <ScreenContainer edges={["top", "left", "right"]}>
             {/* Modal Header */}
             <View
