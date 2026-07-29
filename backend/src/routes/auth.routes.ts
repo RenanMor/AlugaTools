@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "../config/supabase";
 import { verifySupabaseToken } from "../middlewares/auth.middleware";
 
@@ -350,8 +351,6 @@ function backendValidateCPF(cpf: string): boolean {
 
 const firstNames = ["Renan", "Ana", "Carlos", "Maria", "João", "Juliana", "Marcos", "Patrícia", "Lucas", "Sandra"];
 const lastNames = ["Morais", "Silva", "Santos", "Souza", "Oliveira", "Pereira", "Lima", "Costa", "Rodrigues", "Almeida"];
-
-import rateLimit from "express-rate-limit";
 
 // Rate limiter specific to CPF lookup to prevent brute-force enumeration
 const cpfLookupLimiter = rateLimit({
