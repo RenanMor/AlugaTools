@@ -7,7 +7,7 @@ import { useApp } from "@/lib/app-context";
 import { Rental } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
 import { router } from "expo-router";
-import { formatOrderId } from "@/lib/utils";
+import { formatOrderId, getShortOrderId } from "@/lib/utils";
 
 const STATUS_LABEL_BACK: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -219,7 +219,7 @@ export default function StatsScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
-            onPress={() => router.push(`/order/${item.id}`)}
+            onPress={() => router.push(`/order/${getShortOrderId(item.id)}`)}
             style={({ pressed }) => [
               {
                 padding: 12,

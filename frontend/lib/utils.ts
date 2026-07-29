@@ -16,13 +16,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Returns a short, clean public order ID slug for URLs.
+ * Example: "466b66c9-4bde-4b73-b489-514b977767e6" -> "466B66C9"
+ */
+export function getShortOrderId(id: string): string {
+  if (!id) return "00000000";
+  const clean = id.replace(/^(pedido#)/i, "").replace(/-/g, "").toUpperCase();
+  return clean.slice(0, 8);
+}
+
+/**
  * Formats a rental ID into a friendly, safe public identifier string.
  * Example: "466b66c9-4bde-4b73-b489-514b977767e6" -> "Pedido#466B66C9"
  */
 export function formatOrderId(id: string): string {
-  if (!id) return "Pedido#00000000";
-  const clean = id.replace(/-/g, "").toUpperCase();
-  return `Pedido#${clean.slice(0, 8)}`;
+  return `Pedido#${getShortOrderId(id)}`;
 }
 
 /** Returns true when the color is too close to gray (saturation < threshold) */

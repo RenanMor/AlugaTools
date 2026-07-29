@@ -19,7 +19,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { Company, Rental } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
-import { formatOrderId } from "@/lib/utils";
+import { formatOrderId, getShortOrderId } from "@/lib/utils";
 import {
   getAllCompanies,
   updateCompanyStatus,
@@ -216,7 +216,7 @@ export default function DashboardOwnerScreen() {
 
   const handleOpenRentalDetails = (rentalId: string) => {
     setSelectedCompany(null);
-    router.push(`/order/${rentalId}`);
+    router.push(`/order/${getShortOrderId(rentalId)}`);
   };
 
   const handleCancelRental = async (rentalId: string) => {

@@ -174,11 +174,18 @@ export const RentalModel = {
   },
 
   async findById(id: string): Promise<Rental | null> {
-    const { data, error } = await supabaseAdmin
-      .from("rentals")
-      .select("*")
-      .eq("id", id)
-      .single();
+    if (!id) return null;
+    const cleanId = id.replace(/^(pedido#)/i, "").trim().toLowerCase();
+    const isFullUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+
+    let query = supabaseAdmin.from("rentals").select("*");
+    if (isFullUuid) {
+      query = query.eq("id", cleanId);
+    } else {
+      query = query.ilike("id", `${cleanId}%`);
+    }
+
+    const { data, error } = await query.maybeSingle();
     if (error || !data) return null;
     return (await enrichRentals(data)) as Rental;
   },

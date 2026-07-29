@@ -273,9 +273,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isRegister?: boolean,
     cpf?: string,
     phone?: string,
-    cnpj?: string,
     state?: string,
-    city?: string
+    city?: string,
+    companyName?: string
   ) => {
     try {
       let response: any;
@@ -293,6 +293,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             phone: phone ? phone.replace(/\D/g, "") : "",
             state,
             city,
+            companyName,
           }),
         });
       } else {

@@ -88,7 +88,8 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
     // 3. Create default company if profile is 'company'
     let companyId: string | undefined;
     if (profile === "company") {
-      const cleanName = name.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
+      const rawCompName = req.body.companyName || name;
+      const cleanName = rawCompName.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
       const { data: companyData, error: companyError } = await supabaseAdmin
         .from("companies")
         .insert({

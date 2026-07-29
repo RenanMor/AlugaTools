@@ -73,6 +73,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [profile, setProfile] = useState<ProfileType>("customer");
   const [name, setName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cpf, setCpf] = useState("");
@@ -185,6 +186,12 @@ export default function AuthScreen() {
           return;
         }
 
+        if (profile === "company" && !ownerName.trim()) {
+          alert("Nome do proprietario é obrigatório");
+          setLoading(false);
+          return;
+        }
+
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!email.trim() || !emailRegex.test(email.trim())) {
           alert("E-mail inválido. Digite um e-mail válido.");
@@ -213,7 +220,7 @@ export default function AuthScreen() {
           }
         } else {
           const documentToLogin = (profile === "company" ? cnpj : cpf).replace(/\D/g, "");
-          
+
           if (!documentToLogin && !email.trim()) {
             alert("E-mail, CPF ou CNPJ é obrigatório para entrar");
             setLoading(false);
@@ -240,7 +247,7 @@ export default function AuthScreen() {
       // If they used a document, figure out which one it is
       let loginCpf: string | undefined;
       let loginCnpj: string | undefined;
-      
+
       if (mode === "login" && profile !== "deliverer") {
         const rawDoc = profile === "company" ? cnpj : cpf;
         const cleanDoc = rawDoc.replace(/\D/g, "");
@@ -252,7 +259,7 @@ export default function AuthScreen() {
         loginCpf = profile === "customer" ? cpf : undefined;
         loginCnpj = profile === "company" ? cnpj : undefined;
       }
-      
+
       console.log("[Frontend Auth] Invoking login()", {
         email: email.trim(),
         profile,
@@ -263,7 +270,7 @@ export default function AuthScreen() {
 
       const returnedUser = await login(
         email.trim(),
-        name.trim() || "Usuário",
+        profile === "company" ? (ownerName.trim() || name.trim()) : (name.trim() || "Usuário"),
         profile,
         password,
         mode === "register",
@@ -271,7 +278,8 @@ export default function AuthScreen() {
         phone,
         loginCnpj,
         state.trim(),
-        city.trim()
+        city.trim(),
+        profile === "company" ? name.trim() : undefined
       );
 
       const actualProfile = returnedUser?.profile || profile;
@@ -295,7 +303,7 @@ export default function AuthScreen() {
         router.push("/orders");
         return;
       }
-      
+
       router.dismiss();
       router.push("/profile");
     } catch (err: any) {
@@ -397,11 +405,18 @@ export default function AuthScreen() {
                     placeholder="Razão social ou nome fantasia"
                     editable={validateCNPJ(cnpj.replace(/\D/g, ""))}
                   />
+                  <Input
+                    label="Nome do proprietario"
+                    value={ownerName}
+                    onChangeText={setOwnerName}
+                    placeholder="Nome do proprietario / responsável"
+                    editable={validateCNPJ(cnpj.replace(/\D/g, ""))}
+                  />
                   <Input label="Estado (UF)" value={state} onChangeText={setState} placeholder="Ex: SP" />
                   <Input label="Cidade" value={city} onChangeText={setCity} placeholder="Ex: Campinas" />
                 </>
               )}
-              <Input label="Telefone" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
+              <Input label="Telefone WhatsAPP" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
               <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="email@exemplo.com" keyboardType="email-address" />
             </>
           ) : (

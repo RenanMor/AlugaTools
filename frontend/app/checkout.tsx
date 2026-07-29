@@ -21,6 +21,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { createRental, payRental, lookupCep } from "@/lib/api/rentals";
+import { getShortOrderId } from "@/lib/utils";
 
 const SHIPPING_OPTIONS = [
   { id: "pickup", name: "Retirada no local", price: 0, days: "Imediato" },
@@ -276,7 +277,7 @@ export default function CheckoutScreen() {
       setTimeout(() => {
         setPaymentLoadingVisible(false);
         if (firstRentalId) {
-          router.replace(`/order/${firstRentalId}`);
+          router.replace(`/order/${getShortOrderId(firstRentalId)}`);
         } else {
           router.replace("/orders");
         }

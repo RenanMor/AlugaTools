@@ -11,7 +11,7 @@ import { useApp } from "@/lib/app-context";
 import { Rental, RentalStatus } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
 import { spacing, fontSize, fontWeight, pageTitle } from "@/lib/design-tokens";
-import { formatOrderId } from "@/lib/utils";
+import { formatOrderId, getShortOrderId } from "@/lib/utils";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -162,7 +162,7 @@ function OrderCard({ rental }: { rental: Rental }) {
 
   return (
     <Card
-      onPress={() => router.push(`/order/${rental.id}`)}
+      onPress={() => router.push(`/order/${getShortOrderId(rental.id)}`)}
       style={{ padding: spacing.md, gap: spacing.md }}
     >
       {/* Header row: Order ID Badge + Status Badge */}

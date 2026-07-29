@@ -8,7 +8,7 @@ import { useApp } from "@/lib/app-context";
 import { CATEGORIES } from "@/lib/data";
 import { Rental, Tool, Deliverer } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
-import { formatOrderId } from "@/lib/utils";
+import { formatOrderId, getShortOrderId } from "@/lib/utils";
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -410,7 +410,7 @@ function RequestCard({ rental }: { rental: Rental }) {
 
   return (
     <Pressable
-      onPress={() => router.push(`/order/${rental.id}`)}
+      onPress={() => router.push(`/order/${getShortOrderId(rental.id)}`)}
       style={({ pressed }) => [
         {
           padding: 14,
