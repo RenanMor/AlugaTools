@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, Image, Modal, Pressable, ScrollView, Text, TextInput, View, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -28,6 +28,7 @@ export default function DashboardScreen() {
     companies,
     updateCompanyStatus,
     refreshCatalog,
+    refreshRentals,
   } = useApp();
   const companyId = user?.companyId;
   const hasInvalidCompany = !companyId || companyId === "co1";
@@ -47,11 +48,13 @@ export default function DashboardScreen() {
   // Real-time polling: auto-refresh rentals every 3 seconds for active company login
   useEffect(() => {
     if (!user || user.profile !== "company") return;
-    refreshRentals();
-    const interval = setInterval(() => {
+    if (typeof refreshRentals === "function") {
       refreshRentals().catch(() => {});
-    }, 3000);
-    return () => clearInterval(interval);
+      const interval = setInterval(() => {
+        refreshRentals().catch(() => {});
+      }, 3000);
+      return () => clearInterval(interval);
+    }
   }, [user?.id, user?.profile, refreshRentals]);
 
   if (user?.profile === "company" && user.companyStatus !== "approved" && !hasInvalidCompany) {

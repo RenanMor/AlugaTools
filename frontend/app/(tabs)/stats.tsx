@@ -117,75 +117,93 @@ export default function StatsScreen() {
         Estatísticas e Controle
       </Text>
 
-      {/* Cards de Resumo */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 12, paddingBottom: 16 }}
-        style={{ flexGrow: 0 }}
-      >
-        <StatCard
-          title="Faturamento"
-          value={`R$ ${stats.faturamento.toFixed(2)}`}
-          icon="cart.fill"
-          color="#22C55E"
-        />
-        <StatCard
-          title="Em Andamento"
-          value={String(stats.emAndamento)}
-          icon="clock.fill"
-          color="#F59E0B"
-        />
-        <StatCard
-          title="Completos"
-          value={String(stats.completos)}
-          icon="checkmark.circle.fill"
-          color="#3B82F6"
-        />
-        <StatCard
-          title="Cancelados"
-          value={String(stats.cancelados)}
-          icon="xmark.circle.fill"
-          color="#EF4444"
-        />
-      </ScrollView>
-
-      {/* Filtros e Busca */}
-      <View style={{ gap: 12, marginBottom: 16 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-          }}
+      {/* Cards de Resumo (Filtro clicável) */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        <Pressable
+          onPress={() => setFilterStatus(filterStatus === "all" ? "all" : "all")}
+          style={({ pressed }) => [{
+            flex: 1,
+            minWidth: "45%",
+            padding: 14,
+            borderRadius: 16,
+            backgroundColor: filterStatus === "all" ? "#22C55E" + "15" : colors.surface,
+            borderWidth: filterStatus === "all" ? 2 : 1,
+            borderColor: filterStatus === "all" ? "#22C55E" : colors.border,
+            gap: 6,
+            opacity: pressed ? 0.8 : 1,
+          }]}
         >
-          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Pesquisar por ferramenta, cliente..."
-            placeholderTextColor={colors.muted}
-            style={{ flex: 1, color: colors.foreground, fontSize: 14, padding: 0 }}
-          />
-          {search ? (
-            <Pressable onPress={() => setSearch("")}>
-              <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
-            </Pressable>
-          ) : null}
-        </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 12, color: filterStatus === "all" ? "#22C55E" : colors.muted, fontWeight: "700" }}>Faturamento</Text>
+            <IconSymbol name={"cart.fill" as any} size={16} color="#22C55E" />
+          </View>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
+            R$ {stats.faturamento.toFixed(2)}
+          </Text>
+        </Pressable>
 
-        <View style={{ flexDirection: "row", gap: 6 }}>
-          <FilterTabButton label="Todos" active={filterStatus === "all"} onPress={() => setFilterStatus("all")} />
-          <FilterTabButton label="Ativos" active={filterStatus === "in_progress"} onPress={() => setFilterStatus("in_progress")} />
-          <FilterTabButton label="Concluídos" active={filterStatus === "completed"} onPress={() => setFilterStatus("completed")} />
-          <FilterTabButton label="Cancelados" active={filterStatus === "cancelled"} onPress={() => setFilterStatus("cancelled")} />
-        </View>
+        <Pressable
+          onPress={() => setFilterStatus(filterStatus === "in_progress" ? "all" : "in_progress")}
+          style={({ pressed }) => [{
+            flex: 1,
+            minWidth: "45%",
+            padding: 14,
+            borderRadius: 16,
+            backgroundColor: filterStatus === "in_progress" ? "#F59E0B" + "15" : colors.surface,
+            borderWidth: filterStatus === "in_progress" ? 2 : 1,
+            borderColor: filterStatus === "in_progress" ? "#F59E0B" : colors.border,
+            gap: 6,
+            opacity: pressed ? 0.8 : 1,
+          }]}
+        >
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 12, color: filterStatus === "in_progress" ? "#F59E0B" : colors.muted, fontWeight: "700" }}>Em Andamento</Text>
+            <IconSymbol name={"clock.fill" as any} size={16} color="#F59E0B" />
+          </View>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#F59E0B" }}>{stats.emAndamento}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setFilterStatus(filterStatus === "completed" ? "all" : "completed")}
+          style={({ pressed }) => [{
+            flex: 1,
+            minWidth: "45%",
+            padding: 14,
+            borderRadius: 16,
+            backgroundColor: filterStatus === "completed" ? "#22C55E" + "15" : colors.surface,
+            borderWidth: filterStatus === "completed" ? 2 : 1,
+            borderColor: filterStatus === "completed" ? "#22C55E" : colors.border,
+            gap: 6,
+            opacity: pressed ? 0.8 : 1,
+          }]}
+        >
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 12, color: filterStatus === "completed" ? "#22C55E" : colors.muted, fontWeight: "700" }}>Completos</Text>
+            <IconSymbol name={"checkmark.circle.fill" as any} size={16} color="#22C55E" />
+          </View>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#22C55E" }}>{stats.completos}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setFilterStatus(filterStatus === "cancelled" ? "all" : "cancelled")}
+          style={({ pressed }) => [{
+            flex: 1,
+            minWidth: "45%",
+            padding: 14,
+            borderRadius: 16,
+            backgroundColor: filterStatus === "cancelled" ? "#EF4444" + "15" : colors.surface,
+            borderWidth: filterStatus === "cancelled" ? 2 : 1,
+            borderColor: filterStatus === "cancelled" ? "#EF4444" : colors.border,
+            gap: 6,
+            opacity: pressed ? 0.8 : 1,
+          }]}
+        >
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 12, color: filterStatus === "cancelled" ? "#EF4444" : colors.muted, fontWeight: "700" }}>Cancelados</Text>
+            <IconSymbol name={"xmark.circle.fill" as any} size={16} color="#EF4444" />
+          </View>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#EF4444" }}>{stats.cancelados}</Text>
+        </Pressable>
       </View>
 
       {/* Lista de Pedidos */}
@@ -257,28 +275,6 @@ export default function StatsScreen() {
   );
 }
 
-function StatCard({ title, value, icon, color }: { title: string; value: string; icon: string; color: string }) {
-  const colors = useColors();
-  return (
-    <View
-      style={{
-        padding: 14,
-        borderRadius: 16,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        minWidth: 130,
-        gap: 8,
-      }}
-    >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>{title}</Text>
-        <IconSymbol name={icon as any} size={16} color={color} />
-      </View>
-      <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>{value}</Text>
-    </View>
-  );
-}
 
 function FilterTabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const colors = useColors();

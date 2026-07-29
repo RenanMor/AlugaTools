@@ -297,11 +297,7 @@ export default function AuthScreen() {
       }
       
       router.dismiss();
-      if (actualProfile === "company") {
-        router.push("/dashboard");
-      } else if (actualProfile === "deliverer") {
-        router.push("/orders");
-      }
+      router.push("/profile");
     } catch (err: any) {
       alert(err.message || "Erro de autenticação. Verifique suas credenciais.");
     } finally {

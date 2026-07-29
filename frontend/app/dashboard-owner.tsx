@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -62,10 +62,20 @@ export default function DashboardOwnerScreen() {
 
   // Selected company modal state
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const activeCompanyRef = useRef<Company | null>(null);
   const [companyRentals, setCompanyRentals] = useState<Rental[]>([]);
   const [isLoadingRentals, setIsLoadingRentals] = useState(false);
   const [rentalSearchQuery, setRentalSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed">("all");
+
+  // Re-open company modal when returning back from order details
+  useFocusEffect(
+    useCallback(() => {
+      if (activeCompanyRef.current) {
+        setSelectedCompany(activeCompanyRef.current);
+      }
+    }, [])
+  );
 
   // Check permissions: must be owner
   useEffect(() => {
@@ -157,6 +167,7 @@ export default function DashboardOwnerScreen() {
   };
 
   const handleSelectCompany = async (company: Company) => {
+    activeCompanyRef.current = company;
     setSelectedCompany(company);
     setRentalSearchQuery("");
     setStatusFilter("all");
@@ -169,6 +180,16 @@ export default function DashboardOwnerScreen() {
     } finally {
       setIsLoadingRentals(false);
     }
+  };
+
+  const handleCloseModal = () => {
+    activeCompanyRef.current = null;
+    setSelectedCompany(null);
+  };
+
+  const handleOpenRentalDetails = (rentalId: string) => {
+    setSelectedCompany(null);
+    router.push(`/order/${rentalId}`);
   };
 
   const handleCancelRental = async (rentalId: string) => {
@@ -465,8 +486,6 @@ export default function DashboardOwnerScreen() {
         <Modal
           visible={true}
           animationType="slide"
-          onRequestClose={() => setSelectedCompany(null)}
-        >
           <ScreenContainer edges={["top", "left", "right"]}>
             {/* Modal Header */}
             <View
@@ -475,26 +494,62 @@ export default function DashboardOwnerScreen() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 paddingHorizontal: 16,
-                paddingVertical: 14,
+                paddingVertical: 12,
                 borderBottomWidth: 1,
                 borderBottomColor: colors.border,
               }}
             >
-              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+              <Pressable
+                onPress={handleCloseModal}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 8,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <IconSymbol name="arrow.left" size={18} color={colors.foreground} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Voltar</Text>
+              </Pressable>
+
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center", flex: 1, justifyContent: "center", paddingHorizontal: 8 }}>
                 <Image
                   source={{ uri: selectedCompany.logo }}
-                  style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: colors.border }}
+                  style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: colors.border }}
                   resizeMode="contain"
                 />
-                <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
+                <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "800", color: colors.foreground }}>
                   {selectedCompany.name}
                 </Text>
               </View>
+
               <Pressable
-                onPress={() => setSelectedCompany(null)}
-                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                onPress={handleCloseModal}
+                style={({ pressed }) => [
+                  {
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <IconSymbol name="xmark" size={24} color={colors.foreground} />
+                <IconSymbol name="xmark" size={18} color={colors.foreground} />
               </Pressable>
             </View>
 
@@ -660,9 +715,7 @@ export default function DashboardOwnerScreen() {
                       {/* Header row: tool info + status badge + cancel button */}
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <Pressable
-                          onPress={() => {
-                            router.push(`/order/${item.id}`);
-                          }}
+                          onPress={() => handleOpenRentalDetails(item.id)}
                           style={({ pressed }) => [{ flex: 1, gap: 3, opacity: pressed ? 0.7 : 1 }]}
                         >
                           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

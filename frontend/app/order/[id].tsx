@@ -139,7 +139,7 @@ export default function OrderDetailsScreen() {
       const data = await getRentalById(id as string);
       setRental(data);
     } catch (err: any) {
-      Alert.alert("Erro", "Não foi possível carregar os detalhes do pedido.");
+      Alert.alert("Acesso Negado", "Você não tem permissão para visualizar este pedido ou ele não foi encontrado.");
       router.back();
     } finally {
       setIsLoading(false);
