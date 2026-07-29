@@ -62,6 +62,7 @@ export default function DashboardOwnerScreen() {
 
   // Selected company modal state
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [inspectingCompany, setInspectingCompany] = useState<Company | null>(null);
   const activeCompanyRef = useRef<Company | null>(null);
   const [companyRentals, setCompanyRentals] = useState<Rental[]>([]);
   const [isLoadingRentals, setIsLoadingRentals] = useState(false);
@@ -122,6 +123,19 @@ export default function DashboardOwnerScreen() {
   }, [selectedCompany?.id]);
 
   const handleApprove = async (companyId: string) => {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm("Tem certeza que deseja aprovar esta empresa?")) {
+        try {
+          await updateCompanyStatus(companyId, "approved");
+          alert("Empresa aprovada com sucesso!");
+          fetchCompanies();
+        } catch (err: any) {
+          alert(err.message || "Erro ao aprovar empresa.");
+        }
+      }
+      return;
+    }
+
     Alert.alert(
       "Confirmar Aprovação",
       "Tem certeza que deseja aprovar esta empresa?",
@@ -144,6 +158,19 @@ export default function DashboardOwnerScreen() {
   };
 
   const handleReject = async (companyId: string) => {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm("Tem certeza que deseja recusar esta empresa?")) {
+        try {
+          await updateCompanyStatus(companyId, "rejected");
+          alert("Empresa recusada.");
+          fetchCompanies();
+        } catch (err: any) {
+          alert(err.message || "Erro ao recusar empresa.");
+        }
+      }
+      return;
+    }
+
     Alert.alert(
       "Confirmar Recusa",
       "Tem certeza que deseja recusar esta empresa?",
@@ -384,7 +411,13 @@ export default function DashboardOwnerScreen() {
           }
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => handleSelectCompany(item)}
+              onPress={() => {
+                if (item.status === "pending") {
+                  setInspectingCompany(item);
+                } else {
+                  handleSelectCompany(item);
+                }
+              }}
               style={({ pressed }) => [
                 {
                   padding: 14,
@@ -451,28 +484,53 @@ export default function DashboardOwnerScreen() {
               </View>
 
               {item.status === "pending" && (
-                <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginLeft: 8 }}>
                   <Pressable
-                    onPress={() => handleReject(item.id)}
-                    style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      backgroundColor: "#EF444415",
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      handleReject(item.id);
                     }}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: "#EF444415",
+                        borderWidth: 1,
+                        borderColor: "#EF444440",
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
                   >
                     <IconSymbol name="xmark" size={16} color="#EF4444" />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>Recusar</Text>
                   </Pressable>
+
                   <Pressable
-                    onPress={() => handleApprove(item.id)}
-                    style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      backgroundColor: colors.success + "15",
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      handleApprove(item.id);
                     }}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: colors.success + "20",
+                        borderWidth: 1,
+                        borderColor: colors.success + "50",
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
                   >
                     <IconSymbol name="checkmark" size={16} color={colors.success} />
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: colors.success }}>Aprovar</Text>
                   </Pressable>
                 </View>
               )}
@@ -793,6 +851,188 @@ export default function DashboardOwnerScreen() {
           </ScreenContainer>
         </Modal>
       )}
+
+      {/* Pending Company Details Inspection Modal */}
+      {inspectingCompany && (
+        <Modal
+          visible={true}
+          animationType="slide"
+          onRequestClose={() => setInspectingCompany(null)}
+        >
+          <ScreenContainer edges={["top", "left", "right"]}>
+            {/* Modal Header */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              }}
+            >
+              <Pressable
+                onPress={() => setInspectingCompany(null)}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 8,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <IconSymbol name="arrow.left" size={18} color={colors.foreground} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Voltar</Text>
+              </Pressable>
+
+              <Text style={{ fontSize: 16, fontWeight: "800", color: colors.foreground }}>
+                Empresa Solicitante
+              </Text>
+
+              <Pressable
+                onPress={() => setInspectingCompany(null)}
+                style={({ pressed }) => [
+                  {
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <IconSymbol name="xmark" size={18} color={colors.foreground} />
+              </Pressable>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 20, gap: 18 }}>
+              {/* Header profile card */}
+              <View style={{ alignItems: "center", gap: 10, paddingVertical: 10 }}>
+                <Image
+                  source={{ uri: inspectingCompany.logo || "sem-imagem" }}
+                  style={{ width: 72, height: 72, borderRadius: 16, backgroundColor: colors.border }}
+                  resizeMode="contain"
+                />
+                <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground, textAlign: "center" }}>
+                  {inspectingCompany.name}
+                </Text>
+                <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, backgroundColor: "#F59E0B20", borderWidth: 1, borderColor: "#F59E0B50" }}>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: "#F59E0B" }}>Aguardando Análise do Administrador</Text>
+                </View>
+              </View>
+
+              {/* Section: Dados da Empresa */}
+              <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16, gap: 12 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary, marginBottom: 4 }}>
+                  🏢 Dados da Empresa
+                </Text>
+                
+                <InfoRow label="Razão Social / Nome Fantasia" value={inspectingCompany.name} />
+                <InfoRow label="CNPJ" value={inspectingCompany.cnpj || "Não informado"} />
+                <InfoRow label="Localização / Endereço" value={inspectingCompany.location || `${inspectingCompany.city || ""}, ${inspectingCompany.state || ""}`} />
+                <InfoRow label="Descrição" value={inspectingCompany.description || "Sem descrição preenchida"} />
+              </View>
+
+              {/* Section: Dados do Responsável */}
+              <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16, gap: 12 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary, marginBottom: 4 }}>
+                  👤 Responsável pelo Cadastro
+                </Text>
+                
+                <InfoRow label="Nome do Titular" value={inspectingCompany.ownerName || "Titular do Cadastro"} />
+                <InfoRow label="E-mail de Contato" value={inspectingCompany.ownerEmail || "Não informado"} />
+                <InfoRow label="Telefone / WhatsApp" value={inspectingCompany.phone || "Não informado"} />
+              </View>
+            </ScrollView>
+
+            {/* Bottom Actions Footer */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 12,
+                padding: 16,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <Pressable
+                onPress={() => {
+                  const companyId = inspectingCompany.id;
+                  setInspectingCompany(null);
+                  handleReject(companyId);
+                }}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    backgroundColor: "#EF444415",
+                    borderWidth: 1.5,
+                    borderColor: "#EF4444",
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="xmark" size={18} color="#EF4444" />
+                <Text style={{ color: "#EF4444", fontWeight: "800", fontSize: 15 }}>Recusar Empresa</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  const companyId = inspectingCompany.id;
+                  setInspectingCompany(null);
+                  handleApprove(companyId);
+                }}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    backgroundColor: colors.success,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="checkmark" size={18} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Aprovar Empresa</Text>
+              </Pressable>
+            </View>
+          </ScreenContainer>
+        </Modal>
+      )}
     </ScreenContainer>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  const colors = useColors();
+  return (
+    <View style={{ gap: 2 }}>
+      <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{value}</Text>
+    </View>
   );
 }

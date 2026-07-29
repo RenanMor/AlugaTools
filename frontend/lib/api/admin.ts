@@ -18,6 +18,11 @@ function mapCompany(data: any): Company {
     status: data.status,
     primaryColor: data.primary_color || undefined,
     secondaryColor: data.secondary_color || undefined,
+    ownerName: data.owner_name || data.users?.name || undefined,
+    ownerEmail: data.owner_email || data.users?.email || undefined,
+    cnpj: data.cnpj || data.users?.cnpj || undefined,
+    phone: data.phone || data.users?.phone || undefined,
+    createdAt: data.created_at || data.owner_created_at || data.users?.created_at || undefined,
   };
 }
 

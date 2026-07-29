@@ -63,10 +63,24 @@ export const CompanyModel = {
   async findAll(): Promise<Company[]> {
     const { data, error } = await supabaseAdmin
       .from("companies")
-      .select("*")
+      .select("*, users(name, email, cnpj, cpf, phone, created_at)")
       .order("name", { ascending: true });
-    if (error) throw new Error(error.message);
-    return data as Company[];
+    if (error) {
+      const { data: fallback, error: fallbackErr } = await supabaseAdmin
+        .from("companies")
+        .select("*")
+        .order("name", { ascending: true });
+      if (fallbackErr) throw new Error(fallbackErr.message);
+      return fallback as Company[];
+    }
+    return (data || []).map((c: any) => ({
+      ...c,
+      owner_name: c.users?.name,
+      owner_email: c.users?.email,
+      cnpj: c.users?.cnpj,
+      phone: c.users?.phone,
+      owner_created_at: c.users?.created_at,
+    })) as Company[];
   },
 
   async updateStatus(id: string, status: "approved" | "rejected"): Promise<Company> {

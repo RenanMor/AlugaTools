@@ -57,6 +57,11 @@ export interface Company {
   status?: "pending" | "approved" | "rejected";
   primaryColor?: string;
   secondaryColor?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  cnpj?: string;
+  phone?: string;
+  createdAt?: string;
 }
 
 export interface CartItem {
