@@ -29,7 +29,7 @@ const STATUS_COLOR_BACK: Record<string, string> = {
   delivering: "#F97316",
   delivered: "#22C55E",
   active: "#22C55E",
-  completed: "#64748B",
+  completed: "#22C55E",
   cancelled: "#EF4444",
 };
 

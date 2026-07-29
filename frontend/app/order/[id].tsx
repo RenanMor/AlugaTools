@@ -47,7 +47,7 @@ const STATUS_COLOR: Record<RentalStatus, string> = {
   delivering: "#F97316",
   delivered: "#22C55E",
   active: "#22C55E",
-  completed: "#64748B",
+  completed: "#22C55E",
   cancelled: "#EF4444",
   return_expired: "#EF4444",
 };
@@ -84,31 +84,30 @@ export default function OrderDetailsScreen() {
   // Payment loading modal state
   const [paymentLoadingVisible, setPaymentLoadingVisible] = useState(false);
   const [paymentLoadingStatus, setPaymentLoadingStatus] = useState<"processing" | "success" | "failed">("processing");
+  // Rotation animation for loading spinner
   const spinAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
     if (paymentLoadingVisible && paymentLoadingStatus === "processing") {
-      Animated.loop(
+      spinAnim.setValue(0);
+      animation = Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
-          duration: 1200,
+          duration: 1000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
+          isInteraction: false,
         })
-      ).start();
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.08, duration: 700, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ])
-      ).start();
+      );
+      animation.start();
     } else {
       spinAnim.stopAnimation();
-      pulseAnim.stopAnimation();
       spinAnim.setValue(0);
-      pulseAnim.setValue(1);
     }
+    return () => {
+      animation?.stop();
+    };
   }, [paymentLoadingVisible, paymentLoadingStatus]);
 
   const isDeliverer = user?.profile === "deliverer";
@@ -1126,7 +1125,7 @@ export default function OrderDetailsScreen() {
           alignItems: "center",
           padding: 32,
         }}>
-          <Animated.View style={{
+          <View style={{
             backgroundColor: colors.surface,
             borderRadius: 24,
             padding: 36,
@@ -1134,7 +1133,6 @@ export default function OrderDetailsScreen() {
             gap: 20,
             width: "100%",
             maxWidth: 340,
-            transform: [{ scale: pulseAnim }],
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.3,
@@ -1214,7 +1212,7 @@ export default function OrderDetailsScreen() {
                 </View>
               </>
             )}
-          </Animated.View>
+          </View>
         </View>
       </Modal>
     </ScreenContainer>

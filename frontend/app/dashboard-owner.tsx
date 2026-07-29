@@ -10,6 +10,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
@@ -47,7 +48,7 @@ const ADMIN_STATUS_COLOR: Record<string, string> = {
   delivering: "#F97316",
   delivered: "#22C55E",
   active: "#22C55E",
-  completed: "#64748B",
+  completed: "#22C55E",
   cancelled: "#EF4444",
   return_expired: "#EF4444",
 };
@@ -63,6 +64,8 @@ export default function DashboardOwnerScreen() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyRentals, setCompanyRentals] = useState<Rental[]>([]);
   const [isLoadingRentals, setIsLoadingRentals] = useState(false);
+  const [rentalSearchQuery, setRentalSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed">("all");
 
   // Check permissions: must be owner
   useEffect(() => {
@@ -86,7 +89,27 @@ export default function DashboardOwnerScreen() {
 
   useEffect(() => {
     fetchCompanies();
+    // Real-time polling: auto-refresh companies list every 3 seconds
+    const interval = setInterval(() => {
+      getAllCompanies().then(setCompanies).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
+
+  // Real-time polling for selected company's rentals every 3 seconds
+  useEffect(() => {
+    if (!selectedCompany) return;
+    const pollSelected = async () => {
+      try {
+        const data = await getCompanyRentals(selectedCompany.id);
+        setCompanyRentals(data);
+      } catch (err) {
+        // silent error on background poll
+      }
+    };
+    const interval = setInterval(pollSelected, 3000);
+    return () => clearInterval(interval);
+  }, [selectedCompany?.id]);
 
   const handleApprove = async (companyId: string) => {
     Alert.alert(
@@ -135,6 +158,8 @@ export default function DashboardOwnerScreen() {
 
   const handleSelectCompany = async (company: Company) => {
     setSelectedCompany(company);
+    setRentalSearchQuery("");
+    setStatusFilter("all");
     setIsLoadingRentals(true);
     try {
       const rentalsData = await getCompanyRentals(company.id);
@@ -204,6 +229,35 @@ export default function DashboardOwnerScreen() {
     const completedCount = companyRentals.filter((r) => r.status === "completed").length;
     return { totalCount, totalRevenue, activeCount, completedCount };
   }, [companyRentals]);
+
+  const filteredCompanyRentals = useMemo(() => {
+    return companyRentals.filter((r) => {
+      // 1. Status filter
+      if (statusFilter === "active") {
+        const isActive = r.status === "delivered" || r.status === "active";
+        if (!isActive) return false;
+      } else if (statusFilter === "completed") {
+        if (r.status !== "completed") return false;
+      }
+
+      // 2. Search query filter
+      if (rentalSearchQuery.trim()) {
+        const q = rentalSearchQuery.trim().toLowerCase().replace(/^pedido#/i, "");
+        const formattedId = formatOrderId(r.id).toLowerCase();
+        const rawId = r.id.toLowerCase();
+        const toolName = (r.toolName || "").toLowerCase();
+        const customerName = (r.customerName || "").toLowerCase();
+        const matchesSearch =
+          formattedId.includes(q) ||
+          rawId.includes(q) ||
+          toolName.includes(q) ||
+          customerName.includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      return true;
+    });
+  }, [companyRentals, statusFilter, rentalSearchQuery]);
 
   const handleLogout = async () => {
     await logout();
@@ -444,22 +498,80 @@ export default function DashboardOwnerScreen() {
               </Pressable>
             </View>
 
-            {/* Metrics cards */}
-            <View style={{ flexDirection: "row", padding: 16, gap: 12 }}>
-              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
-                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Total de Pedidos</Text>
+            {/* Metrics cards (Clickable filters) */}
+            <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 12 }}>
+              <Pressable
+                onPress={() => setStatusFilter("all")}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: statusFilter === "all" ? colors.primary + "15" : colors.surface,
+                    borderWidth: statusFilter === "all" ? 2 : 1,
+                    borderColor: statusFilter === "all" ? colors.primary : colors.border,
+                    gap: 4,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <Text style={{ fontSize: 12, color: statusFilter === "all" ? colors.primary : colors.muted, fontWeight: "700" }}>Total de Pedidos</Text>
                 <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{stats.totalCount}</Text>
-              </View>
-              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
-                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Em Uso Agora</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setStatusFilter(statusFilter === "active" ? "all" : "active")}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: statusFilter === "active" ? colors.success + "15" : colors.surface,
+                    borderWidth: statusFilter === "active" ? 2 : 1,
+                    borderColor: statusFilter === "active" ? colors.success : colors.border,
+                    gap: 4,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: statusFilter === "active" ? colors.success : colors.muted, fontWeight: "700" }}>
+                    Em Uso Agora
+                  </Text>
+                  {statusFilter === "active" && (
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
+                  )}
+                </View>
                 <Text style={{ fontSize: 20, fontWeight: "800", color: colors.success }}>{stats.activeCount}</Text>
-              </View>
+              </Pressable>
             </View>
             <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 12 }}>
-              <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
-                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Concluídos</Text>
+              <Pressable
+                onPress={() => setStatusFilter(statusFilter === "completed" ? "all" : "completed")}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: statusFilter === "completed" ? colors.success + "15" : colors.surface,
+                    borderWidth: statusFilter === "completed" ? 2 : 1,
+                    borderColor: statusFilter === "completed" ? colors.success : colors.border,
+                    gap: 4,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: statusFilter === "completed" ? colors.success : colors.muted, fontWeight: "700" }}>
+                    Concluídos
+                  </Text>
+                  {statusFilter === "completed" && (
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
+                  )}
+                </View>
                 <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{stats.completedCount}</Text>
-              </View>
+              </Pressable>
+
               <View style={{ flex: 1, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
                 <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>Receita Estimada</Text>
                 <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>R$ {stats.totalRevenue.toFixed(2)}</Text>
@@ -468,27 +580,70 @@ export default function DashboardOwnerScreen() {
 
             {/* Rentals List */}
             <View style={{ flex: 1, paddingHorizontal: 16 }}>
-              <Text
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "700",
+                    color: colors.foreground,
+                  }}
+                >
+                  Controle de Pedidos
+                </Text>
+                {statusFilter !== "all" && (
+                  <Pressable onPress={() => setStatusFilter("all")}>
+                    <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>
+                      Limpar filtro ({statusFilter === "active" ? "Em Uso" : "Concluídos"})
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Search input for company orders */}
+              <View
                 style={{
-                  fontSize: 16,
-                  fontWeight: "700",
-                  color: colors.foreground,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   marginBottom: 12,
+                  gap: 8,
                 }}
               >
-                Controle de Pedidos
-              </Text>
+                <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+                <TextInput
+                  value={rentalSearchQuery}
+                  onChangeText={setRentalSearchQuery}
+                  placeholder="Buscar pedido por ID (Ex: Pedido#466B66C9)..."
+                  placeholderTextColor={colors.muted}
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    color: colors.foreground,
+                    padding: 0,
+                  }}
+                />
+                {rentalSearchQuery.length > 0 && (
+                  <Pressable onPress={() => setRentalSearchQuery("")}>
+                    <IconSymbol name="xmark" size={16} color={colors.muted} />
+                  </Pressable>
+                )}
+              </View>
 
               {isLoadingRentals ? (
                 <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 20 }} />
               ) : (
                 <FlatList
-                  data={companyRentals}
+                  data={filteredCompanyRentals}
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
                   ListEmptyComponent={
                     <Text style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>
-                      Nenhum pedido realizado para esta empresa.
+                      {rentalSearchQuery ? `Nenhum pedido encontrado para "${rentalSearchQuery}".` : "Nenhum pedido realizado para esta empresa."}
                     </Text>
                   }
                   renderItem={({ item }) => (
@@ -506,7 +661,6 @@ export default function DashboardOwnerScreen() {
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <Pressable
                           onPress={() => {
-                            setSelectedCompany(null);
                             router.push(`/order/${item.id}`);
                           }}
                           style={({ pressed }) => [{ flex: 1, gap: 3, opacity: pressed ? 0.7 : 1 }]}

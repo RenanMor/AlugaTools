@@ -71,30 +71,28 @@ export default function CheckoutScreen() {
 
   // Rotation animation for loading spinner
   const spinAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
     if (paymentLoadingVisible && paymentLoadingStatus === "processing") {
-      Animated.loop(
+      spinAnim.setValue(0);
+      animation = Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
-          duration: 1200,
+          duration: 1000,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
+          isInteraction: false,
         })
-      ).start();
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.08, duration: 700, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ])
-      ).start();
+      );
+      animation.start();
     } else {
       spinAnim.stopAnimation();
-      pulseAnim.stopAnimation();
       spinAnim.setValue(0);
-      pulseAnim.setValue(1);
     }
+    return () => {
+      animation?.stop();
+    };
   }, [paymentLoadingVisible, paymentLoadingStatus]);
 
   // CEP Lookup trigger
@@ -804,7 +802,7 @@ export default function CheckoutScreen() {
           alignItems: "center",
           padding: 32,
         }}>
-          <Animated.View style={{
+          <View style={{
             backgroundColor: colors.surface,
             borderRadius: 24,
             padding: 36,
@@ -812,7 +810,6 @@ export default function CheckoutScreen() {
             gap: 20,
             width: "100%",
             maxWidth: 340,
-            transform: [{ scale: pulseAnim }],
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.3,

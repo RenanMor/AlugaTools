@@ -11,6 +11,9 @@ import { env } from "./config/env";
 export function createApp() {
   const app = express();
 
+  // Trust proxy for reverse proxies (Render, Vercel, Cloudflare, etc.) to allow rate-limiting by real client IP
+  app.set("trust proxy", 1);
+
   app.use(
     helmet({
       crossOriginResourcePolicy: false, // Allows images to be fetched by frontend

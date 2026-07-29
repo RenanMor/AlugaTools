@@ -34,16 +34,26 @@ const STATUS_VARIANT: Record<RentalStatus, "info" | "warning" | "primary" | "err
   delivering: "primary",
   delivered: "success",
   active: "success",
-  completed: "muted",
+  completed: "success",
   cancelled: "error",
   return_expired: "error",
 };
 
 export default function OrdersScreen() {
   const colors = useColors();
-  const { rentals, user } = useApp();
+  const { rentals, user, refreshRentals } = useApp();
   const isDeliverer = user?.profile === "deliverer";
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Real-time polling: auto-refresh rentals every 3 seconds
+  React.useEffect(() => {
+    if (!user) return;
+    refreshRentals().catch(() => {});
+    const interval = setInterval(() => {
+      refreshRentals().catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [user?.id, refreshRentals]);
 
   const filteredRentals = useMemo(() => {
     if (!searchQuery.trim()) return rentals;

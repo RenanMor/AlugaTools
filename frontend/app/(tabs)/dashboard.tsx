@@ -44,6 +44,16 @@ export default function DashboardScreen() {
   const myTools = useMemo(() => tools.filter((t) => t.companyId === companyId), [tools, companyId]);
   const myRequests = useMemo(() => rentals.filter((r) => r.companyId === companyId), [rentals, companyId]);
 
+  // Real-time polling: auto-refresh rentals every 3 seconds for active company login
+  useEffect(() => {
+    if (!user || user.profile !== "company") return;
+    refreshRentals();
+    const interval = setInterval(() => {
+      refreshRentals().catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.profile, refreshRentals]);
+
   if (user?.profile === "company" && user.companyStatus !== "approved" && !hasInvalidCompany) {
     const isPending = user.companyStatus === "pending" || !user.companyStatus;
     return (
@@ -386,7 +396,7 @@ const STATUS_COLOR_BACK: Record<string, string> = {
   delivering: "#F97316",
   delivered: "#22C55E",
   active: "#22C55E",
-  completed: "#64748B",
+  completed: "#22C55E",
   cancelled: "#EF4444",
   return_expired: "#EF4444",
 };
