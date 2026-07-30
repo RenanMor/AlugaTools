@@ -2,6 +2,17 @@ import { apiCall } from "../_core/api";
 import { Tool } from "../types";
 
 export function mapTool(data: any): Tool {
+  let parsedImages: string[] = [];
+  if (Array.isArray(data.images)) {
+    parsedImages = data.images;
+  } else if (typeof data.images === "string" && data.images.trim()) {
+    try {
+      parsedImages = JSON.parse(data.images);
+    } catch {
+      parsedImages = [];
+    }
+  }
+
   return {
     id: data.id,
     companyId: data.company_id,
@@ -9,6 +20,7 @@ export function mapTool(data: any): Tool {
     description: data.description || "",
     categoryId: data.category_id,
     image: data.image || data.image_url || "",
+    images: parsedImages,
     pricePerDay: Number(data.price_per_day) || 0,
     available: !!data.available,
     quantity: Number(data.quantity) || 1,
@@ -26,6 +38,7 @@ export function mapToolToDb(tool: Partial<Tool>): any {
   if (tool.description !== undefined) data.description = tool.description;
   if (tool.categoryId !== undefined) data.category_id = tool.categoryId;
   if (tool.image !== undefined) data.image = tool.image;
+  if (tool.images !== undefined) data.images = tool.images;
   if (tool.pricePerDay !== undefined) data.price_per_day = tool.pricePerDay;
   if (tool.available !== undefined) data.available = tool.available;
   if (tool.quantity !== undefined) data.quantity = tool.quantity;

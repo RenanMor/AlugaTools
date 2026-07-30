@@ -30,6 +30,33 @@ export default function ToolScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [filterType, setFilterType] = useState<"highest" | "lowest" | "recent">("highest");
 
+  const allImages = useMemo(() => {
+    const list: string[] = [];
+    if (tool?.image && tool.image.trim()) list.push(tool.image.trim());
+    if (tool?.images && Array.isArray(tool.images)) {
+      tool.images.forEach((img) => {
+        if (img && img.trim() && !list.includes(img.trim())) {
+          list.push(img.trim());
+        }
+      });
+    }
+    return list;
+  }, [tool]);
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const activeImage = allImages[currentImageIndex] || tool?.image;
+
+  const handlePrevImage = () => {
+    if (allImages.length <= 1) return;
+    setCurrentImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  const handleNextImage = () => {
+    if (allImages.length <= 1) return;
+    setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
   // Centralized company theme hook (replaces duplicated useFocusEffect)
   useCompanyTheme(company);
 
@@ -79,7 +106,109 @@ export default function ToolScreen() {
           </Pressable>
         </View>
 
-        <Image source={tool.image ? { uri: tool.image } : require("@/assets/images/sem-imagem.png")} style={{ width: "100%", height: 260, backgroundColor: colors.border }} />
+        {/* Imagem Principal da Capa + Navegação com Setas para Fotos Opcionais */}
+        <View style={{ position: "relative", width: "100%", height: 280, backgroundColor: colors.border }}>
+          <Image
+            source={activeImage ? { uri: activeImage } : require("@/assets/images/sem-imagem.png")}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="contain"
+          />
+
+          {allImages.length > 1 && (
+            <>
+              {/* Seta para Esquerda */}
+              <Pressable
+                onPress={handlePrevImage}
+                style={({ pressed }) => [
+                  {
+                    position: "absolute",
+                    left: 12,
+                    top: "50%",
+                    marginTop: -22,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: "rgba(0,0,0,0.55)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="chevron.left" size={24} color="#fff" />
+              </Pressable>
+
+              {/* Seta para Direita */}
+              <Pressable
+                onPress={handleNextImage}
+                style={({ pressed }) => [
+                  {
+                    position: "absolute",
+                    right: 12,
+                    top: "50%",
+                    marginTop: -22,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: "rgba(0,0,0,0.55)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="chevron.right" size={24} color="#fff" />
+              </Pressable>
+
+              {/* Contador de Imagens */}
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: 12,
+                  right: 12,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: "rgba(0,0,0,0.65)",
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                  {currentImageIndex + 1} / {allImages.length}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Miniaturas abaixo da imagem principal se houver mais de uma foto */}
+        {allImages.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, paddingHorizontal: 16, marginTop: 12 }}
+            contentContainerStyle={{ gap: 10 }}
+          >
+            {allImages.map((imgUri, idx) => (
+              <Pressable
+                key={idx}
+                onPress={() => setCurrentImageIndex(idx)}
+                style={({ pressed }) => [
+                  {
+                    width: 58,
+                    height: 58,
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    borderWidth: currentImageIndex === idx ? 2.5 : 1,
+                    borderColor: currentImageIndex === idx ? colors.primary : colors.border,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <Image source={{ uri: imgUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
         <View style={{ padding: 16, gap: 12 }}>
           <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>{tool.name}</Text>

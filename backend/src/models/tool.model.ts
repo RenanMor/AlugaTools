@@ -7,6 +7,7 @@ export interface Tool {
   description: string;
   category_id: string;
   image: string;
+  images?: string[];
   price_per_day: number;
   available: boolean;
   quantity: number;
@@ -18,9 +19,20 @@ export interface Tool {
 
 function mapRow(row: any): Tool {
   if (!row) return row;
+  let parsedImages: string[] = [];
+  if (Array.isArray(row.images)) {
+    parsedImages = row.images;
+  } else if (typeof row.images === "string" && row.images.trim()) {
+    try {
+      parsedImages = JSON.parse(row.images);
+    } catch {
+      parsedImages = [];
+    }
+  }
   return {
     ...row,
     image: row.image || row.image_url || "",
+    images: parsedImages,
     min_days: row.min_days ?? 1,
     max_days: row.max_days ?? 30,
   };
@@ -39,7 +51,7 @@ async function getToolColumns(): Promise<string[]> {
   } catch (err) {
     console.error("[getToolColumns] Error fetching columns:", err);
   }
-  return ["id", "company_id", "name", "description", "category_id", "image", "price_per_day", "available", "quantity", "min_days", "max_days"];
+  return ["id", "company_id", "name", "description", "category_id", "image", "images", "price_per_day", "available", "quantity", "min_days", "max_days"];
 }
 
 // SECURITY FIX (HIGH-04): SSRF Protection — allowlist of trusted image hosting domains
@@ -328,6 +340,9 @@ export const ToolModel = {
     } else {
       delete payload.image;
     }
+    if (!columns.includes("images")) {
+      delete payload.images;
+    }
 
     const { data, error } = await supabaseAdmin
       .from("tools")
@@ -354,6 +369,9 @@ export const ToolModel = {
       } else {
         delete payload.image;
       }
+    }
+    if (!columns.includes("images")) {
+      delete payload.images;
     }
 
     const { data, error } = await supabaseAdmin

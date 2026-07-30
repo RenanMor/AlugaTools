@@ -70,6 +70,8 @@ export default function OrderDetailsScreen() {
   const [showReceiverModal, setShowReceiverModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showStartDeliveryModal, setShowStartDeliveryModal] = useState(false);
+  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [photoSourceIndex, setPhotoSourceIndex] = useState<number | null>(null);
   const [deliveryPhotos, setDeliveryPhotos] = useState<string[]>(["", "", ""]);
   const [receiverName, setReceiverName] = useState("");
   const [receiverCpf, setReceiverCpf] = useState("");
@@ -149,8 +151,20 @@ export default function OrderDetailsScreen() {
     }
   };
 
+  // Real-time polling: refresh order data every 3 seconds to update status & layout
   useEffect(() => {
+    if (!id) return;
     fetchOrder();
+
+    const interval = setInterval(() => {
+      getRentalById(id as string)
+        .then((updatedData) => {
+          if (updatedData) setRental(updatedData);
+        })
+        .catch(() => {});
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [id]);
 
   // Timer logic
@@ -265,10 +279,19 @@ export default function OrderDetailsScreen() {
   };
 
   const handleUploadDeliveryPhoto = (index: number) => {
+    setPhotoSourceIndex(index);
+    setShowPhotoSourceModal(true);
+  };
+
+  const triggerImageUpload = (index: number, mode: "camera" | "gallery") => {
+    setShowPhotoSourceModal(false);
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/*";
+      if (mode === "camera") {
+        input.setAttribute("capture", "environment");
+      }
       input.onchange = (e: any) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -1266,9 +1289,9 @@ export default function OrderDetailsScreen() {
                               return next;
                             });
                           }}
-                          style={{ position: "absolute", top: 3, right: 3, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 10, padding: 3 }}
+                          style={{ position: "absolute", top: 4, right: 4, backgroundColor: "#EF4444", borderRadius: 12, padding: 5 }}
                         >
-                          <IconSymbol name="xmark" size={12} color="#fff" />
+                          <IconSymbol name="trash" size={14} color="#fff" />
                         </Pressable>
                       </View>
                     ) : (
@@ -1299,6 +1322,105 @@ export default function OrderDetailsScreen() {
                 ]}
               >
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para Escolha de Origem da Foto (Câmera ou Galeria) ou Remoção */}
+      <Modal visible={showPhotoSourceModal} transparent animationType="fade" onRequestClose={() => setShowPhotoSourceModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 20, width: "100%", maxWidth: 360, gap: 14 }}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground, textAlign: "center" }}>
+              Opções da Foto
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+              Escolha como deseja enviar ou gerenciar esta foto:
+            </Text>
+
+            <View style={{ gap: 10, marginTop: 4 }}>
+              <Pressable
+                onPress={() => {
+                  if (photoSourceIndex !== null) triggerImageUpload(photoSourceIndex, "camera");
+                }}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    backgroundColor: colors.primary,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="camera.fill" size={20} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Tirar Foto com Câmera</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  if (photoSourceIndex !== null) triggerImageUpload(photoSourceIndex, "gallery");
+                }}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    backgroundColor: colors.background,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="photo.fill" size={20} color={colors.foreground} />
+                <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 15 }}>Escolher da Galeria / Arquivo</Text>
+              </Pressable>
+
+              {photoSourceIndex !== null && !!deliveryPhotos[photoSourceIndex] && (
+                <Pressable
+                  onPress={() => {
+                    setDeliveryPhotos((prev) => {
+                      const next = [...prev];
+                      next[photoSourceIndex] = "";
+                      return next;
+                    });
+                    setShowPhotoSourceModal(false);
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      backgroundColor: colors.surface,
+                      borderWidth: 1,
+                      borderColor: colors.error,
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <IconSymbol name="trash" size={20} color={colors.error} />
+                  <Text style={{ color: colors.error, fontWeight: "800", fontSize: 15 }}>Remover Foto Atual</Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                onPress={() => setShowPhotoSourceModal(false)}
+                style={({ pressed }) => [
+                  { paddingVertical: 10, alignItems: "center", opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Text style={{ color: colors.muted, fontWeight: "600", fontSize: 14 }}>Cancelar</Text>
               </Pressable>
             </View>
           </View>

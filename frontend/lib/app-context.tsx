@@ -320,9 +320,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  // 4. Real-time polling: auto-refresh rentals list every 3 seconds when user is logged in
   useEffect(() => {
     loadRentals();
-  }, [loadRentals]);
+    if (!user) return;
+    const interval = setInterval(() => {
+      loadRentals();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [user, loadRentals]);
 
   // 4b. Load deliverers list whenever user changes
   const loadDeliverers = useCallback(async () => {
