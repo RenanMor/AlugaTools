@@ -69,6 +69,8 @@ export default function OrderDetailsScreen() {
 
   const [showReceiverModal, setShowReceiverModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showStartDeliveryModal, setShowStartDeliveryModal] = useState(false);
+  const [deliveryPhotos, setDeliveryPhotos] = useState<string[]>(["", "", ""]);
   const [receiverName, setReceiverName] = useState("");
   const [receiverCpf, setReceiverCpf] = useState("");
 
@@ -260,6 +262,48 @@ export default function OrderDetailsScreen() {
     } finally {
       setIsStatusLoading(false);
     }
+  };
+
+  const handleUploadDeliveryPhoto = (index: number) => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            setDeliveryPhotos((prev) => {
+              const next = [...prev];
+              next[index] = reader.result as string;
+              return next;
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      const url = prompt(`Cole a URL da foto ${index + 1}:`);
+      if (url) {
+        setDeliveryPhotos((prev) => {
+          const next = [...prev];
+          next[index] = url;
+          return next;
+        });
+      }
+    }
+  };
+
+  const openStartDeliveryModal = () => {
+    setDeliveryPhotos(["", "", ""]);
+    setShowStartDeliveryModal(true);
+  };
+
+  const handleConfirmStartDelivery = async () => {
+    setShowStartDeliveryModal(false);
+    await handleUpdateStatus("delivering");
   };
 
   const handleRetryPayment = async () => {
@@ -555,7 +599,7 @@ export default function OrderDetailsScreen() {
             {/* Delivery/Company/Owner Actions */}
             {canManageDelivery && rental.status === "pending" && (
               <Pressable
-                onPress={() => handleUpdateStatus("delivering")}
+                onPress={openStartDeliveryModal}
                 style={({ pressed }) => [
                   { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}
@@ -607,7 +651,7 @@ export default function OrderDetailsScreen() {
             {canManageDelivery && rental.status === "accepted" && (
               <View style={{ gap: 10 }}>
                 <Pressable
-                  onPress={() => handleUpdateStatus("completed")}
+                  onPress={() => handleUpdateStatus("return_expired")}
                   style={({ pressed }) => [
                     { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                   ]}
@@ -625,8 +669,8 @@ export default function OrderDetailsScreen() {
               </View>
             )}
 
-            {/* Deliverer: Confirmar Devolução (non-pickup only) */}
-            {!isPickup && isDeliverer && rental.status === "return_expired" && (
+            {/* Deliverer / Company / Owner: Confirmar Devolução */}
+            {canManageDelivery && rental.status === "return_expired" && (
               <Pressable
                 onPress={() => {
                   setReceiverName("");
@@ -637,23 +681,9 @@ export default function OrderDetailsScreen() {
                   { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}
               >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar Devolução</Text>
-              </Pressable>
-            )}
-
-            {/* Company: Confirmar Devolução no Balcão (pickup only) */}
-            {isPickup && isCompany && rental.status === "return_expired" && (
-              <Pressable
-                onPress={() => {
-                  setReceiverName("");
-                  setReceiverCpf("");
-                  setShowReturnModal(true);
-                }}
-                style={({ pressed }) => [
-                  { backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar Devolução no Balcão</Text>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+                  {isPickup ? "Confirmar Devolução no Balcão" : "Confirmar Devolução"}
+                </Text>
               </Pressable>
             )}
           </>
@@ -1178,6 +1208,99 @@ export default function OrderDetailsScreen() {
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Fotos do Produto Antes da Entrega */}
+      <Modal visible={showStartDeliveryModal} transparent animationType="slide" onRequestClose={() => setShowStartDeliveryModal(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <IconSymbol name="camera.fill" size={20} color={colors.primary} />
+                <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Fotos para Entrega</Text>
+              </View>
+              <Pressable onPress={() => setShowStartDeliveryModal(false)}>
+                <IconSymbol name="xmark" size={22} color={colors.foreground} />
+              </Pressable>
+            </View>
+
+            <Text style={{ fontSize: 14, color: colors.muted, lineHeight: 20 }}>
+              Enviar fotos dos produtos que estão indo para entrega (opcionais, até 3 fotos).
+            </Text>
+
+            {/* 3 Upload Boxes */}
+            <View style={{ flexDirection: "row", gap: 12, justifyContent: "center", marginVertical: 8 }}>
+              {[0, 1, 2].map((idx) => {
+                const img = deliveryPhotos[idx];
+                return (
+                  <Pressable
+                    key={idx}
+                    onPress={() => handleUploadDeliveryPhoto(idx)}
+                    style={({ pressed }) => [
+                      {
+                        width: 86,
+                        height: 86,
+                        borderRadius: 14,
+                        backgroundColor: colors.background,
+                        borderWidth: img ? 1 : 1.5,
+                        borderColor: img ? colors.primary : colors.border,
+                        borderStyle: img ? "solid" : "dashed",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        overflow: "hidden",
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    {img ? (
+                      <View style={{ width: "100%", height: "100%", position: "relative" }}>
+                        <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                        <Pressable
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setDeliveryPhotos((prev) => {
+                              const next = [...prev];
+                              next[idx] = "";
+                              return next;
+                            });
+                          }}
+                          style={{ position: "absolute", top: 3, right: 3, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 10, padding: 3 }}
+                        >
+                          <IconSymbol name="xmark" size={12} color="#fff" />
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={{ alignItems: "center", gap: 4, padding: 4 }}>
+                        <IconSymbol name="camera.fill" size={20} color={colors.muted} />
+                        <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>Foto {idx + 1}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+              <Pressable
+                onPress={() => setShowStartDeliveryModal(false)}
+                style={({ pressed }) => [
+                  { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 15 }}>Cancelar</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleConfirmStartDelivery}
+                style={({ pressed }) => [
+                  { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

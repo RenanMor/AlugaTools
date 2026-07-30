@@ -25,6 +25,7 @@ export interface Tool {
   description: string;
   categoryId: string;
   image: string;
+  images?: string[];
   pricePerDay: number;
   available: boolean;
   quantity: number;

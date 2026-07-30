@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Modal, Pressable, ScrollView, Text, TextInput, View, Alert } from "react-native";
+import { FlatList, Image, Modal, Pressable, ScrollView, Text, TextInput, View, Alert, Platform } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -547,7 +547,8 @@ function ToolFormModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  const [image, setImage] = useState("");
+  const [coverImage, setCoverImage] = useState("");
+  const [optionalImages, setOptionalImages] = useState<string[]>(["", "", ""]);
   const [quantity, setQuantity] = useState("1");
   const [minDays, setMinDays] = useState("1");
   const [maxDays, setMaxDays] = useState("30");
@@ -558,9 +559,11 @@ function ToolFormModal({
       setName(tool?.name ?? "");
       setDescription(tool?.description ?? "");
       setPrice(tool ? String(tool.pricePerDay) : "");
-      setImage(tool?.image ?? "");
+      setCoverImage(tool?.image ?? "");
+      const opts = tool?.images ?? [];
+      setOptionalImages([opts[0] || "", opts[1] || "", opts[2] || ""]);
       if (tool?.categoryId) {
-        setSelectedCategories(tool.categoryId.split(",").map(c => c.trim()).filter(Boolean));
+        setSelectedCategories(tool.categoryId.split(",").map((c) => c.trim()).filter(Boolean));
       } else {
         setSelectedCategories([CATEGORIES[0].id]);
       }
@@ -570,26 +573,83 @@ function ToolFormModal({
     }
   }, [visible, tool]);
 
+  const handleUploadCover = () => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => setCoverImage(reader.result as string);
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      const url = prompt("Cole a URL da foto de Capa / Logo:");
+      if (url) setCoverImage(url);
+    }
+  };
+
+  const handleUploadOptional = (index: number) => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            setOptionalImages((prev) => {
+              const next = [...prev];
+              next[index] = reader.result as string;
+              return next;
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      const url = prompt(`Cole a URL da foto adicional ${index + 1}:`);
+      if (url) {
+        setOptionalImages((prev) => {
+          const next = [...prev];
+          next[index] = url;
+          return next;
+        });
+      }
+    }
+  };
+
   const save = () => {
+    if (!coverImage || !coverImage.trim()) {
+      Alert.alert("Foto Obrigatória", "A foto de Capa / Logo é obrigatória.");
+      return;
+    }
+
     const parsedQty = Math.max(1, Number(quantity) || 1);
     const parsedMin = Math.max(1, Number(minDays) || 1);
     const parsedMax = Math.max(parsedMin, Number(maxDays) || 30);
-    let cleanImage = image.trim();
-    if (cleanImage && !/^https?:\/\//i.test(cleanImage)) {
-      cleanImage = `https://${cleanImage}`;
-    }
+    const cleanCover = coverImage.trim();
+
     const base = {
       companyId,
       name: name.trim() || "Nova ferramenta",
       description: description.trim(),
       categoryId: selectedCategories.join(","),
-      image: cleanImage,
+      image: cleanCover,
+      images: optionalImages.filter((img) => !!img.trim()),
       pricePerDay: Number(price) || 0,
       quantity: parsedQty,
       available: parsedQty > 0,
       minDays: parsedMin,
       maxDays: parsedMax,
     };
+
     if (tool) onSave({ ...base, id: tool.id });
     else onSave(base);
   };
@@ -624,7 +684,110 @@ function ToolFormModal({
               </View>
             </View>
 
-            <Field label="URL da imagem" value={image} onChangeText={setImage} placeholder="https://..." />
+            {/* Imagem Obrigatória: Capa / Logo */}
+            <View style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Capa / Logo</Text>
+                <Text style={{ fontSize: 11, fontWeight: "600", color: colors.error }}>* Obrigatória</Text>
+              </View>
+
+              <Pressable
+                onPress={handleUploadCover}
+                style={({ pressed }) => [
+                  {
+                    width: 100,
+                    height: 100,
+                    borderRadius: 14,
+                    backgroundColor: colors.surface,
+                    borderWidth: coverImage ? 1 : 2,
+                    borderColor: coverImage ? colors.primary : colors.border,
+                    borderStyle: coverImage ? "solid" : "dashed",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    overflow: "hidden",
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                {coverImage ? (
+                  <View style={{ width: "100%", height: "100%", position: "relative" }}>
+                    <Image source={{ uri: coverImage }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setCoverImage("");
+                      }}
+                      style={{ position: "absolute", top: 4, right: 4, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 10, padding: 4 }}
+                    >
+                      <IconSymbol name="xmark" size={14} color="#fff" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={{ alignItems: "center", gap: 4, padding: 6 }}>
+                    <IconSymbol name="photo.fill" size={24} color={colors.primary} />
+                    <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "700", textAlign: "center" }}>Upload Capa</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+
+            {/* Fotos Adicionais (3 Opcionais - Separadas por alguns pixels) */}
+            <View style={{ marginBottom: 16, marginTop: 4 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 8 }}>
+                Fotos Adicionais (Até 3 - Opcionais)
+              </Text>
+
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                {[0, 1, 2].map((idx) => {
+                  const img = optionalImages[idx];
+                  return (
+                    <Pressable
+                      key={idx}
+                      onPress={() => handleUploadOptional(idx)}
+                      style={({ pressed }) => [
+                        {
+                          width: 76,
+                          height: 76,
+                          borderRadius: 12,
+                          backgroundColor: colors.surface,
+                          borderWidth: img ? 1 : 1.5,
+                          borderColor: img ? colors.border : colors.border,
+                          borderStyle: img ? "solid" : "dashed",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          overflow: "hidden",
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      {img ? (
+                        <View style={{ width: "100%", height: "100%", position: "relative" }}>
+                          <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setOptionalImages((prev) => {
+                                const next = [...prev];
+                                next[idx] = "";
+                                return next;
+                              });
+                            }}
+                            style={{ position: "absolute", top: 2, right: 2, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 8, padding: 3 }}
+                          >
+                            <IconSymbol name="xmark" size={12} color="#fff" />
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <View style={{ alignItems: "center", gap: 2 }}>
+                          <IconSymbol name="plus" size={18} color={colors.muted} />
+                          <Text style={{ fontSize: 10, color: colors.muted, fontWeight: "600" }}>Foto {idx + 1}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
 
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 8 }}>Categorias (selecione várias se desejar)</Text>
             <ScrollView
