@@ -248,7 +248,8 @@ export default function OrderDetailsScreen() {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    return `${pad(mins)}:${pad(secs)}`;
   };
 
   const pixCode = useMemo(() => {
@@ -297,7 +298,7 @@ export default function OrderDetailsScreen() {
         if (file) {
           const reader = new FileReader();
           reader.onload = () => {
-            setDeliveryPhotos((prev) => {
+            setDeliveryPhotos((prev: string[]) => {
               const next = [...prev];
               next[index] = reader.result as string;
               return next;
@@ -310,7 +311,7 @@ export default function OrderDetailsScreen() {
     } else {
       const url = prompt(`Cole a URL da foto ${index + 1}:`);
       if (url) {
-        setDeliveryPhotos((prev) => {
+        setDeliveryPhotos((prev: string[]) => {
           const next = [...prev];
           next[index] = url;
           return next;
@@ -369,7 +370,7 @@ export default function OrderDetailsScreen() {
       }, 1800);
     } catch (err: any) {
       setPaymentLoadingStatus("failed");
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise<void>((resolve) => setTimeout(resolve, 900));
       setPaymentLoadingVisible(false);
       Alert.alert(
         "Pagamento Recusado",
@@ -811,7 +812,7 @@ export default function OrderDetailsScreen() {
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF do Recebedor</Text>
               <TextInput
                 value={receiverCpf}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/\D/g, "");
                   const limited = cleaned.slice(0, 11);
                   let formatted = limited;
@@ -912,7 +913,7 @@ export default function OrderDetailsScreen() {
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF de Quem Devolve</Text>
               <TextInput
                 value={receiverCpf}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const cleaned = text.replace(/\D/g, "");
                   const limited = cleaned.slice(0, 11);
                   let formatted = limited;
@@ -1028,7 +1029,7 @@ export default function OrderDetailsScreen() {
                     <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Número do Cartão</Text>
                     <TextInput
                       value={retryCardNumber}
-                      onChangeText={(t) => {
+                      onChangeText={(t: string) => {
                         const d = t.replace(/\D/g, "").slice(0, 16);
                         setRetryCardNumber(d.replace(/(\d{4})(?=\d)/g, "$1 ").trim());
                       }}

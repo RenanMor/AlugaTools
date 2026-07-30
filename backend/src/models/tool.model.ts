@@ -123,6 +123,10 @@ async function resolveImageUrl(url: string): Promise<string> {
   if (!url) return url;
   
   let cleanUrl = url.trim();
+  // Return Base64 Data URIs directly without prepending https://
+  if (/^data:image\//i.test(cleanUrl)) {
+    return cleanUrl;
+  }
   if (cleanUrl && !/^https?:\/\//i.test(cleanUrl)) {
     cleanUrl = `https://${cleanUrl}`;
   }
@@ -254,7 +258,7 @@ export const ToolModel = {
       }
     }
 
-    mapped.forEach((t) => {
+    mapped.forEach((t: Tool) => {
       const info = toolRatings[t.id];
       t.rating = info ? Math.round((info.sum / info.count) * 10) / 10 : 0;
       t.rating_count = info ? info.count : 0;
@@ -281,7 +285,7 @@ export const ToolModel = {
         .not("rating", "is", null);
       
       const values = (ratings || []).map((r: any) => Number(r.rating));
-      mapped.rating = values.length > 0 ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : 0;
+      mapped.rating = values.length > 0 ? Math.round((values.reduce((a: number, b: number) => a + b, 0) / values.length) * 10) / 10 : 0;
       mapped.rating_count = values.length;
 
       triggerBackgroundResolution(mapped);
@@ -315,7 +319,7 @@ export const ToolModel = {
       }
     }
 
-    mapped.forEach((t) => {
+    mapped.forEach((t: Tool) => {
       const info = toolRatings[t.id];
       t.rating = info ? Math.round((info.sum / info.count) * 10) / 10 : 0;
       t.rating_count = info ? info.count : 0;

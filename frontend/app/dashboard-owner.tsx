@@ -263,23 +263,23 @@ export default function DashboardOwnerScreen() {
   };
 
   const pendingCompanies = useMemo(
-    () => companies.filter((c) => c.status === "pending"),
+    () => companies.filter((c: Company) => c.status === "pending"),
     [companies]
   );
 
   const stats = useMemo(() => {
-    const nonCancelled = companyRentals.filter((r) => r.status !== "cancelled");
+    const nonCancelled = companyRentals.filter((r: Rental) => r.status !== "cancelled");
     const totalCount = companyRentals.length;
-    const totalRevenue = nonCancelled.reduce((sum, r) => sum + r.totalPrice, 0);
+    const totalRevenue = nonCancelled.reduce((sum: number, r: Rental) => sum + r.totalPrice, 0);
     const activeCount = companyRentals.filter(
-      (r) => r.status === "delivered" || r.status === "active"
+      (r: Rental) => r.status === "delivered" || r.status === "active"
     ).length;
-    const completedCount = companyRentals.filter((r) => r.status === "completed").length;
+    const completedCount = companyRentals.filter((r: Rental) => r.status === "completed").length;
     return { totalCount, totalRevenue, activeCount, completedCount };
   }, [companyRentals]);
 
   const filteredCompanyRentals = useMemo(() => {
-    return companyRentals.filter((r) => {
+    return companyRentals.filter((r: Rental) => {
       // 1. Status filter
       if (statusFilter === "active") {
         const isActive = r.status === "delivered" || r.status === "active";
@@ -296,10 +296,10 @@ export default function DashboardOwnerScreen() {
         const toolName = (r.toolName || "").toLowerCase();
         const customerName = (r.customerName || "").toLowerCase();
         const matchesSearch =
-          formattedId.includes(q) ||
-          rawId.includes(q) ||
-          toolName.includes(q) ||
-          customerName.includes(q);
+          formattedId.indexOf(q) !== -1 ||
+          rawId.indexOf(q) !== -1 ||
+          toolName.indexOf(q) !== -1 ||
+          customerName.indexOf(q) !== -1;
         if (!matchesSearch) return false;
       }
 
@@ -402,14 +402,14 @@ export default function DashboardOwnerScreen() {
       ) : (
         <FlatList
           data={tab === "pending" ? pendingCompanies : companies}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Company) => item.id}
           contentContainerStyle={{ padding: 16, gap: 14 }}
           ListEmptyComponent={
             <Text style={{ textAlign: "center", color: colors.muted, marginTop: 40 }}>
               Nenhuma empresa encontrada nesta categoria.
             </Text>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: Company }) => (
             <Pressable
               onPress={() => {
                 if (item.status === "pending") {
@@ -418,7 +418,7 @@ export default function DashboardOwnerScreen() {
                   handleSelectCompany(item);
                 }
               }}
-              style={({ pressed }) => [
+              style={({ pressed }: { pressed: boolean }) => [
                 {
                   padding: 14,
                   borderRadius: 14,
@@ -754,14 +754,14 @@ export default function DashboardOwnerScreen() {
               ) : (
                 <FlatList
                   data={filteredCompanyRentals}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item: Rental) => item.id}
                   contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
                   ListEmptyComponent={
                     <Text style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>
                       {rentalSearchQuery ? `Nenhum pedido encontrado para "${rentalSearchQuery}".` : "Nenhum pedido realizado para esta empresa."}
                     </Text>
                   }
-                  renderItem={({ item }) => (
+                  renderItem={({ item }: { item: Rental }) => (
                     <View
                       style={{
                         padding: 12,
