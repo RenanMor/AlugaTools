@@ -114,6 +114,7 @@ export default function OrderDetailsScreen() {
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
   const isOwner = !!user?.isOwner;
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
+  const canManageDelivery = isDeliverer || isCompany || isOwner;
 
   // CPF validation helper: checks digit verification algorithm
   const isCpfValid = useMemo(() => {
@@ -551,8 +552,8 @@ export default function OrderDetailsScreen() {
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <>
-            {/* Deliverer Actions (Standard/Express Delivery) */}
-            {!isPickup && isDeliverer && rental.status === "pending" && (
+            {/* Delivery/Company/Owner Actions */}
+            {canManageDelivery && rental.status === "pending" && (
               <Pressable
                 onPress={() => handleUpdateStatus("delivering")}
                 style={({ pressed }) => [
@@ -563,32 +564,9 @@ export default function OrderDetailsScreen() {
               </Pressable>
             )}
 
-            {!isPickup && isDeliverer && rental.status === "delivering" && (
+            {canManageDelivery && rental.status === "delivering" && (
               <Pressable
-                onPress={() => setShowReceiverModal(true)}
-                style={({ pressed }) => [
-                  { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Finalizar Entrega</Text>
-              </Pressable>
-            )}
-
-            {/* Company Actions for Pickup (Retirada no local) */}
-            {isPickup && isCompany && rental.status === "pending" && (
-              <Pressable
-                onPress={() => handleUpdateStatus("delivering")}
-                style={({ pressed }) => [
-                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Iniciar Entrega</Text>
-              </Pressable>
-            )}
-
-            {isPickup && isCompany && rental.status === "delivering" && (
-              <Pressable
-                onPress={() => handleUpdateStatus("delivered")}
+                onPress={() => isPickup ? handleUpdateStatus("delivered") : setShowReceiverModal(true)}
                 style={({ pressed }) => [
                   { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}

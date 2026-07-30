@@ -116,6 +116,20 @@ export interface Rental {
   cancelledByName?: string;
 }
 
+export interface UserAddress {
+  id: string;
+  title?: string;
+  cep: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  isDefault?: boolean;
+  createdAt?: number;
+}
+
 export interface SessionUser {
   id: string;
   name: string;

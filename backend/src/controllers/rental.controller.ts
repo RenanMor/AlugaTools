@@ -393,7 +393,7 @@ export const RentalController = {
       // SECURITY FIX (CRIT-04): Enforce valid status transitions via state machine
       const allowedTransitions: Record<string, string[]> = {
         awaiting_payment: ["pending", "cancelled"],
-        pending:          ["accepted", "rejected", "cancelled"],
+        pending:          ["accepted", "rejected", "delivering", "delivered", "cancelled"],
         accepted:         ["delivering", "delivered", "cancelled"],  // "delivered" for pickup orders
         rejected:         [],  // Terminal state — no further transitions allowed
         delivering:       ["delivered", "cancelled"],
@@ -419,6 +419,15 @@ export const RentalController = {
         }
       }
 
+      // Check if user is system owner / admin
+      const { data: dbUser } = await supabaseAdmin
+        .from("users")
+        .select("is_owner, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const isSystemOwner = !!(dbUser?.is_owner || dbUser?.role === "owner" || dbUser?.role === "admin");
+
       // Check if user is company owner
       const { data: company } = await supabaseAdmin
         .from("companies")
@@ -437,7 +446,7 @@ export const RentalController = {
       const isCompanyOwner = !!company;
       const isCompanyDeliverer = deliverer && deliverer.company_id === rental.company_id;
 
-      if (!isCompanyOwner && !isCompanyDeliverer) {
+      if (!isCompanyOwner && !isCompanyDeliverer && !isSystemOwner) {
         return res.status(403).json({ error: "Não autorizado: apenas a empresa ou entregador podem atualizar o status" });
       }
 

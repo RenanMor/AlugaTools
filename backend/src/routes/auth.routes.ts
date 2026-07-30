@@ -521,4 +521,43 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
   }
 });
 
+// GET /api/auth/user/addresses
+router.get("/user/addresses", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId as string;
+    const { data: dbUser, error } = await supabaseAdmin
+      .from("users")
+      .select("addresses")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) return res.status(400).json({ error: error.message });
+    const addresses = (dbUser && Array.isArray(dbUser.addresses)) ? dbUser.addresses : [];
+    res.json({ data: addresses });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/auth/user/addresses
+router.put("/user/addresses", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId as string;
+    const { addresses } = req.body;
+    if (!Array.isArray(addresses)) {
+      return res.status(400).json({ error: "O campo 'addresses' deve ser um array." });
+    }
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ addresses })
+      .eq("id", userId);
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ data: addresses });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

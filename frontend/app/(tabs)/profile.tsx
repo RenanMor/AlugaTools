@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { AddressModal } from "@/components/address-modal";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
@@ -16,6 +17,7 @@ export default function ProfileScreen() {
   const { user, logout, companies, updateAvatar, updateCompanyStatus, refreshCatalog } = useApp();
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [showUrlModal, setShowUrlModal] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
   const [urlInput, setUrlInput] = useState(user?.avatarUrl || "");
 
   const myCompany = user?.profile === "company" && user.companyId 
@@ -49,7 +51,6 @@ export default function ProfileScreen() {
     if (isUpdatingAvatar) return;
     setIsUpdatingAvatar(true);
     try {
-      // No palette extraction for customer profiles — brand colors handled server-side
       await updateAvatar(urlOrBase64);
       Alert.alert("Sucesso", "Foto de perfil atualizada!");
     } catch (err: any) {
@@ -105,6 +106,20 @@ export default function ProfileScreen() {
                   {user.profile === "company" ? "Empresa" : user.profile === "deliverer" ? "Entregador" : "Cliente"}
                 </Badge>
               </View>
+            </View>
+          </Card>
+
+          {/* User saved addresses card (Customer / User) */}
+          <Card
+            onPress={() => setShowAddressModal(true)}
+            style={{ padding: spacing.lg }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <IconSymbol name="mappin.and.ellipse" size={22} color={colors.primary} />
+              <Text style={{ flex: 1, fontSize: fontSize.md + 1, color: colors.foreground, fontWeight: fontWeight.semibold }}>
+                Meus Endereços Salvos
+              </Text>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </View>
           </Card>
 
@@ -210,6 +225,12 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal for User Addresses */}
+      <AddressModal
+        visible={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+      />
     </ScreenContainer>
   );
 }

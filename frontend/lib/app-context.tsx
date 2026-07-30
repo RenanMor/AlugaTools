@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { useThemeContext } from "./theme-provider";
-import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool, Deliverer } from "./types";
+import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool, Deliverer, UserAddress } from "./types";
 import * as Auth from "./_core/auth";
 import { apiCall } from "./_core/api";
 import {
@@ -20,7 +20,9 @@ import {
   createDeliverer,
   updateDeliverer as apiUpdateDeliverer,
   deleteDeliverer as apiDeleteDeliverer,
-  getDelivererRentals
+  getDelivererRentals,
+  getUserAddresses,
+  saveUserAddresses,
 } from "./api";
 
 interface AppState {
@@ -29,12 +31,19 @@ interface AppState {
   cart: CartItem[];
   rentals: Rental[];
   deliverers: Deliverer[];
+  savedAddresses: UserAddress[];
+  lastOrderAddress: UserAddress | null;
   user: SessionUser | null;
   addToCart: (tool: Tool, companyName: string) => void;
   removeFromCart: (cartItemId: string) => void;
   updateCartDays: (cartItemId: string, days: number) => void;
   updateCartQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
+  addAddress: (address: Omit<UserAddress, "id">) => Promise<UserAddress>;
+  updateAddress: (id: string, address: Partial<UserAddress>) => Promise<UserAddress>;
+  deleteAddress: (id: string) => Promise<void>;
+  setDefaultAddress: (id: string) => Promise<void>;
+  saveAddressFromOrder: (address: Omit<UserAddress, "id">) => Promise<UserAddress | null>;
   login: (
     email: string,
     name: string,
@@ -77,10 +86,131 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [deliverers, setDeliverers] = useState<Deliverer[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const { setPrimaryColor, setSecondaryColor } = useThemeContext();
+
+  const lastOrderAddress = useMemo(() => {
+    const rentalWithAddr = rentals
+      .filter((r) => r.address && r.address.street && r.address.cep)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+    if (rentalWithAddr && rentalWithAddr.address) {
+      return {
+        id: "last_order_addr",
+        title: "Último Pedido",
+        cep: rentalWithAddr.address.cep,
+        street: rentalWithAddr.address.street,
+        number: rentalWithAddr.address.number,
+        complement: rentalWithAddr.address.complement || "",
+        neighborhood: rentalWithAddr.address.neighborhood || "",
+        city: rentalWithAddr.address.city || "",
+        state: rentalWithAddr.address.state || "",
+        createdAt: rentalWithAddr.createdAt,
+      } as UserAddress;
+    }
+    const defaultAddr = savedAddresses.find((a) => a.isDefault) || savedAddresses[0] || null;
+    return defaultAddr;
+  }, [rentals, savedAddresses]);
+
+  const syncAddresses = useCallback(async (newAddresses: UserAddress[]) => {
+    setSavedAddresses(newAddresses);
+    if (user?.id) {
+      await AsyncStorage.setItem(`@AlugaTools_addresses_${user.id}`, JSON.stringify(newAddresses)).catch(() => {});
+      await saveUserAddresses(newAddresses).catch(() => {});
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSavedAddresses([]);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        const local = await AsyncStorage.getItem(`@AlugaTools_addresses_${user.id}`);
+        if (local && mounted) {
+          setSavedAddresses(JSON.parse(local));
+        }
+        const remote = await getUserAddresses();
+        if (Array.isArray(remote) && remote.length > 0 && mounted) {
+          setSavedAddresses(remote);
+          await AsyncStorage.setItem(`@AlugaTools_addresses_${user.id}`, JSON.stringify(remote)).catch(() => {});
+        }
+      } catch (err) {
+        console.warn("Error loading user addresses:", err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [user?.id]);
+
+  const addAddress = useCallback(async (addrData: Omit<UserAddress, "id">): Promise<UserAddress> => {
+    const newAddr: UserAddress = {
+      ...addrData,
+      id: `addr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: Date.now(),
+    };
+    const isFirst = savedAddresses.length === 0;
+    if (addrData.isDefault || isFirst) {
+      newAddr.isDefault = true;
+    }
+    let updated = [...savedAddresses];
+    if (newAddr.isDefault) {
+      updated = updated.map((a) => ({ ...a, isDefault: false }));
+    }
+    updated.unshift(newAddr);
+    await syncAddresses(updated);
+    return newAddr;
+  }, [savedAddresses, syncAddresses]);
+
+  const updateAddress = useCallback(async (id: string, addrData: Partial<UserAddress>): Promise<UserAddress> => {
+    let updated = savedAddresses.map((a) => {
+      if (a.id === id) {
+        return { ...a, ...addrData };
+      }
+      if (addrData.isDefault) {
+        return { ...a, isDefault: false };
+      }
+      return a;
+    });
+    await syncAddresses(updated);
+    return updated.find((a) => a.id === id)!;
+  }, [savedAddresses, syncAddresses]);
+
+  const deleteAddress = useCallback(async (id: string): Promise<void> => {
+    const updated = savedAddresses.filter((a) => a.id !== id);
+    if (updated.length > 0 && !updated.some((a) => a.isDefault)) {
+      updated[0].isDefault = true;
+    }
+    await syncAddresses(updated);
+  }, [savedAddresses, syncAddresses]);
+
+  const setDefaultAddress = useCallback(async (id: string): Promise<void> => {
+    const updated = savedAddresses.map((a) => ({
+      ...a,
+      isDefault: a.id === id,
+    }));
+    await syncAddresses(updated);
+  }, [savedAddresses, syncAddresses]);
+
+  const saveAddressFromOrder = useCallback(async (addrData: Omit<UserAddress, "id">): Promise<UserAddress | null> => {
+    if (!addrData || !addrData.cep || !addrData.number) return null;
+    const cleanCep = addrData.cep.replace(/\D/g, "");
+    const cleanNum = addrData.number.trim().toLowerCase();
+
+    const existing = savedAddresses.find(
+      (a) => a.cep.replace(/\D/g, "") === cleanCep && a.number.trim().toLowerCase() === cleanNum
+    );
+
+    if (existing) {
+      await setDefaultAddress(existing.id);
+      return existing;
+    }
+
+    return await addAddress({ ...addrData, isDefault: true });
+  }, [savedAddresses, setDefaultAddress, addAddress]);
 
   useEffect(() => {
     if (user && (user.profile === "company" || user.profile === "deliverer")) {
@@ -500,12 +630,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cart,
       rentals,
       deliverers,
+      savedAddresses,
+      lastOrderAddress,
       user,
       addToCart,
       removeFromCart,
       updateCartDays,
       updateCartQuantity,
       clearCart,
+      addAddress,
+      updateAddress,
+      deleteAddress,
+      setDefaultAddress,
+      saveAddressFromOrder,
       login,
       logout,
       checkout,
@@ -532,12 +669,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cart,
       rentals,
       deliverers,
+      savedAddresses,
+      lastOrderAddress,
       user,
       addToCart,
       removeFromCart,
       updateCartDays,
       updateCartQuantity,
       clearCart,
+      addAddress,
+      updateAddress,
+      deleteAddress,
+      setDefaultAddress,
+      saveAddressFromOrder,
       login,
       logout,
       checkout,

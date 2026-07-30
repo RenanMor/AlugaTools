@@ -136,3 +136,26 @@ export async function rateRental(id: string, rating: number, comment?: string): 
   });
   return mapRental(response.data);
 }
+
+export async function getUserAddresses(): Promise<any[]> {
+  try {
+    const response = await apiCall<{ data: any[] }>("/api/auth/user/addresses");
+    return response.data || [];
+  } catch (err) {
+    console.warn("Failed to fetch user addresses from API:", err);
+    return [];
+  }
+}
+
+export async function saveUserAddresses(addresses: any[]): Promise<any[]> {
+  try {
+    const response = await apiCall<{ data: any[] }>("/api/auth/user/addresses", {
+      method: "PUT",
+      body: JSON.stringify({ addresses }),
+    });
+    return response.data || [];
+  } catch (err) {
+    console.warn("Failed to save user addresses to API:", err);
+    return addresses;
+  }
+}

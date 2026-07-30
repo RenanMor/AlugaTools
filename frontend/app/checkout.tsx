@@ -18,10 +18,12 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { AddressModal } from "@/components/address-modal";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { createRental, payRental, lookupCep } from "@/lib/api/rentals";
 import { getShortOrderId } from "@/lib/utils";
+import { UserAddress } from "@/lib/types";
 
 const SHIPPING_OPTIONS = [
   { id: "pickup", name: "Retirada no local", price: 0, days: "Imediato" },
@@ -31,7 +33,7 @@ const SHIPPING_OPTIONS = [
 
 export default function CheckoutScreen() {
   const colors = useColors();
-  const { cart, cartTotal, clearCart, refreshCatalog, refreshRentals, user, companies } = useApp();
+  const { cart, cartTotal, clearCart, refreshCatalog, refreshRentals, user, companies, lastOrderAddress, saveAddressFromOrder } = useApp();
 
   // Address fields
   const [cep, setCep] = useState("");
@@ -42,6 +44,30 @@ export default function CheckoutScreen() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+
+  // Auto-fill from last order address or default saved address
+  useEffect(() => {
+    if (lastOrderAddress && !cep && !street && !number) {
+      setCep(lastOrderAddress.cep || "");
+      setStreet(lastOrderAddress.street || "");
+      setNumber(lastOrderAddress.number || "");
+      setComplement(lastOrderAddress.complement || "");
+      setNeighborhood(lastOrderAddress.neighborhood || "");
+      setCity(lastOrderAddress.city || "");
+      setState(lastOrderAddress.state || "");
+    }
+  }, [lastOrderAddress]);
+
+  const handleSelectAddress = (addr: UserAddress) => {
+    setCep(addr.cep || "");
+    setStreet(addr.street || "");
+    setNumber(addr.number || "");
+    setComplement(addr.complement || "");
+    setNeighborhood(addr.neighborhood || "");
+    setCity(addr.city || "");
+    setState(addr.state || "");
+  };
 
   // Shipping
   const [shippingId, setShippingId] = useState("pickup");
@@ -269,6 +295,9 @@ export default function CheckoutScreen() {
 
       // 4. Cleanup & Complete
       setCreatedRentals(null);
+      if (shippingId !== "pickup" && cep && number) {
+        await saveAddressFromOrder({ cep, street, number, complement, neighborhood, city, state }).catch(() => {});
+      }
       await Promise.all([refreshCatalog(), refreshRentals()]);
 
       // Show success state then redirect to the first created rental order
@@ -336,7 +365,29 @@ export default function CheckoutScreen() {
 
           {/* 2. Endereço de entrega */}
           <View style={{ gap: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Endereço de Entrega</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Endereço de Entrega</Text>
+              <Pressable
+                onPress={() => setShowAddressModal(true)}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: colors.primary + "15",
+                    borderWidth: 0.5,
+                    borderColor: colors.primary + "33",
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="mappin.and.ellipse" size={14} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>Meus Endereços</Text>
+              </Pressable>
+            </View>
 
             <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
               <View style={{ flex: 1 }}>
@@ -895,6 +946,12 @@ export default function CheckoutScreen() {
           </View>
         </View>
       </Modal>
+
+      <AddressModal
+        visible={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        onSelectAddress={handleSelectAddress}
+      />
     </ScreenContainer>
   );
 }
