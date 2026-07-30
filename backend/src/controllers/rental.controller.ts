@@ -394,11 +394,11 @@ export const RentalController = {
       const allowedTransitions: Record<string, string[]> = {
         awaiting_payment: ["pending", "cancelled"],
         pending:          ["accepted", "rejected", "delivering", "delivered", "cancelled"],
-        accepted:         ["delivering", "delivered", "cancelled"],  // "delivered" for pickup orders
+        accepted:         ["delivering", "delivered", "active", "completed", "return_expired", "cancelled"],  // Early return requested by customer
         rejected:         [],  // Terminal state — no further transitions allowed
         delivering:       ["delivered", "cancelled"],
-        delivered:        ["active", "cancelled"],
-        active:           ["completed", "return_expired"],
+        delivered:        ["active", "accepted", "completed", "cancelled"],
+        active:           ["completed", "accepted", "return_expired", "cancelled"],
         completed:        [],  // Terminal state
         cancelled:        [],  // Terminal state
         return_expired:   ["completed"],  // Can only be resolved by completing
@@ -445,9 +445,11 @@ export const RentalController = {
 
       const isCompanyOwner = !!company;
       const isCompanyDeliverer = deliverer && deliverer.company_id === rental.company_id;
+      const isCustomerOwner = rental.customer_id === userId;
+      const isCustomerEarlyReturn = isCustomerOwner && status === "accepted" && (currentStatus === "delivered" || currentStatus === "active");
 
-      if (!isCompanyOwner && !isCompanyDeliverer && !isSystemOwner) {
-        return res.status(403).json({ error: "Não autorizado: apenas a empresa ou entregador podem atualizar o status" });
+      if (!isCompanyOwner && !isCompanyDeliverer && !isSystemOwner && !isCustomerEarlyReturn) {
+        return res.status(403).json({ error: "Não autorizado: apenas a empresa, entregador ou cliente (para entrega antecipada) podem atualizar o status" });
       }
 
       const extras: any = {};

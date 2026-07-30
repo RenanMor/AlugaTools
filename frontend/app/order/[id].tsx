@@ -580,7 +580,7 @@ export default function OrderDetailsScreen() {
               <Pressable
                 onPress={() => handleUpdateStatus("accepted")}
                 style={({ pressed }) => [
-                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                  { backgroundColor: "#8B5CF6", borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}
               >
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Entregar antecipadamente</Text>
@@ -603,23 +603,11 @@ export default function OrderDetailsScreen() {
               </Pressable>
             )}
 
-            {/* Company Actions: Marcar como concluído direct */}
-            {isCompany && (rental.status === "delivered" || rental.status === "active") && (
-              <Pressable
-                onPress={() => handleUpdateStatus("completed")}
-                style={({ pressed }) => [
-                  { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Marcar como concluído</Text>
-              </Pressable>
-            )}
-
-            {/* Company Actions: Accept/Reject Early Return */}
-            {isCompany && rental.status === "accepted" && (
+            {/* Company / Deliverer Actions: Accept/Reject Early Return */}
+            {canManageDelivery && rental.status === "accepted" && (
               <View style={{ gap: 10 }}>
                 <Pressable
-                  onPress={() => handleUpdateStatus("return_expired")}
+                  onPress={() => handleUpdateStatus("completed")}
                   style={({ pressed }) => [
                     { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                   ]}
@@ -627,7 +615,7 @@ export default function OrderDetailsScreen() {
                   <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Aceitar Entrega Antecipada</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => handleUpdateStatus("delivered")}
+                  onPress={() => handleUpdateStatus("active")}
                   style={({ pressed }) => [
                     { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.error, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                   ]}
