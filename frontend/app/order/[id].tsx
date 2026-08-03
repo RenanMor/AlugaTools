@@ -114,7 +114,7 @@ export default function OrderDetailsScreen() {
     };
   }, [paymentLoadingVisible, paymentLoadingStatus]);
 
-  const isDeliverer = user?.profile === "deliverer";
+  const isDeliverer = user?.profile === "deliverer" || user?.role === "deliverer";
   const isCompany = !!rental && user?.profile === "company" && user?.companyId === rental.companyId;
   const isOwner = !!user?.isOwner;
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
@@ -428,8 +428,6 @@ export default function OrderDetailsScreen() {
       setIsRetrying(false);
     }
   };
-
-  const isDeliverer = user?.profile === "deliverer" || user?.role === "deliverer";
 
   if (isLoading) {
     return (
