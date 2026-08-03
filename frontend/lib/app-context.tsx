@@ -59,7 +59,7 @@ interface AppState {
   logout: () => void;
   checkout: () => Promise<void>;
   rateRental: (rentalId: string, rating: number, comment?: string) => void;
-  setRentalStatus: (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string) => void;
+  setRentalStatus: (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string, deliveryPhotos?: string[]) => void;
   addTool: (tool: Omit<Tool, "id">) => void;
   updateTool: (tool: Tool) => void;
   deleteTool: (toolId: string) => void;
@@ -545,9 +545,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadCatalog, loadRentals]);
 
-  const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string) => {
+  const handleSetRentalStatus = useCallback(async (rentalId: string, status: RentalStatus, receiverName?: string, receiverCpf?: string, deliveryPhotos?: string[]) => {
     try {
-      await updateRentalStatus(rentalId, status, receiverName, receiverCpf);
+      await updateRentalStatus(rentalId, status, receiverName, receiverCpf, deliveryPhotos);
       await loadRentals();
     } catch (err) {
       console.error("Erro ao atualizar status:", err);

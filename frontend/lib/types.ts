@@ -92,6 +92,7 @@ export interface Rental {
   companyId: string;
   companyName: string;
   customerName: string;
+  customerCpf?: string;
   days: number;
   totalPrice: number;
   status: RentalStatus;
@@ -112,6 +113,7 @@ export interface Rental {
   customerNote?: string;
   receiverName?: string;
   receiverCpf?: string;
+  deliveryPhotos?: string[];
   delivererName?: string;
   cancelledBy?: string;
   cancelledByName?: string;

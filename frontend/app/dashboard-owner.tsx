@@ -33,7 +33,7 @@ const ADMIN_STATUS_LABEL: Record<string, string> = {
   accepted: "Entrega ant. solicitada",
   rejected: "Recusado",
   delivering: "Em rota de entrega",
-  delivered: "Entregue (Em uso)",
+  delivered: "Entregue",
   active: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",
@@ -102,7 +102,7 @@ export default function DashboardOwnerScreen() {
     fetchCompanies();
     // Real-time polling: auto-refresh companies list every 3 seconds
     const interval = setInterval(() => {
-      getAllCompanies().then(setCompanies).catch(() => {});
+      getAllCompanies().then(setCompanies).catch(() => { });
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -456,8 +456,8 @@ export default function DashboardOwnerScreen() {
                           item.status === "approved"
                             ? colors.success + "15"
                             : item.status === "rejected"
-                            ? "#EF444415"
-                            : "#F59E0B15",
+                              ? "#EF444415"
+                              : "#F59E0B15",
                       }}
                     >
                       <Text
@@ -468,15 +468,15 @@ export default function DashboardOwnerScreen() {
                             item.status === "approved"
                               ? colors.success
                               : item.status === "rejected"
-                              ? "#EF4444"
-                              : "#F59E0B",
+                                ? "#EF4444"
+                                : "#F59E0B",
                         }}
                       >
                         {item.status === "approved"
                           ? "Aprovado"
                           : item.status === "rejected"
-                          ? "Recusado"
-                          : "Pendente"}
+                            ? "Recusado"
+                            : "Pendente"}
                       </Text>
                     </View>
                   )}
@@ -940,7 +940,7 @@ export default function DashboardOwnerScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary, marginBottom: 4 }}>
                   🏢 Dados da Empresa
                 </Text>
-                
+
                 <InfoRow label="Razão Social / Nome Fantasia" value={inspectingCompany.name} />
                 <InfoRow label="CNPJ" value={inspectingCompany.cnpj || "Não informado"} />
                 <InfoRow label="Localização / Endereço" value={inspectingCompany.location || `${inspectingCompany.city || ""}, ${inspectingCompany.state || ""}`} />
@@ -952,7 +952,7 @@ export default function DashboardOwnerScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary, marginBottom: 4 }}>
                   👤 Responsável pelo Cadastro
                 </Text>
-                
+
                 <InfoRow label="Nome do Titular" value={inspectingCompany.ownerName || "Titular do Cadastro"} />
                 <InfoRow label="E-mail de Contato" value={inspectingCompany.ownerEmail || "Não informado"} />
                 <InfoRow label="Telefone / WhatsApp" value={inspectingCompany.phone || "Não informado"} />

@@ -32,7 +32,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
   accepted: "Entrega antecipada solicitada",
   rejected: "Recusado",
   delivering: "Em rota de entrega",
-  delivered: "Entregue (Em uso)",
+  delivered: "Entregue",
   active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
@@ -56,7 +56,7 @@ export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const { refreshRentals, refreshCatalog, rateRental, setRentalStatus, user } = useApp();
-  
+
   const [rental, setRental] = useState<Rental | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -70,7 +70,7 @@ export default function OrderDetailsScreen() {
   const [showReceiverModal, setShowReceiverModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showStartDeliveryModal, setShowStartDeliveryModal] = useState(false);
-  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
   const [photoSourceIndex, setPhotoSourceIndex] = useState<number | null>(null);
   const [deliveryPhotos, setDeliveryPhotos] = useState<string[]>(["", "", ""]);
   const [receiverName, setReceiverName] = useState("");
@@ -120,7 +120,21 @@ export default function OrderDetailsScreen() {
   const isPickup = !!rental && (!rental.address || rental.shippingPrice === 0 || !rental.address.street);
   const canManageDelivery = isDeliverer || isCompany || isOwner;
 
-  // CPF validation helper: checks digit verification algorithm
+  const orderCustomerCpf = rental?.customerCpf || (user?.cpf ? user.cpf : "");
+  const targetDeliveryCode = useMemo(() => {
+    if (!orderCustomerCpf) return "";
+    const digits = orderCustomerCpf.replace(/\D/g, "");
+    return digits.length >= 4 ? digits.slice(-4) : digits;
+  }, [orderCustomerCpf]);
+
+  const isDeliveryCodeValid = useMemo(() => {
+    const digits = receiverCpf.replace(/\D/g, "");
+    if (digits.length !== 4) return false;
+    if (!targetDeliveryCode) return true;
+    return digits === targetDeliveryCode;
+  }, [receiverCpf, targetDeliveryCode]);
+
+  // CPF validation helper: checks digit verification algorithm (for return confirmation modal)
   const isCpfValid = useMemo(() => {
     const digits = receiverCpf.replace(/\D/g, "");
     if (digits.length !== 11) return false;
@@ -161,7 +175,7 @@ export default function OrderDetailsScreen() {
         .then((updatedData) => {
           if (updatedData) setRental(updatedData);
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 3000);
 
     return () => clearInterval(interval);
@@ -266,11 +280,11 @@ export default function OrderDetailsScreen() {
     return { barcode, bookletUrl };
   }, [rental]);
 
-  const handleUpdateStatus = async (status: RentalStatus, rName?: string, rCpf?: string) => {
+  const handleUpdateStatus = async (status: RentalStatus, rName?: string, rCpf?: string, dPhotos?: string[]) => {
     if (isStatusLoading) return;
     setIsStatusLoading(true);
     try {
-      await setRentalStatus(rental!.id, status, rName, rCpf);
+      await setRentalStatus(rental!.id, status, rName, rCpf, dPhotos);
       await fetchOrder();
     } catch (err: any) {
       Alert.alert("Erro", err.message || "Não foi possível atualizar o status.");
@@ -281,11 +295,10 @@ export default function OrderDetailsScreen() {
 
   const handleUploadDeliveryPhoto = (index: number) => {
     setPhotoSourceIndex(index);
-    setShowPhotoSourceModal(true);
+    triggerImageUpload(index, "camera");
   };
 
-  const triggerImageUpload = (index: number, mode: "camera" | "gallery") => {
-    setShowPhotoSourceModal(false);
+  const triggerImageUpload = (index: number, mode: "camera" | "gallery" = "camera") => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
@@ -327,7 +340,8 @@ export default function OrderDetailsScreen() {
 
   const handleConfirmStartDelivery = async () => {
     setShowStartDeliveryModal(false);
-    await handleUpdateStatus("delivering");
+    const validPhotos = deliveryPhotos.filter(Boolean);
+    await handleUpdateStatus("delivering", undefined, undefined, validPhotos);
   };
 
   const handleRetryPayment = async () => {
@@ -409,13 +423,20 @@ export default function OrderDetailsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }} showsVerticalScrollIndicator={false}>
-        
+
         {/* Header (Status) */}
         <View style={{ padding: 16, borderRadius: 14, backgroundColor: STATUS_COLOR[rental.status] + "11", borderWidth: 1, borderColor: STATUS_COLOR[rental.status] + "44", alignItems: "center", gap: 6 }}>
           <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>Status do Pedido</Text>
           <Text style={{ fontSize: 20, fontWeight: "800", color: STATUS_COLOR[rental.status] }}>
             {STATUS_LABEL[rental.status]}
           </Text>
+          {rental.status === "delivering" && targetDeliveryCode ? (
+            <View style={{ marginTop: 2, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F973161F", borderWidth: 1, borderColor: "#F9731644", alignItems: "center" }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#F97316", textAlign: "center" }}>
+                conferir pedido e informar código: {targetDeliveryCode}
+              </Text>
+            </View>
+          ) : null}
           <Text style={{ fontSize: 12, color: colors.muted }}>
             Realizado em: {new Date(rental.createdAt).toLocaleString("pt-BR")}
           </Text>
@@ -575,6 +596,31 @@ export default function OrderDetailsScreen() {
           </View>
         </View>
 
+        {/* Fotos da Entrega (Visíveis para todos que acessam o pedido) */}
+        {rental.deliveryPhotos && rental.deliveryPhotos.length > 0 ? (
+          <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <IconSymbol name="camera.fill" size={18} color={colors.primary} />
+              <Text style={{ fontSize: 16, fontWeight: "800", color: colors.foreground }}>Fotos da Entrega</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+              {rental.deliveryPhotos.map((photoUrl, idx) => (
+                <Pressable
+                  key={idx}
+                  onPress={() => setViewingPhotoUrl(photoUrl)}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+                >
+                  <Image
+                    source={{ uri: photoUrl }}
+                    style={{ width: 84, height: 84, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+                    resizeMode="cover"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {/* Observações do Cliente */}
         {rental.customerNote ? (
           <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
@@ -586,28 +632,28 @@ export default function OrderDetailsScreen() {
         {/* Resumo Financeiro */}
         <View style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
           <Text style={{ fontSize: 16, fontWeight: "800", color: colors.foreground, marginBottom: 4 }}>Pagamento</Text>
-          
+
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: colors.muted, fontSize: 14 }}>Método selecionado</Text>
             <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
               {rental.paymentMethod === "PIX" ? "PIX" : rental.paymentMethod === "BOLETO" ? "Boleto" : rental.paymentMethod === "CREDIT_CARD" ? "Cartão de Crédito" : "Cartão de Débito"}
             </Text>
           </View>
-          
+
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
             <Text style={{ color: colors.muted, fontSize: 13 }}>Frete</Text>
             <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "600" }}>
               {rental.shippingPrice && rental.shippingPrice > 0 ? `R$ ${rental.shippingPrice.toFixed(2)}` : "Grátis"}
             </Text>
           </View>
-          
+
           {rental.couponDiscount && rental.couponDiscount > 0 ? (
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <Text style={{ color: colors.success, fontSize: 13 }}>Desconto ({rental.couponCode})</Text>
               <Text style={{ color: colors.success, fontSize: 13, fontWeight: "600" }}>- R$ {rental.couponDiscount.toFixed(2)}</Text>
             </View>
           ) : null}
-          
+
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6 }} />
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: "700" }}>Total Pago</Text>
@@ -634,7 +680,14 @@ export default function OrderDetailsScreen() {
 
             {canManageDelivery && rental.status === "delivering" && (
               <Pressable
-                onPress={() => isPickup ? handleUpdateStatus("delivered") : setShowReceiverModal(true)}
+                onPress={() => {
+                  if (isPickup) {
+                    handleUpdateStatus("delivered");
+                  } else {
+                    setReceiverCpf("");
+                    setShowReceiverModal(true);
+                  }
+                }}
                 style={({ pressed }) => [
                   { backgroundColor: colors.success, borderRadius: 14, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1 },
                 ]}
@@ -718,13 +771,13 @@ export default function OrderDetailsScreen() {
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
               {rental.rating ? "Sua avaliação" : "Avalie este serviço"}
             </Text>
-            <StarRating 
-              value={rental.rating ?? selectedRating} 
-              size={32} 
-              editable={!rental.rating} 
+            <StarRating
+              value={rental.rating ?? selectedRating}
+              size={32}
+              editable={!rental.rating}
               onChange={(v) => {
                 setSelectedRating(v);
-              }} 
+              }}
             />
 
             {!rental.rating && selectedRating > 0 && (
@@ -750,7 +803,7 @@ export default function OrderDetailsScreen() {
                     textAlignVertical: "top",
                   }}
                 />
-                
+
                 <Pressable
                   onPress={async () => {
                     if (isSubmittingRating) return;
@@ -796,92 +849,127 @@ export default function OrderDetailsScreen() {
 
       </ScrollView>
 
-      {/* Modal para Dados do Recebedor (Finalizar Entrega) */}
+      {/* Modal para Finalizar Entrega */}
       <Modal visible={showReceiverModal} transparent={true} animationType="slide" onRequestClose={() => setShowReceiverModal(false)}>
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
           <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Confirmar Recebimento</Text>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Confirmar Entrega</Text>
               <Pressable onPress={() => setShowReceiverModal(false)}>
                 <IconSymbol name="xmark" size={24} color={colors.foreground} />
               </Pressable>
             </View>
 
-            {/* CPF field first */}
+            {/* Código de Entrega (4 dígitos do CPF) */}
             <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CPF do Recebedor</Text>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Código de Entrega (últimos 4 dígitos do CPF)</Text>
               <TextInput
                 value={receiverCpf}
                 onChangeText={(text: string) => {
-                  const cleaned = text.replace(/\D/g, "");
-                  const limited = cleaned.slice(0, 11);
-                  let formatted = limited;
-                  if (limited.length > 9) {
-                    formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9, 11)}`;
-                  } else if (limited.length > 6) {
-                    formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6)}`;
-                  } else if (limited.length > 3) {
-                    formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
-                  }
-                  setReceiverCpf(formatted);
-                  // Clear name if CPF becomes invalid
-                  if (limited.length !== 11) setReceiverName("");
+                  const cleaned = text.replace(/\D/g, "").slice(0, 4);
+                  setReceiverCpf(cleaned);
                 }}
-                placeholder="000.000.000-00"
+                placeholder="0000"
                 placeholderTextColor={colors.muted}
                 keyboardType="numeric"
+                maxLength={4}
                 style={{
                   backgroundColor: colors.background,
                   borderWidth: 1,
-                  borderColor: isCpfValid ? colors.success : colors.border,
+                  borderColor: receiverCpf.length === 4
+                    ? (isDeliveryCodeValid ? colors.success : "#EF4444")
+                    : colors.border,
                   borderRadius: 12,
                   paddingHorizontal: 14,
                   paddingVertical: 12,
                   color: colors.foreground,
+                  fontSize: 18,
+                  fontWeight: "700",
+                  letterSpacing: 4,
+                  textAlign: "center",
                 }}
               />
-              {receiverCpf.replace(/\D/g, "").length === 11 && !isCpfValid && (
-                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600" }}>CPF inválido. Verifique os dígitos.</Text>
+              {receiverCpf.length === 4 && !isDeliveryCodeValid && (
+                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600" }}>
+                  Código incorreto. Não coincide com os últimos 4 dígitos do CPF da conta do pedido.
+                </Text>
               )}
-              {isCpfValid && (
-                <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>✓ CPF válido</Text>
+              {receiverCpf.length === 4 && isDeliveryCodeValid && (
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>
+                  ✓ Código de entrega confirmado
+                </Text>
               )}
             </View>
 
-            {/* Name field - only enabled when CPF is valid */}
-            <View style={{ gap: 6, opacity: isCpfValid ? 1 : 0.4 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Nome Completo do Recebedor</Text>
-              <TextInput
-                value={receiverName}
-                onChangeText={setReceiverName}
-                placeholder="Ex: João da Silva"
-                placeholderTextColor={colors.muted}
-                editable={isCpfValid}
-                style={{
-                  backgroundColor: isCpfValid ? colors.background : colors.border + "44",
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  color: colors.foreground,
-                }}
-              />
+            {/* Fotos da Entrega (Comprovação) */}
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Fotos da Entrega (até 3 fotos)</Text>
+              <View style={{ flexDirection: "row", gap: 10, justifyContent: "center" }}>
+                {[0, 1, 2].map((idx) => {
+                  const img = deliveryPhotos[idx];
+                  return (
+                    <Pressable
+                      key={idx}
+                      onPress={() => handleUploadDeliveryPhoto(idx)}
+                      style={({ pressed }) => [
+                        {
+                          width: 80,
+                          height: 80,
+                          borderRadius: 12,
+                          backgroundColor: colors.background,
+                          borderWidth: img ? 1 : 1.5,
+                          borderColor: img ? colors.primary : colors.border,
+                          borderStyle: img ? "solid" : "dashed",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          overflow: "hidden",
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      {img ? (
+                        <View style={{ width: "100%", height: "100%", position: "relative" }}>
+                          <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setDeliveryPhotos((prev) => {
+                                const next = [...prev];
+                                next[idx] = "";
+                                return next;
+                              });
+                            }}
+                            style={{ position: "absolute", top: 4, right: 4, backgroundColor: "#EF4444", borderRadius: 10, padding: 4 }}
+                          >
+                            <IconSymbol name="trash" size={12} color="#fff" />
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <View style={{ alignItems: "center", gap: 2, padding: 4 }}>
+                          <IconSymbol name="camera.fill" size={18} color={colors.muted} />
+                          <Text style={{ fontSize: 10, color: colors.muted, fontWeight: "600" }}>Foto {idx + 1}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
             <Pressable
               onPress={() => {
                 setShowReceiverModal(false);
-                handleUpdateStatus("delivered", receiverName, receiverCpf);
+                const validPhotos = deliveryPhotos.filter(Boolean);
+                handleUpdateStatus("delivered", undefined, receiverCpf, validPhotos);
               }}
-              disabled={!isCpfValid || !receiverName.trim()}
+              disabled={!isDeliveryCodeValid}
               style={({ pressed }) => [
                 {
                   backgroundColor: colors.success,
                   borderRadius: 14,
                   paddingVertical: 14,
                   alignItems: "center",
-                  opacity: (!isCpfValid || !receiverName.trim()) ? 0.4 : pressed ? 0.85 : 1,
+                  opacity: !isDeliveryCodeValid ? 0.4 : pressed ? 0.85 : 1,
                 },
               ]}
             >
@@ -1013,8 +1101,8 @@ export default function OrderDetailsScreen() {
                     <IconSymbol name="creditcard.fill" size={14} color={colors.muted} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>
                       {rental.paymentMethod === "CREDIT_CARD" ? "Cartão de Crédito" :
-                       rental.paymentMethod === "DEBIT_CARD" ? "Cartão de Débito" :
-                       rental.paymentMethod === "PIX" ? "PIX" : "Boleto"}
+                        rental.paymentMethod === "DEBIT_CARD" ? "Cartão de Débito" :
+                          rental.paymentMethod === "PIX" ? "PIX" : "Boleto"}
                     </Text>
                   </View>
                 </View>
@@ -1329,102 +1417,19 @@ export default function OrderDetailsScreen() {
         </View>
       </Modal>
 
-      {/* Modal para Escolha de Origem da Foto (Câmera ou Galeria) ou Remoção */}
-      <Modal visible={showPhotoSourceModal} transparent animationType="fade" onRequestClose={() => setShowPhotoSourceModal(false)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 }}>
-          <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 20, width: "100%", maxWidth: 360, gap: 14 }}>
-            <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground, textAlign: "center" }}>
-              Opções da Foto
-            </Text>
-            <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
-              Escolha como deseja enviar ou gerenciar esta foto:
-            </Text>
-
-            <View style={{ gap: 10, marginTop: 4 }}>
-              <Pressable
-                onPress={() => {
-                  if (photoSourceIndex !== null) triggerImageUpload(photoSourceIndex, "camera");
-                }}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    backgroundColor: colors.primary,
-                    paddingVertical: 14,
-                    borderRadius: 12,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <IconSymbol name="camera.fill" size={20} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Tirar Foto com Câmera</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  if (photoSourceIndex !== null) triggerImageUpload(photoSourceIndex, "gallery");
-                }}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    backgroundColor: colors.background,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    paddingVertical: 14,
-                    borderRadius: 12,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <IconSymbol name="photo.fill" size={20} color={colors.foreground} />
-                <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 15 }}>Escolher da Galeria / Arquivo</Text>
-              </Pressable>
-
-              {photoSourceIndex !== null && !!deliveryPhotos[photoSourceIndex] && (
-                <Pressable
-                  onPress={() => {
-                    setDeliveryPhotos((prev) => {
-                      const next = [...prev];
-                      next[photoSourceIndex] = "";
-                      return next;
-                    });
-                    setShowPhotoSourceModal(false);
-                  }}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 10,
-                      backgroundColor: colors.surface,
-                      borderWidth: 1,
-                      borderColor: colors.error,
-                      paddingVertical: 14,
-                      borderRadius: 12,
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}
-                >
-                  <IconSymbol name="trash" size={20} color={colors.error} />
-                  <Text style={{ color: colors.error, fontWeight: "800", fontSize: 15 }}>Remover Foto Atual</Text>
-                </Pressable>
-              )}
-
-              <Pressable
-                onPress={() => setShowPhotoSourceModal(false)}
-                style={({ pressed }) => [
-                  { paddingVertical: 10, alignItems: "center", opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <Text style={{ color: colors.muted, fontWeight: "600", fontSize: 14 }}>Cancelar</Text>
-              </Pressable>
-            </View>
-          </View>
+      {/* Modal de Visualização da Foto da Entrega em Tela Cheia */}
+      <Modal visible={!!viewingPhotoUrl} transparent animationType="fade" onRequestClose={() => setViewingPhotoUrl(null)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+          <Pressable onPress={() => setViewingPhotoUrl(null)} style={{ position: "absolute", top: 40, right: 20, zIndex: 10, padding: 10 }}>
+            <IconSymbol name="xmark" size={28} color="#fff" />
+          </Pressable>
+          {viewingPhotoUrl && (
+            <Image
+              source={{ uri: viewingPhotoUrl }}
+              style={{ width: "100%", height: "80%", borderRadius: 12 }}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
     </ScreenContainer>

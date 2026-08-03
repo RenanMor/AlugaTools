@@ -32,13 +32,13 @@ export default function DashboardScreen() {
   } = useApp();
   const companyId = user?.companyId;
   const hasInvalidCompany = !companyId || companyId === "co1";
-  
+
   const [tab, setTab] = useState<"requests" | "tools" | "deliverers">("requests");
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [showToolForm, setShowToolForm] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const myCompany = companyId ? companies.find((c) => c.id === companyId) : null;
-  
+
   const [editingDeliverer, setEditingDeliverer] = useState<Deliverer | null>(null);
   const [showDelivererForm, setShowDelivererForm] = useState(false);
 
@@ -49,9 +49,9 @@ export default function DashboardScreen() {
   useEffect(() => {
     if (!user || user.profile !== "company") return;
     if (typeof refreshRentals === "function") {
-      refreshRentals().catch(() => {});
+      refreshRentals().catch(() => { });
       const interval = setInterval(() => {
-        refreshRentals().catch(() => {});
+        refreshRentals().catch(() => { });
       }, 3000);
       return () => clearInterval(interval);
     }
@@ -189,8 +189,8 @@ export default function DashboardScreen() {
                 Status da Loja: {myCompany.isOpen ? "Loja Aberta" : "Loja Fechada"}
               </Text>
               <Text style={{ fontSize: 11, color: colors.muted }}>
-                {myCompany.isOpen 
-                  ? "Clientes podem buscar e alugar suas ferramentas" 
+                {myCompany.isOpen
+                  ? "Clientes podem buscar e alugar suas ferramentas"
                   : "Sua loja está fechada para novos aluguéis"}
               </Text>
             </View>
@@ -384,7 +384,7 @@ const STATUS_LABEL_BACK: Record<string, string> = {
   accepted: "Entrega ant. solicitada",
   rejected: "Recusado",
   delivering: "Em entrega",
-  delivered: "Entregue (Em uso)",
+  delivered: "Entregue",
   active: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",
@@ -665,7 +665,7 @@ function ToolFormModal({
 
             <Field label="Nome" value={name} onChangeText={setName} placeholder="Ex: Furadeira 750W" />
             <Field label="Descrição" value={description} onChangeText={setDescription} placeholder="Detalhes da ferramenta" multiline />
-            
+
             <View style={{ flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1 }}>
                 <Field label="Preço por dia (R$)" value={price} onChangeText={setPrice} placeholder="35" keyboardType="numeric" />
@@ -954,7 +954,7 @@ function DelivererFormModal({
             <Field label="Nome Completo *" value={name} onChangeText={setName} placeholder="Nome do entregador" />
             <Field label="E-mail *" value={email} onChangeText={setEmail} placeholder="exemplo@entregador.com" keyboardType="default" />
             <Field label="Telefone *" value={phone} onChangeText={handlePhoneChange} placeholder="(11) 99999-9999" keyboardType="numeric" />
-            
+
             {!deliverer && (
               <Field label="Senha Temporária *" value={password} onChangeText={setPassword} placeholder="Mínimo 6 caracteres" secureTextEntry />
             )}

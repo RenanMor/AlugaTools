@@ -375,7 +375,7 @@ export const RentalController = {
 
   async updateStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const { status, receiver_name, receiver_cpf } = req.body;
+      const { status, receiver_name, receiver_cpf, delivery_photos } = req.body;
       const userId = (req as any).userId as string;
 
       // Input validation: only allow valid status values
@@ -414,8 +414,8 @@ export const RentalController = {
 
       // SECURITY FIX (HIGH-03): Require delivery proof for "delivered" status
       if (status === "delivered") {
-        if (!receiver_name || !receiver_name.trim()) {
-          return res.status(400).json({ error: "Nome do recebedor é obrigatório para confirmar a entrega" });
+        if (!receiver_name?.trim() && !receiver_cpf?.trim() && (!delivery_photos || delivery_photos.length === 0)) {
+          return res.status(400).json({ error: "Código de entrega / CPF ou comprovação é obrigatório para confirmar a entrega" });
         }
       }
 
@@ -456,6 +456,7 @@ export const RentalController = {
       if (delivererId) extras.deliverer_id = delivererId;
       if (receiver_name) extras.receiver_name = receiver_name;
       if (receiver_cpf) extras.receiver_cpf = receiver_cpf;
+      if (delivery_photos && Array.isArray(delivery_photos)) extras.delivery_photos = delivery_photos;
 
       const updatedRental = await RentalModel.updateStatus(req.params.id, status, extras);
       res.json({ data: updatedRental });

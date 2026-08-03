@@ -27,11 +27,12 @@ export interface Rental {
   customer_note: string | null;
   receiver_name: string | null;
   receiver_cpf: string | null;
+  delivery_photos?: string[] | null;
   cancelled_by: string | null;
   cancelled_by_name: string | null;
   tool?: { name: string; image: string };
   company?: { name: string };
-  customer?: { name: string };
+  customer?: { name: string; cpf?: string };
   deliverer?: { name: string };
 }
 
@@ -68,7 +69,7 @@ async function enrichRentals(rentals: any | any[]): Promise<any> {
   const [toolsRes, companiesRes, usersRes, deliverersRes] = await Promise.all([
     toolIds.length ? supabaseAdmin.from("tools").select("id, name, image").in("id", toolIds) : Promise.resolve({ data: [] }),
     companyIds.length ? supabaseAdmin.from("companies").select("id, name").in("id", companyIds) : Promise.resolve({ data: [] }),
-    customerIds.length ? supabaseAdmin.from("users").select("id, name").in("id", customerIds) : Promise.resolve({ data: [] }),
+    customerIds.length ? supabaseAdmin.from("users").select("id, name, cpf").in("id", customerIds) : Promise.resolve({ data: [] }),
     delivererIds.length ? supabaseAdmin.from("deliverers").select("id, name").in("id", delivererIds) : Promise.resolve({ data: [] }),
   ]);
 
@@ -78,8 +79,8 @@ async function enrichRentals(rentals: any | any[]): Promise<any> {
   const companyMap: Record<string, { name: string }> = {};
   (companiesRes.data || []).forEach((c: any) => { companyMap[c.id] = { name: c.name }; });
 
-  const userMap: Record<string, { name: string }> = {};
-  (usersRes.data || []).forEach((u: any) => { userMap[u.id] = { name: u.name }; });
+  const userMap: Record<string, { name: string; cpf?: string }> = {};
+  (usersRes.data || []).forEach((u: any) => { userMap[u.id] = { name: u.name, cpf: u.cpf }; });
 
   const delivererMap: Record<string, { name: string }> = {};
   (deliverersRes.data || []).forEach((d: any) => { delivererMap[d.id] = { name: d.name }; });
@@ -241,7 +242,7 @@ export const RentalModel = {
   async updateStatus(
     id: string,
     status: RentalStatus,
-    extras?: { deliverer_id?: string; receiver_name?: string; receiver_cpf?: string }
+    extras?: { deliverer_id?: string; receiver_name?: string; receiver_cpf?: string; delivery_photos?: string[] }
   ): Promise<Rental> {
     const rental = await this.findById(id);
     if (!rental) throw new Error("Pedido não encontrado");
@@ -259,6 +260,12 @@ export const RentalModel = {
       if (extras?.receiver_cpf) {
         updateData.receiver_cpf = extras.receiver_cpf;
       }
+      if (extras?.delivery_photos && extras.delivery_photos.length > 0) {
+        updateData.delivery_photos = extras.delivery_photos;
+      }
+    }
+    if (extras?.delivery_photos && extras.delivery_photos.length > 0 && !updateData.delivery_photos) {
+      updateData.delivery_photos = extras.delivery_photos;
     }
     if (extras?.deliverer_id) {
       updateData.deliverer_id = extras.deliverer_id;

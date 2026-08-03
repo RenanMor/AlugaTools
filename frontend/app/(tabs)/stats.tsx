@@ -15,7 +15,7 @@ const STATUS_LABEL_BACK: Record<string, string> = {
   accepted: "Entrega antecipada solicitada",
   rejected: "Recusado",
   delivering: "Em entrega",
-  delivered: "Entregue (Em uso)",
+  delivered: "Entregue",
   active: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",

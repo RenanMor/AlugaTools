@@ -19,7 +19,7 @@ const STATUS_LABEL: Record<RentalStatus, string> = {
   accepted: "Entrega solicitada",
   rejected: "Recusado",
   delivering: "Em rota de entrega",
-  delivered: "Entregue (Em uso)",
+  delivered: "Entregue",
   active: "Em uso",
   completed: "Concluído",
   cancelled: "Cancelado",
@@ -48,9 +48,9 @@ export default function OrdersScreen() {
   // Real-time polling: auto-refresh rentals every 3 seconds
   React.useEffect(() => {
     if (!user) return;
-    refreshRentals().catch(() => {});
+    refreshRentals().catch(() => { });
     const interval = setInterval(() => {
-      refreshRentals().catch(() => {});
+      refreshRentals().catch(() => { });
     }, 3000);
     return () => clearInterval(interval);
   }, [user?.id, refreshRentals]);
@@ -143,8 +143,8 @@ export default function OrdersScreen() {
                   searchQuery
                     ? `Nenhum pedido corresponde à busca "${searchQuery}".`
                     : isDeliverer
-                    ? "Os pedidos da empresa aparecerão aqui."
-                    : "Explore ferramentas e faça seu primeiro aluguel."
+                      ? "Os pedidos da empresa aparecerão aqui."
+                      : "Explore ferramentas e faça seu primeiro aluguel."
                 }
               />
             }

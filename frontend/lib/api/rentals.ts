@@ -10,6 +10,7 @@ export function mapRental(data: any): Rental {
     companyId: data.company_id,
     companyName: (data.company?.name || "Empresa").replace(/\s*( \s+|\s+ )\s*$/i, "").trim() || "Empresa",
     customerName: data.customer?.name || "Cliente",
+    customerCpf: data.customer?.cpf || data.customer_cpf || undefined,
     days: Number(data.days) || 1,
     totalPrice: Number(data.total_price) || 0,
     status: data.status,
@@ -30,6 +31,7 @@ export function mapRental(data: any): Rental {
     customerNote: data.customer_note || undefined,
     receiverName: data.receiver_name || undefined,
     receiverCpf: data.receiver_cpf || undefined,
+    deliveryPhotos: Array.isArray(data.delivery_photos) ? data.delivery_photos : undefined,
     delivererName: data.deliverer?.name || undefined,
     cancelledBy: data.cancelled_by || undefined,
     cancelledByName: data.cancelled_by_name || undefined,
@@ -60,13 +62,11 @@ export async function createRental(rental: {
   toolId: string;
   companyId: string;
   days: number;
-  totalPrice: number;
-  paymentMethod?: string;
+  paymentMethod: string;
   shippingPrice?: number;
   address?: any;
   couponCode?: string;
   couponDiscount?: number;
-  customerNote?: string;
 }): Promise<Rental> {
   const response = await apiCall<{ data: any }>("/api/rentals", {
     method: "POST",
@@ -74,13 +74,11 @@ export async function createRental(rental: {
       tool_id: rental.toolId,
       company_id: rental.companyId,
       days: rental.days,
-      total_price: rental.totalPrice,
       payment_method: rental.paymentMethod,
       shipping_price: rental.shippingPrice,
       address: rental.address,
       coupon_code: rental.couponCode,
       coupon_discount: rental.couponDiscount,
-      customer_note: rental.customerNote,
     }),
   });
   return mapRental(response.data);
@@ -88,21 +86,21 @@ export async function createRental(rental: {
 
 export async function payRental(
   id: string,
-  paymentData: { card?: any; installments?: number }
-): Promise<{ data: Rental; payment: any }> {
-  const response = await apiCall<{ data: any; payment: any }>(`/api/rentals/${id}/pay`, {
+  paymentData?: {
+    card?: any;
+    installments?: number;
+  }
+): Promise<Rental> {
+  const response = await apiCall<{ data: any }>(`/api/rentals/${id}/pay`, {
     method: "POST",
-    body: JSON.stringify(paymentData),
+    body: JSON.stringify(paymentData || {}),
   });
-  return {
-    data: mapRental(response.data),
-    payment: response.payment,
-  };
+  return mapRental(response.data);
 }
 
 export async function cancelRental(id: string): Promise<Rental> {
   const response = await apiCall<{ data: any }>(`/api/rentals/${id}/cancel`, {
-    method: "POST",
+    method: "PATCH",
   });
   return mapRental(response.data);
 }
@@ -116,7 +114,8 @@ export async function updateRentalStatus(
   id: string,
   status: RentalStatus,
   receiverName?: string,
-  receiverCpf?: string
+  receiverCpf?: string,
+  deliveryPhotos?: string[]
 ): Promise<Rental> {
   const response = await apiCall<{ data: any }>(`/api/rentals/${id}/status`, {
     method: "PATCH",
@@ -124,6 +123,7 @@ export async function updateRentalStatus(
       status,
       receiver_name: receiverName,
       receiver_cpf: receiverCpf,
+      delivery_photos: deliveryPhotos,
     }),
   });
   return mapRental(response.data);
