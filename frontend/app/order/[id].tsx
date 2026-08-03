@@ -429,6 +429,8 @@ export default function OrderDetailsScreen() {
     }
   };
 
+  const isDeliverer = user?.profile === "deliverer" || user?.role === "deliverer";
+
   if (isLoading) {
     return (
       <ScreenContainer>
@@ -463,10 +465,13 @@ export default function OrderDetailsScreen() {
           <Text style={{ fontSize: 20, fontWeight: "800", color: STATUS_COLOR[rental.status] }}>
             {STATUS_LABEL[rental.status]}
           </Text>
-          {rental.status === "delivering" && targetDeliveryCode ? (
-            <View style={{ marginTop: 2, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F973161F", borderWidth: 1, borderColor: "#F9731644", alignItems: "center" }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#F97316", textAlign: "center" }}>
-                conferir pedido e informar código: {targetDeliveryCode}
+          {rental.status === "delivering" && targetDeliveryCode && !isDeliverer ? (
+            <View style={{ marginTop: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "#F97316", alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" }}>
+                conferir pedido e informar código:
+              </Text>
+              <Text style={{ fontSize: 26, fontWeight: "900", color: "#FFFFFF", letterSpacing: 4, textAlign: "center" }}>
+                {targetDeliveryCode}
               </Text>
             </View>
           ) : null}
@@ -934,80 +939,19 @@ export default function OrderDetailsScreen() {
               )}
             </View>
 
-            {/* Fotos da Entrega (Comprovação) */}
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Fotos da Entrega (3 fotos obrigatórias)</Text>
-              <View style={{ flexDirection: "row", gap: 10, justifyContent: "center" }}>
-                {[0, 1, 2].map((idx) => {
-                  const img = deliveryPhotos[idx];
-                  return (
-                    <Pressable
-                      key={idx}
-                      onPress={() => handleUploadDeliveryPhoto(idx)}
-                      style={({ pressed }) => [
-                        {
-                          width: 80,
-                          height: 80,
-                          borderRadius: 12,
-                          backgroundColor: colors.background,
-                          borderWidth: img ? 1 : 1.5,
-                          borderColor: img ? colors.primary : colors.border,
-                          borderStyle: img ? "solid" : "dashed",
-                          justifyContent: "center",
-                          alignItems: "center",
-                          overflow: "hidden",
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
-                    >
-                      {img ? (
-                        <View style={{ width: "100%", height: "100%", position: "relative" }}>
-                          <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setDeliveryPhotos((prev) => {
-                                const next = [...prev];
-                                next[idx] = "";
-                                return next;
-                              });
-                            }}
-                            style={{ position: "absolute", top: 4, right: 4, backgroundColor: "#EF4444", borderRadius: 10, padding: 4 }}
-                          >
-                            <IconSymbol name="trash" size={12} color="#fff" />
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <View style={{ alignItems: "center", gap: 2, padding: 4 }}>
-                          <IconSymbol name="camera.fill" size={18} color={colors.muted} />
-                          <Text style={{ fontSize: 10, color: colors.muted, fontWeight: "600" }}>Foto {idx + 1}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {deliveryPhotos.filter(Boolean).length < 3 && (
-                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600", textAlign: "center" }}>
-                  As 3 fotos são obrigatórias para finalizar a entrega ({deliveryPhotos.filter(Boolean).length}/3 enviadas).
-                </Text>
-              )}
-            </View>
-
             <Pressable
               onPress={() => {
                 setShowReceiverModal(false);
-                const validPhotos = deliveryPhotos.filter(Boolean);
-                handleUpdateStatus("delivered", undefined, receiverCpf, validPhotos);
+                handleUpdateStatus("delivered", undefined, receiverCpf);
               }}
-              disabled={!isDeliveryCodeValid || deliveryPhotos.filter(Boolean).length < 3}
+              disabled={!isDeliveryCodeValid}
               style={({ pressed }) => [
                 {
                   backgroundColor: colors.success,
                   borderRadius: 14,
                   paddingVertical: 14,
                   alignItems: "center",
-                  opacity: (!isDeliveryCodeValid || deliveryPhotos.filter(Boolean).length < 3) ? 0.4 : pressed ? 0.85 : 1,
+                  opacity: !isDeliveryCodeValid ? 0.4 : pressed ? 0.85 : 1,
                 },
               ]}
             >
