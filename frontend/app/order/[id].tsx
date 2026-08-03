@@ -298,6 +298,37 @@ export default function OrderDetailsScreen() {
     triggerImageUpload(index, "camera");
   };
 
+  const compressImage = (dataUrl: string, maxWidth = 1000, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined" || !dataUrl.startsWith("data:image")) {
+        return resolve(dataUrl);
+      }
+      const img = document.createElement("img");
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(dataUrl);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
   const triggerImageUpload = (index: number, mode: "camera" | "gallery" = "camera") => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
@@ -310,10 +341,12 @@ export default function OrderDetailsScreen() {
         const file = e.target.files?.[0];
         if (file) {
           const reader = new FileReader();
-          reader.onload = () => {
+          reader.onload = async () => {
+            const raw = reader.result as string;
+            const compressed = await compressImage(raw, 1000, 0.7);
             setDeliveryPhotos((prev: string[]) => {
               const next = [...prev];
-              next[index] = reader.result as string;
+              next[index] = compressed;
               return next;
             });
           };
@@ -903,7 +936,7 @@ export default function OrderDetailsScreen() {
 
             {/* Fotos da Entrega (Comprovação) */}
             <View style={{ gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Fotos da Entrega (até 3 fotos)</Text>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Fotos da Entrega (3 fotos obrigatórias)</Text>
               <View style={{ flexDirection: "row", gap: 10, justifyContent: "center" }}>
                 {[0, 1, 2].map((idx) => {
                   const img = deliveryPhotos[idx];
@@ -954,6 +987,11 @@ export default function OrderDetailsScreen() {
                   );
                 })}
               </View>
+              {deliveryPhotos.filter(Boolean).length < 3 && (
+                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600", textAlign: "center" }}>
+                  As 3 fotos são obrigatórias para finalizar a entrega ({deliveryPhotos.filter(Boolean).length}/3 enviadas).
+                </Text>
+              )}
             </View>
 
             <Pressable
@@ -962,14 +1000,14 @@ export default function OrderDetailsScreen() {
                 const validPhotos = deliveryPhotos.filter(Boolean);
                 handleUpdateStatus("delivered", undefined, receiverCpf, validPhotos);
               }}
-              disabled={!isDeliveryCodeValid}
+              disabled={!isDeliveryCodeValid || deliveryPhotos.filter(Boolean).length < 3}
               style={({ pressed }) => [
                 {
                   backgroundColor: colors.success,
                   borderRadius: 14,
                   paddingVertical: 14,
                   alignItems: "center",
-                  opacity: !isDeliveryCodeValid ? 0.4 : pressed ? 0.85 : 1,
+                  opacity: (!isDeliveryCodeValid || deliveryPhotos.filter(Boolean).length < 3) ? 0.4 : pressed ? 0.85 : 1,
                 },
               ]}
             >
@@ -1339,7 +1377,7 @@ export default function OrderDetailsScreen() {
             </View>
 
             <Text style={{ fontSize: 14, color: colors.muted, lineHeight: 20 }}>
-              Enviar fotos dos produtos que estão indo para entrega (opcionais, até 3 fotos).
+              Enviar as 3 fotos obrigatórias das ferramentas que estão indo para entrega.
             </Text>
 
             {/* 3 Upload Boxes */}
@@ -1394,6 +1432,12 @@ export default function OrderDetailsScreen() {
               })}
             </View>
 
+            {deliveryPhotos.filter(Boolean).length < 3 && (
+              <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "600", textAlign: "center" }}>
+                As 3 fotos são obrigatórias para iniciar a entrega ({deliveryPhotos.filter(Boolean).length}/3 enviadas).
+              </Text>
+            )}
+
             <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
               <Pressable
                 onPress={() => setShowStartDeliveryModal(false)}
@@ -1406,8 +1450,9 @@ export default function OrderDetailsScreen() {
 
               <Pressable
                 onPress={handleConfirmStartDelivery}
+                disabled={deliveryPhotos.filter(Boolean).length < 3}
                 style={({ pressed }) => [
-                  { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", opacity: pressed ? 0.85 : 1 },
+                  { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", opacity: deliveryPhotos.filter(Boolean).length < 3 ? 0.4 : pressed ? 0.85 : 1 },
                 ]}
               >
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmar</Text>
