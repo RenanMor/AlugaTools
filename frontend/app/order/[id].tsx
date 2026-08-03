@@ -372,8 +372,8 @@ export default function OrderDetailsScreen() {
   };
 
   const handleConfirmStartDelivery = async () => {
-    setShowStartDeliveryModal(false);
     const validPhotos = deliveryPhotos.filter(Boolean);
+    setShowStartDeliveryModal(false);
     await handleUpdateStatus("delivering", undefined, undefined, validPhotos);
   };
 
