@@ -268,16 +268,34 @@ export default function OrderDetailsScreen() {
 
   const pixCode = useMemo(() => {
     if (!rental || rental.paymentMethod !== "PIX") return null;
-    const charge = rental.paymentData?.charges?.[0];
-    return charge?.payment_method?.pix?.qrcode?.text || rental.paymentData?.qr_codes?.[0]?.text || null;
+    const paymentData = rental.paymentData;
+    // 1. Unified fields saved by payment-gateway router
+    if (paymentData?.pix_copy_paste) return paymentData.pix_copy_paste;
+    if (paymentData?.pixCopyPaste) return paymentData.pixCopyPaste;
+    // 2. Pagar.me V5 structure: charges[0].last_transaction.qr_code
+    const pagarmeQr = paymentData?.charges?.[0]?.last_transaction?.qr_code;
+    if (pagarmeQr) return pagarmeQr;
+    // 3. Asaas payload field
+    if (paymentData?.payload) return paymentData.payload;
+    // 4. Legacy PagBank fallback
+    const charge = paymentData?.charges?.[0];
+    return charge?.payment_method?.pix?.qrcode?.text || paymentData?.qr_codes?.[0]?.text || null;
   }, [rental]);
 
-  const boletoInfo = useMemo(() => {
-    if (!rental || rental.paymentMethod !== "BOLETO") return null;
-    const charge = rental.paymentData?.charges?.[0];
-    const barcode = charge?.payment_method?.boleto?.barcode || null;
-    const bookletUrl = charge?.links?.find((l: any) => l.rel === "pay" || l.media === "application/pdf")?.href || null;
-    return { barcode, bookletUrl };
+  const pixQrImage = useMemo(() => {
+    if (!rental || rental.paymentMethod !== "PIX") return null;
+    const paymentData = rental.paymentData;
+    if (paymentData?.pix_qr_code) {
+      const code = paymentData.pix_qr_code;
+      return code.startsWith("http") || code.startsWith("data:") ? code : `data:image/png;base64,${code}`;
+    }
+    if (paymentData?.pixQrCode) {
+      const code = paymentData.pixQrCode;
+      return code.startsWith("http") || code.startsWith("data:") ? code : `data:image/png;base64,${code}`;
+    }
+    const pagarmeQrUrl = paymentData?.charges?.[0]?.last_transaction?.qr_code_url;
+    if (pagarmeQrUrl) return pagarmeQrUrl;
+    return null;
   }, [rental]);
 
   const handleUpdateStatus = async (status: RentalStatus, rName?: string, rCpf?: string, dPhotos?: string[]) => {
@@ -519,35 +537,27 @@ export default function OrderDetailsScreen() {
               </Pressable>
             </View>
 
-            {rental.paymentMethod === "PIX" && pixCode && (
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>Chave Copia e Cola PIX:</Text>
-                <TextInput
-                  value={pixCode}
-                  editable={false}
-                  selectTextOnFocus
-                  style={{ fontSize: 12, fontFamily: Platform.OS === "web" ? "monospace" : undefined, color: colors.muted, backgroundColor: colors.background, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}
-                />
-              </View>
-            )}
-
-            {rental.paymentMethod === "BOLETO" && boletoInfo && (
-              <View style={{ gap: 8 }}>
-                {boletoInfo.barcode && (
+            {rental.paymentMethod === "PIX" && (
+              <View style={{ gap: 10 }}>
+                {pixQrImage && (
+                  <View style={{ alignItems: "center", paddingVertical: 8 }}>
+                    <Image
+                      source={{ uri: pixQrImage }}
+                      style={{ width: 180, height: 180, borderRadius: 8, backgroundColor: "#fff" }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
+                {pixCode && (
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>Código de Barras:</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>Chave Copia e Cola PIX:</Text>
                     <TextInput
-                      value={boletoInfo.barcode}
+                      value={pixCode}
                       editable={false}
                       selectTextOnFocus
                       style={{ fontSize: 12, fontFamily: Platform.OS === "web" ? "monospace" : undefined, color: colors.muted, backgroundColor: colors.background, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}
                     />
                   </View>
-                )}
-                {boletoInfo.bookletUrl && (
-                  <Pressable onPress={() => Linking.openURL(boletoInfo.bookletUrl!)} style={({ pressed }) => [{ backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: "center", opacity: pressed ? 0.85 : 1 }]}>
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Visualizar Boleto (PDF)</Text>
-                  </Pressable>
                 )}
               </View>
             )}

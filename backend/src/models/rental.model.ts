@@ -17,6 +17,7 @@ export interface Rental {
   payment_id: string | null;
   payment_status: string | null;
   payment_data: any | null;
+  payment_gateway: string | null;
   expires_at: string | null;
   shipping_price: number;
   address: any | null;
@@ -305,6 +306,7 @@ export const RentalModel = {
     payment_id?: string;
     payment_status?: string;
     payment_data?: any;
+    payment_gateway?: string;
     status?: RentalStatus;
   }): Promise<Rental> {
     const { data, error } = await supabaseAdmin

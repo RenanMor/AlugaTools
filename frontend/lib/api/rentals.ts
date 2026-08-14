@@ -21,6 +21,7 @@ export function mapRental(data: any): Rental {
     paymentId: data.payment_id || undefined,
     paymentStatus: data.payment_status || undefined,
     paymentData: data.payment_data || undefined,
+    paymentGateway: data.payment_gateway || undefined,
     expiresAt: data.expires_at || undefined,
     shippingPrice: data.shipping_price !== undefined ? Number(data.shipping_price) : undefined,
     address: data.address || undefined,

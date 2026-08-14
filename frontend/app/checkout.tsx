@@ -82,7 +82,7 @@ export default function CheckoutScreen() {
   const [discountAmount, setDiscountAmount] = useState(0);
 
   // Payment method
-  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "BOLETO">("PIX");
+  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "CREDIT_CARD" | "DEBIT_CARD">("PIX");
 
   // Card details
   const [cardNumber, setCardNumber] = useState("");
@@ -616,8 +616,8 @@ export default function CheckoutScreen() {
           <View style={{ gap: 10 }}>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Método de Pagamento</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-              {(["PIX", "CREDIT_CARD", "DEBIT_CARD", "BOLETO"] as const).map((method) => {
-                const labels = { PIX: "PIX", CREDIT_CARD: "Crédito", DEBIT_CARD: "Débito", BOLETO: "Boleto" };
+              {(["PIX", "CREDIT_CARD", "DEBIT_CARD"] as const).map((method) => {
+                const labels = { PIX: "PIX", CREDIT_CARD: "Crédito", DEBIT_CARD: "Débito" };
                 const isSelected = paymentMethod === method;
                 return (
                   <Pressable

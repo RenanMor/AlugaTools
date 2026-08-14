@@ -5,12 +5,11 @@ import { DelivererModel } from "../models/deliverer.model";
 import { ToolModel } from "../models/tool.model";
 import { supabaseAdmin } from "../config/supabase";
 import {
-  createPagBankOrder,
-  payWithPix,
-  payWithCreditCard,
-  payWithDebitCard,
-  payWithBoleto,
-} from "../utils/pagbank";
+  processPayment,
+  selectGateway,
+  PaymentUserData,
+  PaymentRentalData,
+} from "../utils/payment-gateway";
 
 export const RentalController = {
   async create(req: Request, res: Response, next: NextFunction) {
@@ -70,8 +69,20 @@ export const RentalController = {
         return res.status(400).json({ error: "O valor total do pedido deve ser maior que zero" });
       }
 
+      // Validate payment method
+      const validMethods = ["PIX", "CREDIT_CARD", "DEBIT_CARD"];
+      if (!payment_method || !validMethods.includes(payment_method)) {
+        return res.status(400).json({
+          error: `Método de pagamento inválido. Métodos aceitos: ${validMethods.join(", ")}`,
+        });
+      }
+
       // Set expiration to 30 minutes from now
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+      // Determine which gateway will be used (for informational logging)
+      const gateway = selectGateway(calculatedTotal, payment_method);
+      console.log(`[RentalController.create] New rental: R$${calculatedTotal} → gateway: ${gateway}`);
 
       const rental = await RentalModel.create({
         tool_id,
@@ -120,7 +131,7 @@ export const RentalController = {
         return res.status(400).json({ error: "O prazo de 30 minutos para pagamento expirou" });
       }
 
-      // Fetch customer details from database for PagBank
+      // Fetch customer details from database
       const { data: user, error: userError } = await supabaseAdmin
         .from("users")
         .select("name, email, cpf, phone")
@@ -139,6 +150,7 @@ export const RentalController = {
         });
       }
 
+      // Parse phone
       const cleanPhone = (user.phone || "").replace(/\D/g, "");
       let normalizedPhone = cleanPhone;
       if (normalizedPhone.startsWith("55") && (normalizedPhone.length === 12 || normalizedPhone.length === 13)) {
@@ -154,146 +166,90 @@ export const RentalController = {
         phoneNumber = normalizedPhone;
       }
 
-      // Format user name to ensure it has both first and last name for PagBank
-      const customerName = (user.name || "").trim();
-      const formattedName = customerName.split(/\s+/).length >= 2 
-        ? customerName 
-        : `${customerName} Silva`;
-
-      // Map checkout address to PagBank format
-      const addr = rental.address || {};
-      const pagBankAddress = {
-        street: addr.street || "Rua Ficticia",
-        number: addr.number || "123",
-        complement: addr.complement || undefined,
-        locality: addr.neighborhood || "Bairro",
-        city: addr.city || "Cidade",
-        region: addr.state || "SP",
-        region_code: (addr.state || "SP").substring(0, 2).toUpperCase(),
-        country: "BRA",
-        postal_code: (addr.cep || "").replace(/\D/g, "") || "01001000",
+      // Build unified payment data
+      const paymentUser: PaymentUserData = {
+        id: customerId,
+        name: user.name || "Cliente",
+        email: user.email,
+        cpf: cleanCpf,
+        phoneArea,
+        phoneNumber,
       };
 
-      // Create PagBank order first
-      const order = await createPagBankOrder({
-        referenceId: `rental_${rental.id}`,
-        customer: {
-          name: formattedName,
-          email: user.email,
-          tax_id: cleanCpf,
-          phones: [
-            {
-              country: "55",
-              area: phoneArea,
-              number: phoneNumber,
-              type: "MOBILE",
-            },
-          ],
-        },
-        items: [
-          {
-            reference_id: rental.tool_id,
-            name: rental.tool?.name || "Aluguel de Ferramenta",
-            quantity: 1,
-            unit_amount: Math.round(rental.total_price * 100),
-          },
-        ],
-        shippingAddress: rental.payment_method === "BOLETO" || rental.payment_method === "CREDIT_CARD" || rental.payment_method === "DEBIT_CARD"
-          ? pagBankAddress
-          : undefined,
-        notificationUrls: process.env.PUBLIC_API_URL 
-          ? [`${process.env.PUBLIC_API_URL}/api/webhooks/pagbank`] 
-          : undefined,
-      });
+      const paymentRental: PaymentRentalData = {
+        id: rental.id,
+        totalPrice: rental.total_price,
+        paymentMethod: rental.payment_method as "PIX" | "CREDIT_CARD" | "DEBIT_CARD",
+        toolName: rental.tool?.name || "Aluguel de Ferramenta",
+        toolId: rental.tool_id,
+        address: rental.address || undefined,
+      };
 
-      let paymentResult: any;
+      // Map card data from frontend format to gateway format
+      const cardInput = card
+        ? {
+            number: card.number,
+            holder_name: card.holder?.name || user.name,
+            exp_month: card.exp_month,
+            exp_year: card.exp_year,
+            security_code: card.security_code,
+            holder: card.holder,
+          }
+        : undefined;
+
+      // Process payment through the unified gateway router
+      const paymentResult = await processPayment(
+        paymentRental,
+        paymentUser,
+        cardInput,
+        installments
+      );
+
+      // Determine rental status based on payment result
       let newStatus = rental.status;
-      let paymentStatus = "PENDING";
-
-      const amountCents = Math.round(rental.total_price * 100);
-
-      // Charge payment depending on method
-      if (rental.payment_method === "PIX") {
-        paymentResult = await payWithPix(order.id, amountCents);
-        const charge = paymentResult.charges?.[0];
-        paymentStatus = charge?.status || "PENDING";
-      } else if (rental.payment_method === "CREDIT_CARD") {
-        if (!card) {
-          return res.status(400).json({ error: "Dados do cartão de crédito ausentes" });
-        }
-        paymentResult = await payWithCreditCard(
-          order.id,
-          amountCents,
-          card,
-          installments || 1,
-          true,
-          card.holder?.name || user.name,
-          cleanCpf
-        );
-        const charge = paymentResult.charges?.[0];
-        paymentStatus = charge?.status || "PENDING";
-
-        if (paymentStatus === "PAID" || paymentStatus === "AUTHORIZED") {
-          newStatus = "pending"; // Transitions to "Aguardando empresa"
-        } else {
-          return res.status(400).json({
-            error: `Pagamento recusado: ${charge?.payment_response?.message || "Erro desconhecido"}`,
-            details: charge,
-          });
-        }
-      } else if (rental.payment_method === "DEBIT_CARD") {
-        if (!card) {
-          return res.status(400).json({ error: "Dados do cartão de débito ausentes" });
-        }
-        paymentResult = await payWithDebitCard(
-          order.id,
-          amountCents,
-          card,
-          card.holder?.name || user.name,
-          cleanCpf
-        );
-        const charge = paymentResult.charges?.[0];
-        paymentStatus = charge?.status || "PENDING";
-
-        if (paymentStatus === "PAID" || paymentStatus === "AUTHORIZED") {
-          newStatus = "pending"; // Transitions to "Aguardando empresa"
-        } else {
-          return res.status(400).json({
-            error: `Pagamento recusado: ${charge?.payment_response?.message || "Erro desconhecido"}`,
-            details: charge,
-          });
-        }
-      } else if (rental.payment_method === "BOLETO") {
-        // Set boleto due date to tomorrow
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const dueDateStr = tomorrow.toISOString().substring(0, 10);
-
-        paymentResult = await payWithBoleto(
-          order.id,
-          amountCents,
-          dueDateStr,
-          user.name,
-          cleanCpf,
-          user.email,
-          pagBankAddress
-        );
-        const charge = paymentResult.charges?.[0];
-        paymentStatus = charge?.status || "PENDING";
-      } else {
-        return res.status(400).json({ error: "Método de pagamento inválido ou não suportado" });
+      if (paymentResult.isPaid) {
+        newStatus = "pending"; // Transitions to "Aguardando empresa"
+      } else if (paymentResult.status === "DECLINED") {
+        return res.status(400).json({
+          error: "Pagamento recusado. Verifique os dados do cartão e tente novamente.",
+          details: paymentResult.rawResponse,
+        });
       }
+      // For PIX, status stays awaiting_payment until webhook confirms
 
-      // Update rental status and payment data
+      // Prepare normalized payment_data to save in DB
+      const paymentDataToSave = {
+        ...(typeof paymentResult.rawResponse === "object" && paymentResult.rawResponse !== null ? paymentResult.rawResponse : {}),
+        pix_qr_code: paymentResult.pixQrCode || undefined,
+        pix_copy_paste: paymentResult.pixCopyPaste || undefined,
+        pix_expiration_date: paymentResult.pixExpirationDate || undefined,
+        invoice_url: paymentResult.invoiceUrl || undefined,
+        authentication_url: paymentResult.authenticationUrl || undefined,
+        gateway: paymentResult.gateway,
+      };
+
+      // Update rental with payment data
       const updatedRental = await RentalModel.updatePayment(rental.id, {
-        payment_id: order.id,
-        payment_status: paymentStatus,
-        payment_data: paymentResult,
+        payment_id: paymentResult.paymentId,
+        payment_status: paymentResult.status,
+        payment_data: paymentDataToSave,
+        payment_gateway: paymentResult.gateway,
         status: newStatus,
       });
 
-      res.json({ data: updatedRental, payment: paymentResult });
+      res.json({
+        data: updatedRental,
+        payment: {
+          gateway: paymentResult.gateway,
+          status: paymentResult.status,
+          pixQrCode: paymentResult.pixQrCode || undefined,
+          pixCopyPaste: paymentResult.pixCopyPaste || undefined,
+          invoiceUrl: paymentResult.invoiceUrl || undefined,
+          authenticationUrl: paymentResult.authenticationUrl || undefined,
+        },
+      });
     } catch (err: any) {
+      console.error("[RentalController.pay] Error:", err.message || err);
       next(err);
     }
   },
