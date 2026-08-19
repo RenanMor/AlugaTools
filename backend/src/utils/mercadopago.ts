@@ -12,6 +12,18 @@ export interface MercadoPagoPayer {
     type: "CPF" | "CNPJ";
     number: string;
   };
+  address?: {
+    zip_code?: string;
+    street_name?: string;
+    street_number?: number;
+    neighborhood?: string;
+    city?: string;
+    federal_unit?: string;
+  };
+  phone?: {
+    area_code?: string;
+    number?: string;
+  };
 }
 
 export interface MercadoPagoItem {
