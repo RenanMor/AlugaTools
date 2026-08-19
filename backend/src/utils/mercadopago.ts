@@ -82,7 +82,6 @@ export function detectCardPaymentMethod(cardNumber: string, isDebit = false): st
 // ---------- Card Token Generation ----------
 
 export async function createMercadoPagoCardToken(card: MercadoPagoCardInput, payer: MercadoPagoPayer): Promise<string> {
-  const api = createMercadoPagoClient();
   const cleanCardNumber = card.number.replace(/\s/g, "");
   const expMonth = Number(card.exp_month);
   let expYear = Number(card.exp_year);
@@ -94,22 +93,41 @@ export async function createMercadoPagoCardToken(card: MercadoPagoCardInput, pay
     expiration_year: expYear,
     security_code: card.security_code,
     cardholder: {
-      name: card.holder_name,
+      name: card.holder_name || payer.first_name || "APRO",
       identification: payer.identification,
     },
   };
 
+  const baseURL = env.mercadoPagoBaseUrl || "https://api.mercadopago.com";
+
   try {
-    const params = env.mercadoPagoPublicKey ? { public_key: env.mercadoPagoPublicKey } : {};
-    const res = await api.post("/v1/card_tokens", payload, {
-      params,
-      headers: {
-        "X-Idempotency-Key": randomUUID(),
-      },
-    });
+    let res;
+    // When public_key is available, call card_tokens WITHOUT Bearer header (PCI standard flow)
+    if (env.mercadoPagoPublicKey) {
+      res = await axios.post(`${baseURL}/v1/card_tokens`, payload, {
+        params: { public_key: env.mercadoPagoPublicKey },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": randomUUID(),
+        },
+      });
+    } else {
+      // Fallback to Bearer token authentication
+      res = await axios.post(`${baseURL}/v1/card_tokens`, payload, {
+        headers: {
+          Authorization: `Bearer ${env.mercadoPagoAccessToken}`,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": randomUUID(),
+        },
+      });
+    }
+
     return res.data.id;
   } catch (error: any) {
-    console.error("[MercadoPago] createCardToken error:", JSON.stringify(error.response?.data || error.message, null, 2));
+    console.error(
+      "[MercadoPago] createCardToken error:",
+      JSON.stringify(error.response?.data || error.message, null, 2)
+    );
     const errorMsg =
       error.response?.data?.message ||
       error.response?.data?.cause?.[0]?.description ||

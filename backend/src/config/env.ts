@@ -10,9 +10,9 @@ export const env = {
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 
   // Mercado Pago (Primary Gateway)
-  mercadoPagoAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || "",
-  mercadoPagoPublicKey: process.env.MERCADO_PAGO_PUBLIC_KEY || "",
-  mercadoPagoBaseUrl: process.env.MERCADO_PAGO_BASE_URL || "https://api.mercadopago.com",
+  mercadoPagoAccessToken: (process.env.MERCADO_PAGO_ACCESS_TOKEN || "").trim(),
+  mercadoPagoPublicKey: (process.env.MERCADO_PAGO_PUBLIC_KEY || "").trim(),
+  mercadoPagoBaseUrl: (process.env.MERCADO_PAGO_BASE_URL || "https://api.mercadopago.com").trim(),
 
   // Inactive / Fallback Gateways (Disabled by default)
   pagarmeSecretKey: process.env.PAGARME_SECRET_KEY || "",
