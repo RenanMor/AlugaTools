@@ -529,9 +529,14 @@ function normalizeStatus(
   gateway: PaymentGateway
 ): string {
   if (gateway === "mercadopago") {
+    // Orders API statuses: processed, created, pending, cancelled, failed
+    // Payments API statuses (legacy): approved, pending, rejected, cancelled, refunded
     switch (status?.toLowerCase()) {
+      case "processed":
       case "approved":
+      case "paid":
         return "PAID";
+      case "created":
       case "pending":
       case "in_process":
       case "authorized":
@@ -540,6 +545,7 @@ function normalizeStatus(
       case "refunded":
       case "charged_back":
         return "CANCELLED";
+      case "failed":
       case "rejected":
         return "DECLINED";
       default:

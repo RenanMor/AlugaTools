@@ -81,14 +81,17 @@ router.post("/mercadopago", async (req: Request, res: Response) => {
     }
 
     // Step 3: Update rental status if approved
-    if (isPaid && rental.payment_status !== "PAID") {
+    // Orders API uses "processed" as approved status; Payments API uses "approved"
+    const isPaidStatus = isPaid || status === "processed" || status === "paid";
+
+    if (isPaidStatus && rental.payment_status !== "PAID") {
       await RentalModel.updatePayment(rental.id, {
         payment_id: String(paymentId),
         payment_status: "PAID",
         status: "pending", // Transitions to "Aguardando empresa"
       });
       console.log(`[Webhook MercadoPago] Rental ${rental.id} payment approved! Status updated to pending.`);
-    } else if (status === "rejected" || status === "cancelled") {
+    } else if (status === "rejected" || status === "cancelled" || status === "failed") {
       await RentalModel.updatePayment(rental.id, {
         payment_id: String(paymentId),
         payment_status: "DECLINED",
