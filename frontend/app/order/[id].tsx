@@ -272,12 +272,18 @@ export default function OrderDetailsScreen() {
     // 1. Unified fields saved by payment-gateway router
     if (paymentData?.pix_copy_paste) return paymentData.pix_copy_paste;
     if (paymentData?.pixCopyPaste) return paymentData.pixCopyPaste;
-    // 2. Pagar.me V5 structure: charges[0].last_transaction.qr_code
+    // 2. Mercado Pago nested structures
+    const mpTx =
+      paymentData?.transactions?.payments?.[0]?.point_of_interaction?.transaction_data ||
+      paymentData?.point_of_interaction?.transaction_data;
+    if (mpTx?.qr_code) return mpTx.qr_code;
+    if (paymentData?.qr_code) return paymentData.qr_code;
+    // 3. Pagar.me V5 structure: charges[0].last_transaction.qr_code
     const pagarmeQr = paymentData?.charges?.[0]?.last_transaction?.qr_code;
     if (pagarmeQr) return pagarmeQr;
-    // 3. Asaas payload field
+    // 4. Asaas payload field
     if (paymentData?.payload) return paymentData.payload;
-    // 4. Legacy PagBank fallback
+    // 5. Legacy PagBank fallback
     const charge = paymentData?.charges?.[0];
     return charge?.payment_method?.pix?.qrcode?.text || paymentData?.qr_codes?.[0]?.text || null;
   }, [rental]);
@@ -293,10 +299,22 @@ export default function OrderDetailsScreen() {
       const code = paymentData.pixQrCode;
       return code.startsWith("http") || code.startsWith("data:") ? code : `data:image/png;base64,${code}`;
     }
+    // Mercado Pago nested base64
+    const mpTx =
+      paymentData?.transactions?.payments?.[0]?.point_of_interaction?.transaction_data ||
+      paymentData?.point_of_interaction?.transaction_data;
+    if (mpTx?.qr_code_base64) {
+      const code = mpTx.qr_code_base64;
+      return code.startsWith("http") || code.startsWith("data:") ? code : `data:image/png;base64,${code}`;
+    }
     const pagarmeQrUrl = paymentData?.charges?.[0]?.last_transaction?.qr_code_url;
     if (pagarmeQrUrl) return pagarmeQrUrl;
+    // Fallback: If we have pix copia e cola string, generate QR code image via standard QR image API
+    if (pixCode) {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixCode)}`;
+    }
     return null;
-  }, [rental]);
+  }, [rental, pixCode]);
 
   const handleUpdateStatus = async (status: RentalStatus, rName?: string, rCpf?: string, dPhotos?: string[]) => {
     if (isStatusLoading) return;

@@ -157,17 +157,39 @@ export async function mercadopagoPayPix(input: {
     });
 
     const order = res.data;
-    const payment = order.transactions?.payments?.[0];
-    const txData = payment?.point_of_interaction?.transaction_data;
-
     console.log("[MercadoPago] PIX order created:", order.id, "status:", order.status);
+
+    // Robust extraction: can be inside transactions.payments[0], point_of_interaction, or root
+    const payment = order.transactions?.payments?.[0] || order.payments?.[0] || order;
+    const txData =
+      payment?.point_of_interaction?.transaction_data ||
+      order.point_of_interaction?.transaction_data ||
+      payment?.transaction_data;
+
+    const pixQrCode =
+      txData?.qr_code_base64 ||
+      order.qr_code_base64 ||
+      payment?.qr_code_base64 ||
+      null;
+
+    const pixCopyPaste =
+      txData?.qr_code ||
+      order.qr_code ||
+      payment?.qr_code ||
+      null;
+
+    const ticketUrl =
+      txData?.ticket_url ||
+      order.ticket_url ||
+      payment?.ticket_url ||
+      null;
 
     return {
       paymentId: order.id,
       status: order.status,
-      pixQrCode: txData?.qr_code_base64 || null,
-      pixCopyPaste: txData?.qr_code || null,
-      ticketUrl: txData?.ticket_url || null,
+      pixQrCode,
+      pixCopyPaste,
+      ticketUrl,
       rawResponse: order,
     };
   } catch (error: any) {

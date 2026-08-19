@@ -186,13 +186,12 @@ async function processMercadoPago(
       payer,
     });
 
-    const isPaid = result.status === "approved";
-
+    // When generating a PIX order, it is in pending state awaiting customer payment
     return {
       gateway: "mercadopago",
       paymentId: result.paymentId,
-      status: normalizeStatus(result.status, "mercadopago"),
-      isPaid,
+      status: "PENDING",
+      isPaid: false,
       pixQrCode: result.pixQrCode,
       pixCopyPaste: result.pixCopyPaste,
       ticketUrl: result.ticketUrl,
