@@ -40,9 +40,15 @@ router.post("/mercadopago", async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
-    // Only process payment notifications
-    if (type && !String(type).includes("payment")) {
-      console.log(`[Webhook MercadoPago] Notification type "${type}" is not payment. Acknowledged.`);
+    // Process payment and order notifications
+    const isRelevantType =
+      !type ||
+      String(type).includes("payment") ||
+      String(type).includes("order") ||
+      String(type).includes("action");
+
+    if (!isRelevantType) {
+      console.log(`[Webhook MercadoPago] Notification type "${type}" ignored. Acknowledged.`);
       return res.status(200).send("OK");
     }
 
