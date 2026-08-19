@@ -562,9 +562,30 @@ export default function OrderDetailsScreen() {
               </View>
             )}
 
+            {/* Saldo Mercado Pago / Wallet Direct Button */}
+            {rental.paymentMethod === "MERCADO_PAGO_WALLET" && rental.paymentData?.invoice_url && (
+              <Pressable
+                onPress={() => Linking.openURL(rental.paymentData.invoice_url)}
+                style={({ pressed }) => [
+                  { backgroundColor: "#009EE3", borderRadius: 12, paddingVertical: 14, alignItems: "center", opacity: pressed ? 0.85 : 1, gap: 4 },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+                  Pagar com Mercado Pago
+                </Text>
+                <Text style={{ color: "#fff", opacity: 0.9, fontSize: 12 }}>
+                  Toque para abrir a tela de pagamento seguro
+                </Text>
+              </Pressable>
+            )}
+
             {/* Retry payment CTA for awaiting_payment */}
             <Pressable
               onPress={() => {
+                if (rental.paymentMethod === "MERCADO_PAGO_WALLET" && rental.paymentData?.invoice_url) {
+                  Linking.openURL(rental.paymentData.invoice_url);
+                  return;
+                }
                 setRetryCardNumber("");
                 setRetryCardHolder("");
                 setRetryCardExpiry("");
@@ -579,6 +600,8 @@ export default function OrderDetailsScreen() {
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
                 {rental.paymentMethod === "CREDIT_CARD" || rental.paymentMethod === "DEBIT_CARD"
                   ? "Tentar Pagar Novamente"
+                  : rental.paymentMethod === "MERCADO_PAGO_WALLET"
+                  ? "Abrir Mercado Pago"
                   : "Ver Opção de Pagamento"}
               </Text>
             </Pressable>
@@ -682,7 +705,7 @@ export default function OrderDetailsScreen() {
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: colors.muted, fontSize: 14 }}>Método selecionado</Text>
             <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
-              {rental.paymentMethod === "PIX" ? "PIX" : rental.paymentMethod === "BOLETO" ? "Boleto" : rental.paymentMethod === "CREDIT_CARD" ? "Cartão de Crédito" : "Cartão de Débito"}
+              {rental.paymentMethod === "PIX" ? "PIX" : rental.paymentMethod === "MERCADO_PAGO_WALLET" ? "Saldo Mercado Pago" : rental.paymentMethod === "CREDIT_CARD" ? "Cartão de Crédito" : "Cartão de Débito"}
             </Text>
           </View>
 
@@ -1092,7 +1115,7 @@ export default function OrderDetailsScreen() {
                     <Text style={{ fontSize: 12, color: colors.muted }}>
                       {rental.paymentMethod === "CREDIT_CARD" ? "Cartão de Crédito" :
                         rental.paymentMethod === "DEBIT_CARD" ? "Cartão de Débito" :
-                          rental.paymentMethod === "PIX" ? "PIX" : "Boleto"}
+                          rental.paymentMethod === "MERCADO_PAGO_WALLET" ? "Saldo Mercado Pago" : "PIX"}
                     </Text>
                   </View>
                 </View>

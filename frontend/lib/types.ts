@@ -103,7 +103,7 @@ export interface Rental {
   paymentId?: string;
   paymentStatus?: string;
   paymentData?: any;
-  paymentGateway?: "pagarme" | "asaas";
+  paymentGateway?: "mercadopago" | "pagarme" | "asaas";
   expiresAt?: string;
   shippingPrice?: number;
   address?: any;

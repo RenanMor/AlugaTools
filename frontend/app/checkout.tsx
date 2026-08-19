@@ -15,6 +15,7 @@ import {
   Text,
   TextInput,
   View,
+  Linking,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -82,7 +83,7 @@ export default function CheckoutScreen() {
   const [discountAmount, setDiscountAmount] = useState(0);
 
   // Payment method
-  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "CREDIT_CARD" | "DEBIT_CARD">("PIX");
+  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "MERCADO_PAGO_WALLET">("PIX");
 
   // Card details
   const [cardNumber, setCardNumber] = useState("");
@@ -284,13 +285,17 @@ export default function CheckoutScreen() {
           setTimeout(() => reject(new Error("O pagamento demorou muito para responder. Por favor, verifique se o pagamento foi concluído em Meus Pedidos.")), 25000)
         );
 
-        await Promise.race([
+        const payRes: any = await Promise.race([
           payRental(rental.id, {
             card: cardPayload,
             installments: paymentMethod === "CREDIT_CARD" ? Number(installments) || 1 : undefined,
           }),
           timeoutPromise
         ]);
+
+        if (paymentMethod === "MERCADO_PAGO_WALLET" && payRes?.payment?.invoiceUrl) {
+          Linking.openURL(payRes.payment.invoiceUrl).catch((e) => console.warn("Could not open Mercado Pago URL", e));
+        }
       }
 
       // 4. Cleanup & Complete
@@ -616,8 +621,13 @@ export default function CheckoutScreen() {
           <View style={{ gap: 10 }}>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Método de Pagamento</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-              {(["PIX", "CREDIT_CARD", "DEBIT_CARD"] as const).map((method) => {
-                const labels = { PIX: "PIX", CREDIT_CARD: "Crédito", DEBIT_CARD: "Débito" };
+              {(["PIX", "CREDIT_CARD", "DEBIT_CARD", "MERCADO_PAGO_WALLET"] as const).map((method) => {
+                const labels = {
+                  PIX: "PIX",
+                  CREDIT_CARD: "Crédito",
+                  DEBIT_CARD: "Débito",
+                  MERCADO_PAGO_WALLET: "Saldo Mercado Pago",
+                };
                 const isSelected = paymentMethod === method;
                 return (
                   <Pressable
@@ -634,7 +644,7 @@ export default function CheckoutScreen() {
                       borderColor: isSelected ? colors.primary : colors.border,
                     }}
                   >
-                    <Text style={{ color: isSelected ? "#fff" : colors.foreground, fontWeight: "700", fontSize: 13 }}>
+                    <Text style={{ color: isSelected ? "#fff" : colors.foreground, fontWeight: "700", fontSize: 13, textAlign: "center" }}>
                       {labels[method]}
                     </Text>
                   </Pressable>
@@ -642,6 +652,16 @@ export default function CheckoutScreen() {
               })}
             </View>
           </View>
+
+          {/* Saldo Mercado Pago Notice */}
+          {paymentMethod === "MERCADO_PAGO_WALLET" && (
+            <View style={{ gap: 6, padding: 14, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>Saldo em Conta Mercado Pago</Text>
+              <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18 }}>
+                Ao confirmar, você será direcionado com segurança para finalizar o pagamento utilizando seu saldo em conta ou carteira do Mercado Pago.
+              </Text>
+            </View>
+          )}
 
           {/* Card inputs */}
           {(paymentMethod === "CREDIT_CARD" || paymentMethod === "DEBIT_CARD") && (
