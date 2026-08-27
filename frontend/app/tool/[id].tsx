@@ -211,22 +211,67 @@ export default function ToolScreen() {
         )}
 
         <View style={{ padding: 16, gap: 12 }}>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>{tool.name}</Text>
+          {/* Box Preta: Nome do Produto */}
+          <View
+            style={{
+              backgroundColor: "#000000",
+              padding: 14,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: "#27272A",
+            }}
+          >
+            <Text style={{ fontSize: 20, fontWeight: "800", color: "#FFFFFF" }}>{tool.name}</Text>
+          </View>
 
+          {/* Box Preta: Empresa */}
           <Pressable
             onPress={() => router.push({ pathname: "/company/[id]", params: { id: company.id } })}
-            style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [
+              {
+                backgroundColor: "#000000",
+                padding: 12,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: "#27272A",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
           >
-            <Image source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.border }} resizeMode="contain" />
-            <Text style={{ fontSize: 14, color: colors.muted }}>{company.name}</Text>
+            <Image
+              source={company.logo ? { uri: company.logo } : require("@/assets/images/sem-imagem.png")}
+              style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#27272A" }}
+              resizeMode="contain"
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: "#A1A1AA", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 }}>Empresa</Text>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#FFFFFF" }}>{company.name}</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color="#A1A1AA" />
           </Pressable>
 
-          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.success }}>
-            R$ {tool.pricePerDay}
-            <Text style={{ fontSize: 15, color: colors.muted, fontWeight: "500" }}> /dia</Text>
-          </Text>
+          {/* Box Preta: Preço por Dia */}
+          <View
+            style={{
+              backgroundColor: "#000000",
+              padding: 14,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: "#27272A",
+              flexDirection: "row",
+              alignItems: "baseline",
+            }}
+          >
+            <Text style={{ fontSize: 26, fontWeight: "800", color: colors.success }}>
+              R$ {tool.pricePerDay}
+            </Text>
+            <Text style={{ fontSize: 15, color: "#9CA3AF", fontWeight: "600" }}> /dia</Text>
+          </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: availableQty > 0 && tool.available ? colors.success : (quantityInCart > 0 ? colors.warning : colors.error) }} />
             <Text style={{ fontSize: 14, fontWeight: "600", color: availableQty > 0 && tool.available ? colors.success : (quantityInCart > 0 ? colors.warning : colors.error) }}>
               {availableQty > 0 && tool.available 
@@ -251,12 +296,24 @@ export default function ToolScreen() {
             </View>
           )}
 
+          {/* Box Preta: Descrição */}
+          <View
+            style={{
+              backgroundColor: "#000000",
+              padding: 14,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: "#27272A",
+              gap: 6,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#FFFFFF" }}>Descrição</Text>
+            <Text style={{ fontSize: 15, color: "#D4D4D8", lineHeight: 22 }}>
+              {tool.description || "Sem descrição disponível."}
+            </Text>
+          </View>
+
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
-
-          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Descrição</Text>
-          <Text style={{ fontSize: 15, color: colors.muted, lineHeight: 22 }}>{tool.description}</Text>
-
-          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
 
           {/* Reviews section */}
           <View style={{ gap: 12 }}>
