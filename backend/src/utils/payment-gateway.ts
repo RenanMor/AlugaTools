@@ -2,15 +2,29 @@
  * Payment Gateway Router
  *
  * Primary Active Gateway:
- * - Mercado Pago (Checkout API / Orders / Preferences)
- *   Supports: PIX, Credit Card, Debit Card, Saldo Mercado Pago (Wallet)
+ * - Asaas v3 (with Split de Pagamentos)
+ *   Supports: PIX, Credit Card, Debit Card (via invoiceUrl)
+ *   Split: Automatic distribution between platform and company
  *
  * Inactive / Disabled Gateways (Kept for fallback/historical reference):
- * - Pagar.me V5 (orders <= R$200)
- * - Asaas v3 (orders > R$200)
+ * - Mercado Pago (Checkout API / Orders / Preferences)
+ * - Pagar.me V5
  */
 
 import { env } from "../config/env";
+import { CompanyModel } from "../models/company.model";
+import {
+  findOrCreateAsaasCustomer,
+  asaasPayPix,
+  asaasPayCreditCard,
+  asaasPayDebitCard,
+  AsaasCardData,
+  AsaasCardHolderInfo,
+  AsaasSplitItem,
+  buildSplitConfig,
+} from "./asaas";
+
+// Inactive gateways kept for reference/fallback
 import {
   mercadopagoPayPix,
   mercadopagoPayCreditCard,
@@ -18,8 +32,6 @@ import {
   mercadopagoPayWallet,
   MercadoPagoPayer,
 } from "./mercadopago";
-
-// Inactive gateways kept for reference/fallback
 import {
   pagarmePayPix,
   pagarmePayCreditCard,
@@ -28,23 +40,16 @@ import {
   PagarmeItem,
   PagarmeAddress,
 } from "./pagarme";
-import {
-  findOrCreateAsaasCustomer,
-  asaasPayPix,
-  asaasPayCreditCard,
-  AsaasCardData,
-  AsaasCardHolderInfo,
-} from "./asaas";
 
 // ---------- Configuration ----------
 
-export type PaymentGateway = "mercadopago" | "pagarme" | "asaas";
+export type PaymentGateway = "asaas" | "mercadopago" | "pagarme";
 
 /**
  * Active gateway switch.
- * Set to "mercadopago" as the primary active gateway.
+ * Set to "asaas" as the primary active gateway with Split support.
  */
-export const ACTIVE_GATEWAY: PaymentGateway = "mercadopago";
+export const ACTIVE_GATEWAY: PaymentGateway = "asaas";
 
 // ---------- Types ----------
 
@@ -63,6 +68,7 @@ export interface PaymentRentalData {
   paymentMethod: "PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "MERCADO_PAGO_WALLET";
   toolName: string;
   toolId: string;
+  companyId: string; // Required for split routing
   address?: {
     street?: string;
     number?: string;
@@ -101,7 +107,7 @@ export interface PaymentResult {
 
 /**
  * Determine which gateway to use.
- * Returns "mercadopago" as primary.
+ * Returns "asaas" as primary.
  */
 export function selectGateway(
   _totalPrice: number,
@@ -124,20 +130,162 @@ export async function processPayment(
     `[PaymentGateway] Routing rental ${rental.id} (R$${rental.totalPrice}, method: ${rental.paymentMethod}) → ${gateway.toUpperCase()}`
   );
 
-  if (gateway === "mercadopago") {
-    return processMercadoPago(rental, user, cardData, installments);
+  if (gateway === "asaas") {
+    return processAsaas(rental, user, cardData, installments);
   }
 
   // Fallbacks if ever re-enabled:
-  if (gateway === "pagarme") {
-    return processPagarme(rental, user, cardData, installments);
+  if (gateway === "mercadopago") {
+    return processMercadoPago(rental, user, cardData, installments);
   } else {
-    return processAsaas(rental, user, cardData, installments);
+    return processPagarme(rental, user, cardData, installments);
   }
 }
 
 // ============================================================
-// 1. Mercado Pago Processing (ACTIVE PRIMARY)
+// 1. Asaas Processing (ACTIVE PRIMARY — Split de Pagamentos)
+// ============================================================
+
+async function processAsaas(
+  rental: PaymentRentalData,
+  user: PaymentUserData,
+  cardData?: PaymentCardInput,
+  installments?: number
+): Promise<PaymentResult> {
+  const cleanCpf = user.cpf.replace(/\D/g, "");
+  const cleanPhone = `${user.phoneArea}${user.phoneNumber}`;
+
+  // 1. Find or create customer in Asaas
+  const asaasCustomerId = await findOrCreateAsaasCustomer({
+    name: ensureFullName(user.name),
+    email: user.email,
+    cpfCnpj: cleanCpf,
+    mobilePhone: cleanPhone,
+    externalReference: user.id,
+  });
+
+  const externalReference = `rental_${rental.id}`;
+  const dueDate = getTomorrowDate();
+
+  // 2. Build split configuration for the company
+  let split: AsaasSplitItem[] = [];
+  try {
+    const companyAsaas = await CompanyModel.getAsaasData(rental.companyId);
+    if (companyAsaas?.asaas_wallet_id) {
+      const feePercent = companyAsaas.platform_fee_percent ?? env.platformFeePercent;
+      split = buildSplitConfig(companyAsaas.asaas_wallet_id, feePercent);
+      console.log(
+        `[PaymentGateway] Split configured: company wallet=${companyAsaas.asaas_wallet_id}, platformFee=${feePercent}%, companyShare=${100 - feePercent}%`
+      );
+    } else {
+      console.warn(
+        `[PaymentGateway] Company ${rental.companyId} has no Asaas walletId — payment will be processed WITHOUT split (all funds to platform)`
+      );
+    }
+  } catch (err) {
+    console.error("[PaymentGateway] Error fetching company Asaas data:", err);
+    // Continue without split — platform receives all funds
+  }
+
+  // --- A. PIX ---
+  if (rental.paymentMethod === "PIX") {
+    const result = await asaasPayPix({
+      customerId: asaasCustomerId,
+      value: rental.totalPrice,
+      description: `Aluguel: ${rental.toolName || "Ferramenta"}`,
+      externalReference,
+      dueDate,
+      split,
+    });
+
+    return {
+      gateway: "asaas",
+      paymentId: result.paymentId,
+      status: normalizeStatus(result.status, "asaas"),
+      isPaid: result.status === "CONFIRMED" || result.status === "RECEIVED",
+      pixQrCode: result.pixQrCode,
+      pixCopyPaste: result.pixCopyPaste,
+      pixExpirationDate: result.pixExpirationDate,
+      invoiceUrl: result.invoiceUrl,
+      rawResponse: result.rawResponse,
+    };
+  }
+
+  // --- B. Cartão de Crédito ---
+  if (rental.paymentMethod === "CREDIT_CARD") {
+    if (!cardData) throw new Error("Dados do cartão de crédito ausentes");
+
+    const addr = rental.address || {};
+    const holderInfo: AsaasCardHolderInfo = {
+      name: cardData.holder_name || cardData.holder?.name || user.name,
+      email: user.email,
+      cpfCnpj: cleanCpf,
+      postalCode: (addr.cep || "").replace(/\D/g, "") || "01001000",
+      addressNumber: addr.number || "0",
+      phone: cleanPhone,
+    };
+
+    const result = await asaasPayCreditCard({
+      customerId: asaasCustomerId,
+      value: rental.totalPrice,
+      description: `Aluguel: ${rental.toolName || "Ferramenta"}`,
+      externalReference,
+      dueDate,
+      card: {
+        holderName: cardData.holder_name || cardData.holder?.name || user.name,
+        number: cardData.number,
+        expiryMonth: String(cardData.exp_month),
+        expiryYear: String(cardData.exp_year),
+        ccv: cardData.security_code,
+      },
+      cardHolderInfo: holderInfo,
+      installmentCount: installments || 1,
+      split,
+    });
+
+    return {
+      gateway: "asaas",
+      paymentId: result.paymentId,
+      status: normalizeStatus(result.status, "asaas"),
+      isPaid: result.status === "CONFIRMED" || result.status === "RECEIVED",
+      invoiceUrl: result.invoiceUrl,
+      rawResponse: result.rawResponse,
+    };
+  }
+
+  // --- C. Cartão de Débito (via invoiceUrl redirect) ---
+  if (rental.paymentMethod === "DEBIT_CARD") {
+    const result = await asaasPayDebitCard({
+      customerId: asaasCustomerId,
+      value: rental.totalPrice,
+      description: `Aluguel: ${rental.toolName || "Ferramenta"}`,
+      externalReference,
+      dueDate,
+      split,
+    });
+
+    return {
+      gateway: "asaas",
+      paymentId: result.paymentId,
+      status: normalizeStatus(result.status, "asaas"),
+      isPaid: false, // Debit always requires redirect — confirmed via webhook
+      invoiceUrl: result.invoiceUrl,
+      rawResponse: result.rawResponse,
+    };
+  }
+
+  // --- D. Mercado Pago Wallet — Not supported on Asaas ---
+  if (rental.paymentMethod === "MERCADO_PAGO_WALLET") {
+    throw new Error(
+      "Método 'Saldo Mercado Pago' não é suportado pelo gateway Asaas. Use PIX ou Cartão de Crédito."
+    );
+  }
+
+  throw new Error(`Método de pagamento inválido: ${rental.paymentMethod}`);
+}
+
+// ============================================================
+// 2. Mercado Pago Processing (INACTIVE / DISABLED)
 // ============================================================
 
 async function processMercadoPago(
@@ -186,7 +334,6 @@ async function processMercadoPago(
       payer,
     });
 
-    // When generating a PIX order, it is in pending state awaiting customer payment
     return {
       gateway: "mercadopago",
       paymentId: result.paymentId,
@@ -284,7 +431,7 @@ async function processMercadoPago(
 }
 
 // ============================================================
-// 2. Pagar.me Processing (INACTIVE / DISABLED)
+// 3. Pagar.me Processing (INACTIVE / DISABLED)
 // ============================================================
 
 async function processPagarme(
@@ -402,95 +549,6 @@ async function processPagarme(
 }
 
 // ============================================================
-// 3. Asaas Processing (INACTIVE / DISABLED)
-// ============================================================
-
-async function processAsaas(
-  rental: PaymentRentalData,
-  user: PaymentUserData,
-  cardData?: PaymentCardInput,
-  installments?: number
-): Promise<PaymentResult> {
-  const cleanCpf = user.cpf.replace(/\D/g, "");
-  const cleanPhone = `${user.phoneArea}${user.phoneNumber}`;
-
-  const asaasCustomerId = await findOrCreateAsaasCustomer({
-    name: ensureFullName(user.name),
-    email: user.email,
-    cpfCnpj: cleanCpf,
-    mobilePhone: cleanPhone,
-    externalReference: user.id,
-  });
-
-  const externalReference = `rental_${rental.id}`;
-  const dueDate = getTomorrowDate();
-
-  if (rental.paymentMethod === "PIX") {
-    const result = await asaasPayPix({
-      customerId: asaasCustomerId,
-      value: rental.totalPrice,
-      description: `Aluguel: ${rental.toolName || "Ferramenta"}`,
-      externalReference,
-      dueDate,
-    });
-
-    return {
-      gateway: "asaas",
-      paymentId: result.paymentId,
-      status: normalizeStatus(result.status, "asaas"),
-      isPaid: result.status === "CONFIRMED" || result.status === "RECEIVED",
-      pixQrCode: result.pixQrCode,
-      pixCopyPaste: result.pixCopyPaste,
-      pixExpirationDate: result.pixExpirationDate,
-      invoiceUrl: result.invoiceUrl,
-      rawResponse: result.rawResponse,
-    };
-  }
-
-  if (rental.paymentMethod === "CREDIT_CARD") {
-    if (!cardData) throw new Error("Dados do cartão de crédito ausentes");
-
-    const addr = rental.address || {};
-    const holderInfo: AsaasCardHolderInfo = {
-      name: cardData.holder_name || cardData.holder?.name || user.name,
-      email: user.email,
-      cpfCnpj: cleanCpf,
-      postalCode: (addr.cep || "").replace(/\D/g, "") || "01001000",
-      addressNumber: addr.number || "0",
-      phone: cleanPhone,
-    };
-
-    const result = await asaasPayCreditCard({
-      customerId: asaasCustomerId,
-      value: rental.totalPrice,
-      description: `Aluguel: ${rental.toolName || "Ferramenta"}`,
-      externalReference,
-      dueDate,
-      card: {
-        holderName: cardData.holder_name || cardData.holder?.name || user.name,
-        number: cardData.number,
-        expiryMonth: String(cardData.exp_month),
-        expiryYear: String(cardData.exp_year),
-        ccv: cardData.security_code,
-      },
-      cardHolderInfo: holderInfo,
-      installmentCount: installments || 1,
-    });
-
-    return {
-      gateway: "asaas",
-      paymentId: result.paymentId,
-      status: normalizeStatus(result.status, "asaas"),
-      isPaid: result.status === "CONFIRMED" || result.status === "RECEIVED",
-      invoiceUrl: result.invoiceUrl,
-      rawResponse: result.rawResponse,
-    };
-  }
-
-  throw new Error("Método não suportado pelo Asaas");
-}
-
-// ============================================================
 // Helpers
 // ============================================================
 
@@ -527,9 +585,28 @@ function normalizeStatus(
   status: string,
   gateway: PaymentGateway
 ): string {
+  if (gateway === "asaas") {
+    switch (status?.toUpperCase()) {
+      case "CONFIRMED":
+      case "RECEIVED":
+      case "RECEIVED_IN_CASH":
+        return "PAID";
+      case "PENDING":
+      case "AWAITING_RISK_ANALYSIS":
+        return "PENDING";
+      case "OVERDUE":
+      case "REFUNDED":
+      case "CHARGEBACK_REQUESTED":
+      case "CHARGEBACK_DISPUTE":
+        return "CANCELLED";
+      case "REFUND_REQUESTED":
+        return "REFUNDING";
+      default:
+        return "PENDING";
+    }
+  }
+
   if (gateway === "mercadopago") {
-    // Orders API statuses: processed, created, pending, cancelled, failed
-    // Payments API statuses (legacy): approved, pending, rejected, cancelled, refunded
     switch (status?.toLowerCase()) {
       case "processed":
       case "approved":
@@ -565,27 +642,6 @@ function normalizeStatus(
         return "CANCELLED";
       case "failed":
         return "DECLINED";
-      default:
-        return "PENDING";
-    }
-  }
-
-  if (gateway === "asaas") {
-    switch (status?.toUpperCase()) {
-      case "CONFIRMED":
-      case "RECEIVED":
-      case "RECEIVED_IN_CASH":
-        return "PAID";
-      case "PENDING":
-      case "AWAITING_RISK_ANALYSIS":
-        return "PENDING";
-      case "OVERDUE":
-      case "REFUNDED":
-      case "CHARGEBACK_REQUESTED":
-      case "CHARGEBACK_DISPUTE":
-        return "CANCELLED";
-      case "REFUND_REQUESTED":
-        return "REFUNDING";
       default:
         return "PENDING";
     }

@@ -23,6 +23,26 @@ function mapCompany(data: any): Company {
     cnpj: data.cnpj || data.users?.cnpj || undefined,
     phone: data.phone || data.users?.phone || undefined,
     createdAt: data.created_at || data.owner_created_at || data.users?.created_at || undefined,
+    // Address
+    postalCode: data.postal_code || undefined,
+    addressStreet: data.address_street || undefined,
+    addressNumber: data.address_number || undefined,
+    neighborhood: data.neighborhood || undefined,
+    // Banking & Pix
+    pixKeyType: data.pix_key_type || undefined,
+    pixKey: data.pix_key || undefined,
+    bankCode: data.bank_code || undefined,
+    bankAgency: data.bank_agency || undefined,
+    bankAccount: data.bank_account || undefined,
+    bankAccountDigit: data.bank_account_digit || undefined,
+    bankAccountType: data.bank_account_type || undefined,
+    bankOwnerName: data.bank_owner_name || undefined,
+    bankCpfCnpj: data.bank_cpf_cnpj || undefined,
+    // Asaas
+    asaasAccountId: data.asaas_account_id || undefined,
+    asaasWalletId: data.asaas_wallet_id || undefined,
+    asaasStatus: data.asaas_status || (data.asaas_wallet_id ? "active" : "not_created"),
+    platformFeePercent: data.platform_fee_percent !== null && data.platform_fee_percent !== undefined ? Number(data.platform_fee_percent) : undefined,
   };
 }
 
@@ -37,6 +57,32 @@ export async function updateCompanyStatus(id: string, status: "approved" | "reje
     body: JSON.stringify({ status }),
   });
   return mapCompany(response.data);
+}
+
+/**
+ * Creates an Asaas subaccount on-demand for a company.
+ * Explicitly invoked by Admin.
+ */
+export async function createCompanySubaccount(id: string): Promise<{
+  accountId: string;
+  walletId: string;
+  status: string;
+}> {
+  const response = await apiCall<{ data: any }>(`/api/admin/companies/${id}/create-subaccount`, {
+    method: "POST",
+  });
+  return response.data;
+}
+
+/**
+ * Dispatches a transfer payout from company's Asaas subaccount to their registered bank account / Pix.
+ */
+export async function transferCompanyFunds(id: string, value: number, description?: string): Promise<any> {
+  const response = await apiCall<{ data: any }>(`/api/admin/companies/${id}/transfer-funds`, {
+    method: "POST",
+    body: JSON.stringify({ value, description }),
+  });
+  return response.data;
 }
 
 export async function getCompanyRentals(companyId: string): Promise<Rental[]> {

@@ -63,6 +63,26 @@ export interface Company {
   cnpj?: string;
   phone?: string;
   createdAt?: string;
+  // Address for onboarding
+  postalCode?: string;
+  addressStreet?: string;
+  addressNumber?: string;
+  neighborhood?: string;
+  // Pix / Banking details for payouts
+  pixKeyType?: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+  pixKey?: string;
+  bankCode?: string;
+  bankAgency?: string;
+  bankAccount?: string;
+  bankAccountDigit?: string;
+  bankAccountType?: "CONTA_CORRENTE" | "CONTA_POUPANCA";
+  bankOwnerName?: string;
+  bankCpfCnpj?: string;
+  // Asaas Subaccount details
+  asaasAccountId?: string;
+  asaasWalletId?: string;
+  asaasStatus?: "not_created" | "pending" | "active" | "error";
+  platformFeePercent?: number;
 }
 
 export interface CartItem {

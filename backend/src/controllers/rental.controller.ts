@@ -70,7 +70,7 @@ export const RentalController = {
       }
 
       // Validate payment method
-      const validMethods = ["PIX", "CREDIT_CARD", "DEBIT_CARD", "MERCADO_PAGO_WALLET"];
+      const validMethods = ["PIX", "CREDIT_CARD", "DEBIT_CARD"];
       if (!payment_method || !validMethods.includes(payment_method)) {
         return res.status(400).json({
           error: `Método de pagamento inválido. Métodos aceitos: ${validMethods.join(", ")}`,
@@ -182,6 +182,7 @@ export const RentalController = {
         paymentMethod: rental.payment_method as "PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "MERCADO_PAGO_WALLET",
         toolName: rental.tool?.name || "Aluguel de Ferramenta",
         toolId: rental.tool_id,
+        companyId: rental.company_id,
         address: rental.address || undefined,
       };
 

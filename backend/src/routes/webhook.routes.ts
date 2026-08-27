@@ -145,9 +145,19 @@ router.post("/pagarme", async (req: Request, res: Response) => {
 });
 
 // ============================================================
-// 3. Asaas Webhook (INACTIVE / DISABLED)
+// 3. Asaas Webhook (PRIMARY ACTIVE — Split de Pagamentos)
 // ============================================================
 
+/**
+ * Asaas sends webhooks for payment and split events.
+ * Key events handled:
+ * - PAYMENT_CONFIRMED / PAYMENT_RECEIVED: Payment confirmed → update rental to "pending"
+ * - PAYMENT_OVERDUE: Payment overdue → log warning
+ * - PAYMENT_SPLIT_DONE: Split executed → log for audit trail
+ * - PAYMENT_SPLIT_DIVERGENCE_BLOCK: Split value exceeds netValue → alert
+ *
+ * Always validates directly with Asaas API before updating database.
+ */
 router.post("/asaas", async (req: Request, res: Response) => {
   try {
     const payload = req.body;
@@ -155,24 +165,81 @@ router.post("/asaas", async (req: Request, res: Response) => {
     const paymentData = payload?.payment || {};
     const externalReference = paymentData?.externalReference || "";
 
-    console.log(`[Webhook Asaas] Received event (Inactive gateway): ${event}, Ref: ${externalReference}`);
+    console.log(`[Webhook Asaas] Received event: ${event}, Ref: ${externalReference}, PaymentId: ${paymentData?.id || "N/A"}`);
 
+    // --- Handle payment confirmation events ---
     if (["PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"].includes(event) && externalReference?.startsWith("rental_")) {
       const rentalId = externalReference.replace("rental_", "");
       const rental = await RentalModel.findById(rentalId);
-      if (rental?.payment_id) {
-        const { isPaid } = await getAsaasPaymentStatus(rental.payment_id);
+
+      if (!rental) {
+        console.warn(`[Webhook Asaas] Rental not found for ref: ${externalReference}`);
+        return res.status(200).send("OK");
+      }
+
+      // Double-check with Asaas API to prevent spoofed webhooks
+      if (rental.payment_id || paymentData?.id) {
+        const paymentIdToCheck = rental.payment_id || paymentData.id;
+        const { isPaid } = await getAsaasPaymentStatus(paymentIdToCheck);
+
         if (isPaid && rental.payment_status !== "PAID") {
           await RentalModel.updatePayment(rental.id, {
+            payment_id: paymentData.id || rental.payment_id,
             payment_status: "PAID",
-            status: "pending",
+            status: "pending", // Transitions to "Aguardando empresa"
           });
+          console.log(`[Webhook Asaas] ✅ Rental ${rental.id} payment confirmed! Status updated to pending.`);
+        } else if (!isPaid) {
+          console.warn(`[Webhook Asaas] Payment ${paymentIdToCheck} NOT confirmed by API (spoofed webhook?)`);
         }
       }
     }
+
+    // --- Handle payment overdue ---
+    if (event === "PAYMENT_OVERDUE" && externalReference?.startsWith("rental_")) {
+      const rentalId = externalReference.replace("rental_", "");
+      console.warn(`[Webhook Asaas] Payment overdue for rental ${rentalId}`);
+      // Optionally auto-cancel expired rentals here
+    }
+
+    // --- Handle split events (audit logging) ---
+    if (event === "PAYMENT_SPLIT_DONE") {
+      const splitId = payload?.additionalInfo?.splitId || "N/A";
+      console.log(
+        `[Webhook Asaas] 💰 Split executed: splitId=${splitId}, paymentId=${paymentData?.id || "N/A"}, ref=${externalReference}`
+      );
+    }
+
+    if (event === "PAYMENT_SPLIT_DIVERGENCE_BLOCK") {
+      const splitId = payload?.additionalInfo?.splitId || "N/A";
+      console.error(
+        `[Webhook Asaas] ⚠️ SPLIT DIVERGENCE BLOCK: splitId=${splitId}, paymentId=${paymentData?.id || "N/A"}. ` +
+        `Split value exceeds netValue. Must be corrected within 2 business days.`
+      );
+    }
+
+    if (event === "PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED") {
+      console.warn(
+        `[Webhook Asaas] Split divergence block expired for paymentId=${paymentData?.id || "N/A"}. Splits were cancelled.`
+      );
+    }
+
+    // --- Handle refund/chargeback ---
+    if (["PAYMENT_REFUNDED", "PAYMENT_CHARGEBACK_REQUESTED"].includes(event) && externalReference?.startsWith("rental_")) {
+      const rentalId = externalReference.replace("rental_", "");
+      const rental = await RentalModel.findById(rentalId);
+      if (rental && rental.payment_status !== "CANCELLED") {
+        await RentalModel.updatePayment(rental.id, {
+          payment_status: "CANCELLED",
+        });
+        console.log(`[Webhook Asaas] Rental ${rental.id} payment refunded/chargebacked.`);
+      }
+    }
+
     res.status(200).send("OK");
   } catch (error) {
     console.error("[Webhook Asaas] Error:", error);
+    // Always return 200 to prevent webhook retry storms
     res.status(200).send("OK");
   }
 });

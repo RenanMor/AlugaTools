@@ -23,6 +23,7 @@ import { formatOrderId, getShortOrderId } from "@/lib/utils";
 import {
   getAllCompanies,
   updateCompanyStatus,
+  createCompanySubaccount,
   getCompanyRentals,
   cancelCompanyRental,
 } from "@/lib/api/admin";
@@ -189,6 +190,67 @@ export default function DashboardOwnerScreen() {
             }
           },
         },
+      ]
+    );
+  };
+
+  const [isCreatingSubaccount, setIsCreatingSubaccount] = useState(false);
+
+  const handleCreateSubaccount = async (company: Company) => {
+    const confirmMessage = `A criação de cada subconta no Asaas tem um custo operacional de aproximadamente R$ 13,00 cobrado pelo Asaas.\n\nDeseja prosseguir com a criação da subconta Asaas para "${company.name}"?`;
+
+    const executeCreation = async () => {
+      setIsCreatingSubaccount(true);
+      try {
+        const result = await createCompanySubaccount(company.id);
+        const successMsg = `Subconta Asaas criada com sucesso!\nWallet ID: ${result.walletId}`;
+        if (Platform.OS === "web") {
+          alert(successMsg);
+        } else {
+          Alert.alert("Sucesso", successMsg);
+        }
+        await fetchCompanies();
+        if (selectedCompany && selectedCompany.id === company.id) {
+          setSelectedCompany({
+            ...selectedCompany,
+            asaasWalletId: result.walletId,
+            asaasAccountId: result.accountId,
+            asaasStatus: "active",
+          });
+        }
+        if (inspectingCompany && inspectingCompany.id === company.id) {
+          setInspectingCompany({
+            ...inspectingCompany,
+            asaasWalletId: result.walletId,
+            asaasAccountId: result.accountId,
+            asaasStatus: "active",
+          });
+        }
+      } catch (err: any) {
+        const errMsg = err.message || "Erro ao criar subconta Asaas.";
+        if (Platform.OS === "web") {
+          alert(errMsg);
+        } else {
+          Alert.alert("Erro", errMsg);
+        }
+      } finally {
+        setIsCreatingSubaccount(false);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(confirmMessage)) {
+        await executeCreation();
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Criar Subconta Asaas (R$ 13,00)",
+      confirmMessage,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar e Criar", onPress: executeCreation },
       ]
     );
   };
@@ -613,8 +675,65 @@ export default function DashboardOwnerScreen() {
               </Pressable>
             </View>
 
+            {/* Asaas Subaccount Status / Create Banner */}
+            <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: colors.foreground }}>
+                    Split Asaas:
+                  </Text>
+                  <View style={{
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 6,
+                    backgroundColor: selectedCompany.asaasWalletId ? colors.success + "20" : "#F59E0B20",
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: selectedCompany.asaasWalletId ? colors.success : "#F59E0B" }}>
+                      {selectedCompany.asaasWalletId ? "Subconta Ativa" : "Sem Subconta"}
+                    </Text>
+                  </View>
+                </View>
+
+                {!selectedCompany.asaasWalletId && (
+                  <Pressable
+                    disabled={isCreatingSubaccount}
+                    onPress={() => handleCreateSubaccount(selectedCompany)}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        paddingVertical: 6,
+                        paddingHorizontal: 10,
+                        borderRadius: 6,
+                        backgroundColor: colors.primary,
+                        opacity: pressed || isCreatingSubaccount ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    {isCreatingSubaccount ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <IconSymbol name="plus" size={13} color="#fff" />
+                        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 11 }}>
+                          Criar Subconta (R$ 13)
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+
+              {selectedCompany.asaasWalletId ? (
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                  Wallet ID: {selectedCompany.asaasWalletId}
+                </Text>
+              ) : null}
+            </View>
+
             {/* Metrics cards (Clickable filters) */}
-            <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 12 }}>
+            <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 12 }}>
               <Pressable
                 onPress={() => setStatusFilter("all")}
                 style={({ pressed }) => [
@@ -956,6 +1075,88 @@ export default function DashboardOwnerScreen() {
                 <InfoRow label="Nome do Titular" value={inspectingCompany.ownerName || "Titular do Cadastro"} />
                 <InfoRow label="E-mail de Contato" value={inspectingCompany.ownerEmail || "Não informado"} />
                 <InfoRow label="Telefone / WhatsApp" value={inspectingCompany.phone || "Não informado"} />
+              </View>
+
+              {/* Section: Dados Bancários & Subconta Asaas */}
+              <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16, gap: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary }}>
+                    💳 Dados Bancários & Split Asaas
+                  </Text>
+                  <View style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 6,
+                    backgroundColor: inspectingCompany.asaasWalletId ? colors.success + "20" : "#F59E0B20",
+                  }}>
+                    <Text style={{
+                      fontSize: 11,
+                      fontWeight: "700",
+                      color: inspectingCompany.asaasWalletId ? colors.success : "#F59E0B",
+                    }}>
+                      {inspectingCompany.asaasWalletId ? "Subconta Ativa" : "Subconta Não Criada"}
+                    </Text>
+                  </View>
+                </View>
+
+                {inspectingCompany.asaasWalletId ? (
+                  <InfoRow label="Wallet ID (Asaas Split)" value={inspectingCompany.asaasWalletId} />
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 16 }}>
+                      ℹ️ A subconta do Asaas ainda não foi criada. Criar uma subconta gera um custo de aproximadamente R$ 13,00 pelo Asaas.
+                    </Text>
+                    <Pressable
+                      disabled={isCreatingSubaccount}
+                      onPress={() => handleCreateSubaccount(inspectingCompany)}
+                      style={({ pressed }) => [
+                        {
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                          paddingVertical: 10,
+                          paddingHorizontal: 14,
+                          borderRadius: 8,
+                          backgroundColor: colors.primary,
+                          opacity: pressed || isCreatingSubaccount ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      {isCreatingSubaccount ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <IconSymbol name="plus" size={16} color="#fff" />
+                          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>
+                            Criar Subconta Asaas (R$ 13,00)
+                          </Text>
+                        </>
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+
+                {/* Pix & Bank details */}
+                {inspectingCompany.pixKey ? (
+                  <InfoRow
+                    label={`Chave Pix (${inspectingCompany.pixKeyType || "Chave"})`}
+                    value={inspectingCompany.pixKey}
+                  />
+                ) : null}
+
+                {inspectingCompany.bankCode ? (
+                  <InfoRow
+                    label="Conta Bancária de Repasse"
+                    value={`Banco ${inspectingCompany.bankCode} | Ag: ${inspectingCompany.bankAgency || "0000"} | Conta: ${inspectingCompany.bankAccount || ""}-${inspectingCompany.bankAccountDigit || "0"} (${inspectingCompany.bankAccountType || "CORRENTE"})`}
+                  />
+                ) : null}
+
+                {!inspectingCompany.pixKey && !inspectingCompany.bankCode ? (
+                  <Text style={{ fontSize: 12, color: colors.muted, fontStyle: "italic" }}>
+                    Nenhuma chave Pix ou conta bancária cadastrada pela empresa.
+                  </Text>
+                ) : null}
               </View>
             </ScrollView>
 
