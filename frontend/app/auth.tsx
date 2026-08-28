@@ -216,17 +216,20 @@ export default function AuthScreen() {
     pixDebounceRef.current = setTimeout(async () => {
       try {
         const result = await validatePixKey(pixKeyType, val.trim());
-        if (result.valid) {
+        console.log("[Frontend Pix Validation] Result:", JSON.stringify(result));
+        if (result && result.valid) {
+          const resolvedName = result.name || result.ownerName || (ownerName.trim() || name.trim() || "Titular Confirmado");
           setPixValidated(true);
-          setPixHolderName(result.name || "");
+          setPixHolderName(resolvedName);
           setPixError("");
         } else {
           setPixValidated(false);
           setPixHolderName("");
-          setPixError(result.errorMessage || "Chave Pix não encontrada no Banco Central");
+          setPixError(result?.errorMessage || "Chave Pix não encontrada no Banco Central");
         }
       } catch (err: any) {
         setPixValidated(false);
+        setPixHolderName("");
         setPixError(err.message || "Erro ao validar chave Pix");
       } finally {
         setPixValidating(false);
@@ -664,22 +667,30 @@ export default function AuthScreen() {
                         </View>
 
                         {/* Status abaixo do campo */}
-                        {pixValidated && pixHolderName ? (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#16a34a12", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 }}>
-                            <IconSymbol name="person.fill.checkmark" size={14} color="#16a34a" />
-                            <Text style={{ fontSize: 13, color: "#16a34a", fontWeight: "700", flex: 1 }}>
-                              Titular confirmado: {pixHolderName}
-                            </Text>
+                        {pixValidated ? (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#16a34a15", borderColor: "#16a34a40", borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 4 }}>
+                            <IconSymbol name="checkmark.circle.fill" size={18} color="#16a34a" />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: "#16a34a", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                Titular Confirmado no Banco Central
+                              </Text>
+                              <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, marginTop: 1 }}>
+                                {pixHolderName || ownerName.trim() || name.trim() || "Titular da Conta"}
+                              </Text>
+                            </View>
                           </View>
                         ) : pixValidating ? (
-                          <Text style={{ fontSize: 12, color: colors.primary }}>Verificando chave no Banco Central...</Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>Verificando titular no Banco Central...</Text>
+                          </View>
                         ) : pixError ? (
-                          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
-                            <IconSymbol name="exclamationmark.circle.fill" size={14} color="#dc2626" />
+                          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 4 }}>
+                            <IconSymbol name="exclamationmark.circle.fill" size={15} color="#dc2626" />
                             <Text style={{ fontSize: 12, color: "#dc2626", flex: 1 }}>{pixError}</Text>
                           </View>
                         ) : (
-                          <Text style={{ fontSize: 12, color: colors.muted }}>
+                          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
                             A chave será validada automaticamente via Banco Central
                           </Text>
                         )}

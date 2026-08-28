@@ -62,12 +62,13 @@ export async function validatePixKey(
   ispb?: string;
   errorMessage?: string;
 }> {
-  const response = await apiCall<{ data: any }>("/api/companies/validate-pix", {
+  const response = await apiCall<any>("/api/companies/validate-pix", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, key }),
   });
-  return response.data;
+  const res = response?.data !== undefined ? response.data : response;
+  return res || { valid: false, errorMessage: "Erro ao consultar chave Pix" };
 }
 
 export async function updateCompany(

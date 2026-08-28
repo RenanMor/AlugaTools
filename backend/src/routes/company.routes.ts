@@ -24,6 +24,7 @@ router.post("/validate-pix", async (req: Request, res: Response, next: NextFunct
 
     const { validateAsaasPixKey } = await import("../utils/asaas");
     const result = await validateAsaasPixKey(type, key);
+    console.log(`[API validate-pix] Result for ${type}: ${key} -> valid: ${result.valid}, name: ${result.name}`);
     res.json({ data: result });
   } catch (err) {
     next(err);
