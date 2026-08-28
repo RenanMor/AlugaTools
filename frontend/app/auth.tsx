@@ -171,14 +171,20 @@ export default function AuthScreen() {
       setCepLoading(true);
       try {
         const data = await lookupCep(cleaned);
+        console.log("[CEP Lookup] Response:", data);
         if (data) {
-          if (data.logradouro) setAddressStreet(data.logradouro);
-          if (data.bairro) setNeighborhood(data.bairro);
-          if (data.localidade) setCity(data.localidade);
-          if (data.uf) setState(data.uf);
+          const street = data.street || data.logradouro || "";
+          const neigh = data.neighborhood || data.bairro || "";
+          const cty = data.city || data.localidade || "";
+          const uf = data.state || data.uf || "";
+
+          if (street) setAddressStreet(street);
+          if (neigh) setNeighborhood(neigh);
+          if (cty) setCity(cty);
+          if (uf) setState(uf);
         }
-      } catch {
-        // Silent — user fills manually
+      } catch (err: any) {
+        console.warn("[CEP Lookup] Failed:", err.message);
       } finally {
         setCepLoading(false);
       }
