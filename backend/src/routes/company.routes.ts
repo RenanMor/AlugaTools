@@ -9,8 +9,8 @@ router.get("/featured", CompanyController.getFeatured);
 router.get("/category/:categoryId", CompanyController.getByCategory);
 router.get("/:id", CompanyController.getById);
 
-// Endpoint to validate Pix Key via DICT (Banco Central) through Asaas
-router.post("/validate-pix", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
+// Endpoint to validate Pix Key via DICT (Banco Central) through Asaas (público para uso no cadastro)
+router.post("/validate-pix", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { type, key } = req.body;
     if (!type || !key) {
