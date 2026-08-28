@@ -54,10 +54,12 @@ export async function getCompaniesByCategory(categoryId: string): Promise<Compan
 
 export async function validatePixKey(
   type: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP",
-  key: string
+  key: string,
+  extra?: { ownerName?: string; companyName?: string }
 ): Promise<{
   valid: boolean;
   name?: string;
+  bankName?: string;
   cpfCnpj?: string;
   ispb?: string;
   errorMessage?: string;
@@ -65,7 +67,7 @@ export async function validatePixKey(
   const response = await apiCall<any>("/api/companies/validate-pix", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type, key }),
+    body: JSON.stringify({ type, key, ...extra }),
   });
   const res = response?.data !== undefined ? response.data : response;
   return res || { valid: false, errorMessage: "Erro ao consultar chave Pix" };

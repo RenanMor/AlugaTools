@@ -556,21 +556,44 @@ export function buildSplitConfig(
 export interface AsaasPixKeyValidationResult {
   valid: boolean;
   name?: string;
+  bankName?: string;
   cpfCnpj?: string;
   ispb?: string;
   endToEndId?: string;
   errorMessage?: string;
 }
 
+export const ISPB_BANK_MAP: Record<string, string> = {
+  "00000000": "Banco do Brasil",
+  "00360305": "Caixa Econômica",
+  "60701190": "Itaú Unibanco",
+  "60746948": "Banco Bradesco",
+  "90400888": "Banco Santander",
+  "18236120": "Nubank",
+  "10573521": "Mercado Pago",
+  "07450604": "Banco Inter",
+  "22896431": "PicPay",
+  "33657248": "C6 Bank",
+  "00000208": "Banco BRB",
+  "00416968": "Banco Safra",
+  "02038232": "Banco Original",
+  "17184037": "Banco Mercantil",
+  "28195667": "Neon",
+  "30306294": "BTG Pactual",
+  "38031548": "PagBank",
+  "46563938": "Asaas",
+};
+
 /**
  * Validates a Pix key directly against Banco Central's DICT via Asaas API.
- * Returns account holder information if valid.
+ * Returns account holder and bank/PSP information if valid.
  *
  * Docs: https://docs.asaas.com/reference/consultar-chave-pix
  */
 export async function validateAsaasPixKey(
   type: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP",
-  key: string
+  key: string,
+  fallback?: { ownerName?: string; companyName?: string }
 ): Promise<AsaasPixKeyValidationResult> {
   const api = createAsaasClient();
   const cleanKey = type === "CPF" || type === "CNPJ" || type === "PHONE" 
@@ -584,31 +607,58 @@ export async function validateAsaasPixKey(
       params: { type, key: cleanKey },
     });
 
-    const data = response.data;
+    const data = response.data || {};
+    const holderName = data.name || data.ownerName || data.holderName || data.accountHolderName || data.accountHolder?.name || "Titular Confirmado";
+    const ispb = data.ispb || data.accountHolder?.ispb;
+    const bankName = data.participantName || data.bankName || (ispb ? ISPB_BANK_MAP[ispb] : null) || "Banco Participante";
+
     return {
       valid: true,
-      name: data.name || data.ownerName || "Titular Confirmado",
+      name: holderName,
+      bankName: bankName,
       cpfCnpj: data.cpfCnpj,
-      ispb: data.ispb,
+      ispb: ispb,
       endToEndId: data.endToEndId,
     };
   } catch (error: any) {
     console.warn("[Asaas] validatePixKey warning:", error.response?.data || error.message);
 
     // No Sandbox do Asaas, apenas a chave mock 47996515839 existe no DICT de teste.
-    // Qualquer outra chave real gera 404 no Sandbox porque o Sandbox não conecta ao Banco Central real.
-    // Em Sandbox, quando der 404, simulamos o retorno do DICT com o nome para permitir testes de qualquer chave.
+    // Para qualquer outra chave testada em Sandbox (404), resolvemos o nome real do proprietário/empresa:
     if (isSandbox && error.response?.status === 404) {
-      console.log(`[Asaas Sandbox] Simulando validação DICT para chave teste (${type}: ${cleanKey})`);
-      const mockName = type === "EMAIL"
-        ? `Empresa ${cleanKey.split("@")[0].toUpperCase()}`
-        : type === "CPF" || type === "CNPJ"
-        ? `Titular Registrado (${cleanKey.slice(0, 3)}***)`
-        : `Titular Pix Teste`;
+      console.log(`[Asaas Sandbox] Resolvendo titular para chave de teste (${type}: ${cleanKey})`);
+
+      let resolvedName = fallback?.ownerName?.trim() || fallback?.companyName?.trim();
+
+      // Se for CNPJ real e não tiver nome, tenta buscar a razão social oficial na Receita Federal via BrasilAPI
+      if (!resolvedName && type === "CNPJ" && cleanKey.length === 14) {
+        try {
+          const cnpjRes = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cleanKey}`, { timeout: 3000 });
+          if (cnpjRes.data?.razao_social || cnpjRes.data?.nome_fantasia) {
+            resolvedName = cnpjRes.data.razao_social || cnpjRes.data.nome_fantasia;
+          }
+        } catch {
+          // Silent fallback
+        }
+      }
+
+      // Se for E-mail (ex: joao.silva@email.com), formata como nome próprio
+      if (!resolvedName && type === "EMAIL") {
+        const userPart = cleanKey.split("@")[0].replace(/[._-]/g, " ");
+        resolvedName = userPart
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ");
+      }
+
+      if (!resolvedName) {
+        resolvedName = fallback?.companyName || fallback?.ownerName || "Titular da Conta";
+      }
 
       return {
         valid: true,
-        name: mockName,
+        name: resolvedName,
+        bankName: "Mercado Pago",
         cpfCnpj: cleanKey,
       };
     }

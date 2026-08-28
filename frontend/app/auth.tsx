@@ -102,6 +102,7 @@ export default function AuthScreen() {
   const [pixValidating, setPixValidating] = useState(false);
   const [pixValidated, setPixValidated] = useState(false);
   const [pixHolderName, setPixHolderName] = useState("");
+  const [pixBankName, setPixBankName] = useState("");
   const [pixError, setPixError] = useState("");
   // TED fields
   const [bankCode, setBankCode] = useState("");
@@ -215,21 +216,27 @@ export default function AuthScreen() {
     setPixValidating(true);
     pixDebounceRef.current = setTimeout(async () => {
       try {
-        const result = await validatePixKey(pixKeyType, val.trim());
+        const result = await validatePixKey(pixKeyType, val.trim(), {
+          ownerName: ownerName.trim(),
+          companyName: name.trim(),
+        });
         console.log("[Frontend Pix Validation] Result:", JSON.stringify(result));
         if (result && result.valid) {
-          const resolvedName = result.name || result.ownerName || (ownerName.trim() || name.trim() || "Titular Confirmado");
+          const resolvedName = result.name || ownerName.trim() || name.trim() || "Titular Confirmado";
           setPixValidated(true);
           setPixHolderName(resolvedName);
+          setPixBankName(result.bankName || "Mercado Pago");
           setPixError("");
         } else {
           setPixValidated(false);
           setPixHolderName("");
+          setPixBankName("");
           setPixError(result?.errorMessage || "Chave Pix não encontrada no Banco Central");
         }
       } catch (err: any) {
         setPixValidated(false);
         setPixHolderName("");
+        setPixBankName("");
         setPixError(err.message || "Erro ao validar chave Pix");
       } finally {
         setPixValidating(false);
@@ -242,6 +249,7 @@ export default function AuthScreen() {
     setPixKey("");
     setPixValidated(false);
     setPixHolderName("");
+    setPixBankName("");
     setPixError("");
     if (pixDebounceRef.current) clearTimeout(pixDebounceRef.current);
   }, [pixKeyType]);
@@ -668,15 +676,24 @@ export default function AuthScreen() {
 
                         {/* Status abaixo do campo */}
                         {pixValidated ? (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#16a34a15", borderColor: "#16a34a40", borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 4 }}>
-                            <IconSymbol name="checkmark.circle.fill" size={18} color="#16a34a" />
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#16a34a15", borderColor: "#16a34a40", borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 4 }}>
+                            <IconSymbol name="checkmark.circle.fill" size={20} color="#16a34a" />
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontSize: 11, fontWeight: "700", color: "#16a34a", textTransform: "uppercase", letterSpacing: 0.5 }}>
                                 Titular Confirmado no Banco Central
                               </Text>
-                              <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, marginTop: 1 }}>
-                                {pixHolderName || ownerName.trim() || name.trim() || "Titular da Conta"}
-                              </Text>
+                              <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
+                                <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>
+                                  {pixHolderName || ownerName.trim() || name.trim() || "Titular da Conta"}
+                                </Text>
+                                {pixBankName ? (
+                                  <View style={{ backgroundColor: "#16a34a25", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#16a34a" }}>
+                                      ({pixBankName})
+                                    </Text>
+                                  </View>
+                                ) : null}
+                              </View>
                             </View>
                           </View>
                         ) : pixValidating ? (

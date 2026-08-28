@@ -12,7 +12,7 @@ router.get("/:id", CompanyController.getById);
 // Endpoint to validate Pix Key via DICT (Banco Central) through Asaas (público para uso no cadastro)
 router.post("/validate-pix", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { type, key } = req.body;
+    const { type, key, ownerName, companyName } = req.body;
     if (!type || !key) {
       return res.status(400).json({ error: "Tipo e chave Pix são obrigatórios" });
     }
@@ -23,8 +23,8 @@ router.post("/validate-pix", async (req: Request, res: Response, next: NextFunct
     }
 
     const { validateAsaasPixKey } = await import("../utils/asaas");
-    const result = await validateAsaasPixKey(type, key);
-    console.log(`[API validate-pix] Result for ${type}: ${key} -> valid: ${result.valid}, name: ${result.name}`);
+    const result = await validateAsaasPixKey(type, key, { ownerName, companyName });
+    console.log(`[API validate-pix] Result for ${type}: ${key} -> valid: ${result.valid}, name: ${result.name}, bank: ${result.bankName}`);
     res.json({ data: result });
   } catch (err) {
     next(err);
