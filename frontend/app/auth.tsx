@@ -192,12 +192,26 @@ export default function AuthScreen() {
   };
 
   // Minimum key lengths per type for triggering validation
-  const PIX_MIN_LENGTH: Record<string, number> = {
-    CPF: 11,
-    CNPJ: 14,
-    EMAIL: 6,
-    PHONE: 10,
-    EVP: 32,
+  // Helper to check if the Pix key is complete enough to trigger validation
+  const isPixKeyReadyForValidation = (type: PixKeyType, value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    const cleanDigits = trimmed.replace(/\D/g, "");
+
+    switch (type) {
+      case "EMAIL":
+        return trimmed.includes("@") && trimmed.includes(".") && trimmed.length >= 6 && !trimmed.endsWith("@") && !trimmed.endsWith(".");
+      case "CPF":
+        return cleanDigits.length === 11;
+      case "CNPJ":
+        return cleanDigits.length === 14;
+      case "PHONE":
+        return cleanDigits.length >= 10 && cleanDigits.length <= 11;
+      case "EVP":
+        return trimmed.length >= 32;
+      default:
+        return false;
+    }
   };
 
   // Debounce Pix validation: triggers 800ms after user stops typing
@@ -207,20 +221,19 @@ export default function AuthScreen() {
     setPixKey(val);
     setPixValidated(false);
     setPixHolderName("");
+    setPixBankName("");
     setPixError("");
 
     // Cancel any pending validation
     if (pixDebounceRef.current) clearTimeout(pixDebounceRef.current);
 
-    const cleanVal = val.trim().replace(/\D/g, "");
-    const minLen = PIX_MIN_LENGTH[pixKeyType] || 5;
-    const useRaw = pixKeyType === "EMAIL" || pixKeyType === "EVP";
-    const effectiveLen = useRaw ? val.trim().length : cleanVal.length;
+    if (!isPixKeyReadyForValidation(pixKeyType, val)) {
+      setPixValidating(false);
+      return;
+    }
 
-    if (effectiveLen < minLen) return; // Not enough chars yet — wait
-
-    setPixValidating(true);
     pixDebounceRef.current = setTimeout(async () => {
+      setPixValidating(true);
       try {
         const result = await validatePixKey(pixKeyType, val.trim(), {
           ownerName: ownerName.trim(),
@@ -253,6 +266,7 @@ export default function AuthScreen() {
   // Reset Pix state when key type changes
   useEffect(() => {
     setPixKey("");
+    setPixValidating(false);
     setPixValidated(false);
     setPixHolderName("");
     setPixBankName("");
@@ -668,11 +682,9 @@ export default function AuthScreen() {
                               fontSize: 15,
                             }}
                           />
-                          {/* Ícone de status à direita do campo */}
+                          {/* Ícone de status à direita do campo (apenas resultado final) */}
                           <View style={{ position: "absolute", right: 12, alignItems: "center", justifyContent: "center" }}>
-                            {pixValidating ? (
-                              <ActivityIndicator size="small" color={colors.primary} />
-                            ) : pixValidated ? (
+                            {pixValidated ? (
                               <IconSymbol name="checkmark.circle.fill" size={20} color="#16a34a" />
                             ) : pixError ? (
                               <IconSymbol name="xmark.circle.fill" size={20} color="#dc2626" />
