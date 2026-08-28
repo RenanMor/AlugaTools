@@ -121,10 +121,10 @@ router.post("/companies/:id/create-subaccount", async (req: Request, res: Respon
       cpfCnpj: cleanDoc,
       mobilePhone: cleanPhone || undefined,
       phone: cleanPhone || undefined,
-      postalCode: company.postal_code || undefined,
-      address: company.address_street || company.location || undefined,
-      addressNumber: company.address_number || undefined,
-      province: company.neighborhood || undefined,
+      postalCode: req.body?.postalCode || req.body?.postal_code || company.postal_code || undefined,
+      address: req.body?.address || req.body?.addressStreet || company.address_street || company.location || undefined,
+      addressNumber: req.body?.addressNumber || req.body?.address_number || company.address_number || undefined,
+      province: req.body?.province || req.body?.neighborhood || company.neighborhood || undefined,
       companyType: cleanDoc.length === 14 ? "LIMITED" : "MEI",
     });
 

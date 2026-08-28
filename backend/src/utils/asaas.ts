@@ -129,23 +129,25 @@ export async function createAsaasSubaccount(
   const api = createAsaasClient();
 
   const cleanDoc = input.cpfCnpj.replace(/\D/g, "");
+  const cleanPostalCode = (input.postalCode || "").replace(/\D/g, "") || "01001000";
+  const cleanPhone = (input.mobilePhone || input.phone || "11999999999").replace(/\D/g, "");
 
   const payload: any = {
     name: input.name,
     email: input.email,
     cpfCnpj: cleanDoc,
-    mobilePhone: input.mobilePhone || undefined,
-    phone: input.phone || undefined,
-    address: input.address || undefined,
-    addressNumber: input.addressNumber || undefined,
-    province: input.province || undefined,
-    postalCode: input.postalCode ? input.postalCode.replace(/\D/g, "") : undefined,
+    mobilePhone: cleanPhone,
+    phone: cleanPhone,
+    address: input.address || "Rua Principal",
+    addressNumber: input.addressNumber || "100",
+    province: input.province || "Centro",
+    postalCode: cleanPostalCode,
     companyType: input.companyType || (cleanDoc.length === 14 ? "LIMITED" : "MEI"),
     incomeValue: input.incomeValue || 5000,
   };
 
   try {
-    console.log(`[Asaas] Creating subaccount via POST ${getAsaasBaseUrl()}/accounts for doc: ${cleanDoc.slice(0, 4)}***`);
+    console.log(`[Asaas] Creating subaccount via POST ${getAsaasBaseUrl()}/accounts for doc: ${cleanDoc.slice(0, 4)}*** (CEP: ${cleanPostalCode})`);
     const response = await api.post("/accounts", payload);
     const account = response.data;
 

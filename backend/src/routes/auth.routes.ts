@@ -101,6 +101,8 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
           location: `${city || "São Paulo"}, ${state || "SP"}`,
           state: state || "SP",
           city: city || "São Paulo",
+          cnpj: cnpj ? cnpj.replace(/\D/g, "") : null,
+          phone: phone || null,
         })
         .select()
         .single();
