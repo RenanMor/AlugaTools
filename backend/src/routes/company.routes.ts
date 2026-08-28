@@ -102,6 +102,31 @@ router.put("/:id", verifySupabaseToken, async (req: Request, res: Response, next
     if (bank_owner_name !== undefined) updates.bank_owner_name = bank_owner_name;
     if (bank_cpf_cnpj !== undefined) updates.bank_cpf_cnpj = bank_cpf_cnpj;
 
+    // Validate Pix key via DICT (Banco Central) when pix_key is being set
+    if (pix_key && pix_key_type) {
+      try {
+        const { validateAsaasPixKey } = await import("../utils/asaas");
+        const validation = await validateAsaasPixKey(pix_key_type, pix_key);
+        if (!validation.valid) {
+          return res.status(400).json({
+            error: `Chave Pix inválida: ${validation.errorMessage || "Não encontrada no Banco Central"}`,
+            pixValidation: validation,
+          });
+        }
+        // Enrich with validated holder data if not provided
+        if (!bank_owner_name && validation.name) {
+          updates.bank_owner_name = validation.name;
+        }
+        if (!bank_cpf_cnpj && validation.cpfCnpj) {
+          updates.bank_cpf_cnpj = validation.cpfCnpj;
+        }
+        console.log(`[Company] ✅ Pix key validated for company ${id}: ${pix_key_type} ${pix_key} → ${validation.name}`);
+      } catch (pixErr: any) {
+        console.warn(`[Company] Pix validation warning for ${id}:`, pixErr.message);
+        // Don't block the update if validation service is unavailable
+      }
+    }
+
     const { data: updated, error: updateError } = await supabaseAdmin
       .from("companies")
       .update(updates)

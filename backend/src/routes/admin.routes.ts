@@ -216,4 +216,52 @@ router.post("/companies/:id/transfer-funds", async (req: Request, res: Response,
   }
 });
 
+// 7. Query Subaccount Balance (for admin monitoring)
+router.get("/companies/:id/balance", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const { data: company, error: compErr } = await supabaseAdmin
+      .from("companies")
+      .select("name, asaas_api_key, asaas_wallet_id, asaas_status, pix_key, pix_key_type, bank_code, bank_agency, bank_account")
+      .eq("id", id)
+      .single();
+
+    if (compErr || !company) {
+      return res.status(404).json({ error: "Empresa não encontrada" });
+    }
+
+    if (!company.asaas_api_key) {
+      return res.status(400).json({
+        error: "A empresa não possui subconta Asaas ativa.",
+        asaasStatus: company.asaas_status || "not_created",
+      });
+    }
+
+    const { getSubaccountBalance } = await import("../utils/asaas");
+    const balance = await getSubaccountBalance(company.asaas_api_key);
+
+    res.json({
+      data: {
+        companyName: company.name,
+        walletId: company.asaas_wallet_id,
+        balance: balance.balance,
+        availableBalance: balance.availableBalance,
+        pendingBalance: balance.pendingBalance,
+        payoutInfo: {
+          hasPixKey: !!(company.pix_key && company.pix_key_type),
+          pixKeyType: company.pix_key_type || null,
+          pixKey: company.pix_key || null,
+          hasBankAccount: !!(company.bank_code && company.bank_account),
+          bankCode: company.bank_code || null,
+          bankAgency: company.bank_agency || null,
+          bankAccount: company.bank_account || null,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

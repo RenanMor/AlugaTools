@@ -616,3 +616,56 @@ export async function transferSubaccountFunds(
   }
 }
 
+// ============================================================
+// Subaccount Balance Query
+// ============================================================
+
+export interface AsaasBalance {
+  balance: number;
+  availableBalance: number;
+  pendingBalance: number;
+}
+
+/**
+ * Queries the current balance of an Asaas subaccount.
+ * Uses the subaccount's individual API key.
+ *
+ * Docs: https://docs.asaas.com/reference/recuperar-saldo-da-conta
+ */
+export async function getSubaccountBalance(
+  subaccountApiKey: string
+): Promise<AsaasBalance> {
+  if (!subaccountApiKey) {
+    throw new Error("API Key da subconta não fornecida para consulta de saldo");
+  }
+
+  const api = axios.create({
+    baseURL: env.asaasBaseUrl || "https://api-sandbox.asaas.com/v3",
+    headers: {
+      access_token: subaccountApiKey,
+      "Content-Type": "application/json",
+    },
+  });
+
+  try {
+    const response = await api.get("/finance/getCurrentBalance");
+    const data = response.data;
+    return {
+      balance: Number(data.totalBalance ?? data.balance ?? 0),
+      availableBalance: Number(data.availableBalance ?? data.balance ?? 0),
+      pendingBalance: Number(data.pendingBalance ?? 0),
+    };
+  } catch (error: any) {
+    console.error(
+      "[Asaas] getSubaccountBalance error:",
+      JSON.stringify(error.response?.data || error.message, null, 2)
+    );
+    const errorMsg =
+      error.response?.data?.errors?.[0]?.description ||
+      error.message ||
+      "Erro ao consultar saldo da subconta";
+    throw new Error(errorMsg);
+  }
+}
+
+
