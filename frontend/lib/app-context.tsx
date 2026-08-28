@@ -54,7 +54,24 @@ interface AppState {
     phone?: string,
     cnpj?: string,
     state?: string,
-    city?: string
+    city?: string,
+    companyName?: string,
+    // Company onboarding: address
+    postalCode?: string,
+    addressStreet?: string,
+    addressNumber?: string,
+    neighborhood?: string,
+    // Company onboarding: payment method
+    pixKeyType?: string,
+    pixKey?: string,
+    pixHolderName?: string,
+    bankCode?: string,
+    bankAgency?: string,
+    bankAccount?: string,
+    bankAccountDigit?: string,
+    bankAccountType?: string,
+    bankOwnerName?: string,
+    bankCpfCnpj?: string
   ) => Promise<any>;
   logout: () => void;
   checkout: () => Promise<void>;
@@ -412,7 +429,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     cnpj?: string,
     state?: string,
     city?: string,
-    companyName?: string
+    companyName?: string,
+    // Company onboarding: address
+    postalCode?: string,
+    addressStreet?: string,
+    addressNumber?: string,
+    neighborhood?: string,
+    // Company onboarding: payment method
+    pixKeyType?: string,
+    pixKey?: string,
+    _pixHolderName?: string,
+    bankCode?: string,
+    bankAgency?: string,
+    bankAccount?: string,
+    bankAccountDigit?: string,
+    bankAccountType?: string,
+    bankOwnerName?: string,
+    bankCpfCnpj?: string
   ) => {
     try {
       let response: any;
@@ -431,6 +464,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             state,
             city,
             companyName,
+            // Address
+            postal_code: postalCode,
+            address_street: addressStreet,
+            address_number: addressNumber,
+            neighborhood,
+            // Payment method
+            pix_key_type: pixKeyType || undefined,
+            pix_key: pixKey || undefined,
+            bank_code: bankCode || undefined,
+            bank_agency: bankAgency || undefined,
+            bank_account: bankAccount || undefined,
+            bank_account_digit: bankAccountDigit || undefined,
+            bank_account_type: bankAccountType || undefined,
+            bank_owner_name: bankOwnerName || undefined,
+            bank_cpf_cnpj: bankCpfCnpj || undefined,
           }),
         });
       } else {

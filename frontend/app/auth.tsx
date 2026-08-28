@@ -1,11 +1,16 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, Text, TextInput, View, ScrollView } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { Pressable, Text, TextInput, View, ScrollView, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { ProfileType } from "@/lib/types";
+import { lookupCep } from "@/lib/api/rentals";
+import { validatePixKey } from "@/lib/api/companies";
+
+type PaymentMethod = "pix" | "ted";
+type PixKeyType = "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
 
 function validateCPF(cpf: string): boolean {
   cpf = cpf.replace(/[^\d]+/g, "");
@@ -83,8 +88,33 @@ export default function AuthScreen() {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
 
+  // Address fields (company onboarding)
+  const [postalCode, setPostalCode] = useState("");
+  const [addressStreet, setAddressStreet] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
+
+  // Payment method (company onboarding)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [pixKeyType, setPixKeyType] = useState<PixKeyType>("EMAIL");
+  const [pixKey, setPixKey] = useState("");
+  const [pixValidating, setPixValidating] = useState(false);
+  const [pixValidated, setPixValidated] = useState(false);
+  const [pixHolderName, setPixHolderName] = useState("");
+  const [pixError, setPixError] = useState("");
+  // TED fields
+  const [bankCode, setBankCode] = useState("");
+  const [bankAgency, setBankAgency] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankAccountDigit, setBankAccountDigit] = useState("");
+  const [bankAccountType, setBankAccountType] = useState<"CONTA_CORRENTE" | "CONTA_POUPANCA">("CONTA_CORRENTE");
+  const [bankOwnerName, setBankOwnerName] = useState("");
+  const [bankCpfCnpj, setBankCpfCnpj] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [companyApprovalStatus, setCompanyApprovalStatus] = useState<"pending" | "rejected" | null>(null);
+
 
   const handleCpfChange = (val: string) => {
     const cleaned = val.replace(/\D/g, "");
@@ -131,6 +161,88 @@ export default function AuthScreen() {
     setPhone(formatted);
   };
 
+  const handleCepChange = async (val: string) => {
+    const cleaned = val.replace(/\D/g, "").slice(0, 8);
+    const formatted = cleaned.length > 5 ? `${cleaned.slice(0, 5)}-${cleaned.slice(5)}` : cleaned;
+    setPostalCode(formatted);
+
+    if (cleaned.length === 8) {
+      setCepLoading(true);
+      try {
+        const data = await lookupCep(cleaned);
+        if (data) {
+          if (data.logradouro) setAddressStreet(data.logradouro);
+          if (data.bairro) setNeighborhood(data.bairro);
+          if (data.localidade) setCity(data.localidade);
+          if (data.uf) setState(data.uf);
+        }
+      } catch {
+        // Silent — user fills manually
+      } finally {
+        setCepLoading(false);
+      }
+    }
+  };
+
+  // Minimum key lengths per type for triggering validation
+  const PIX_MIN_LENGTH: Record<string, number> = {
+    CPF: 11,
+    CNPJ: 14,
+    EMAIL: 6,
+    PHONE: 10,
+    EVP: 32,
+  };
+
+  // Debounce Pix validation: triggers 800ms after user stops typing
+  const pixDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePixKeyChange = (val: string) => {
+    setPixKey(val);
+    setPixValidated(false);
+    setPixHolderName("");
+    setPixError("");
+
+    // Cancel any pending validation
+    if (pixDebounceRef.current) clearTimeout(pixDebounceRef.current);
+
+    const cleanVal = val.trim().replace(/\D/g, "");
+    const minLen = PIX_MIN_LENGTH[pixKeyType] || 5;
+    const useRaw = pixKeyType === "EMAIL" || pixKeyType === "EVP";
+    const effectiveLen = useRaw ? val.trim().length : cleanVal.length;
+
+    if (effectiveLen < minLen) return; // Not enough chars yet — wait
+
+    setPixValidating(true);
+    pixDebounceRef.current = setTimeout(async () => {
+      try {
+        const result = await validatePixKey(pixKeyType, val.trim());
+        if (result.valid) {
+          setPixValidated(true);
+          setPixHolderName(result.name || "");
+          setPixError("");
+        } else {
+          setPixValidated(false);
+          setPixHolderName("");
+          setPixError(result.errorMessage || "Chave Pix não encontrada no Banco Central");
+        }
+      } catch (err: any) {
+        setPixValidated(false);
+        setPixError(err.message || "Erro ao validar chave Pix");
+      } finally {
+        setPixValidating(false);
+      }
+    }, 800);
+  };
+
+  // Reset Pix state when key type changes
+  useEffect(() => {
+    setPixKey("");
+    setPixValidated(false);
+    setPixHolderName("");
+    setPixError("");
+    if (pixDebounceRef.current) clearTimeout(pixDebounceRef.current);
+  }, [pixKeyType]);
+
   const submit = async () => {
     if (loading) return;
     setLoading(true);
@@ -144,20 +256,19 @@ export default function AuthScreen() {
 
         if (profile === "company") {
           const cleanCnpj = cnpj.replace(/\D/g, "");
-          if (!cleanCnpj) {
-            alert("CNPJ é obrigatório para empresas");
-            setLoading(false);
-            return;
-          }
-          if (!validateCNPJ(cleanCnpj)) {
-            alert("CNPJ inválido. Digite um CNPJ real.");
-            setLoading(false);
-            return;
-          }
-          if (!state.trim() || !city.trim()) {
-            alert("Estado e Cidade são obrigatórios para empresas");
-            setLoading(false);
-            return;
+          if (!cleanCnpj) { alert("CNPJ é obrigatório para empresas"); setLoading(false); return; }
+          if (!validateCNPJ(cleanCnpj)) { alert("CNPJ inválido. Digite um CNPJ real."); setLoading(false); return; }
+          if (!postalCode.replace(/\D/g, "")) { alert("CEP é obrigatório para empresas"); setLoading(false); return; }
+          if (!addressNumber.trim()) { alert("Número do endereço é obrigatório"); setLoading(false); return; }
+          if (!state.trim() || !city.trim()) { alert("Estado e Cidade são obrigatórios para empresas"); setLoading(false); return; }
+
+          if (paymentMethod === "pix") {
+            if (!pixKey.trim()) { alert("Informe a chave Pix"); setLoading(false); return; }
+            if (!pixValidated) { alert("Por favor, valide sua chave Pix antes de continuar"); setLoading(false); return; }
+          } else {
+            if (!bankCode.trim() || !bankAgency.trim() || !bankAccount.trim() || !bankOwnerName.trim() || !bankCpfCnpj.trim()) {
+              alert("Preencha todos os dados bancários para TED"); setLoading(false); return;
+            }
           }
         } else {
           const cleanCpf = cpf.replace(/\D/g, "");
@@ -268,6 +379,8 @@ export default function AuthScreen() {
         isRegister: mode === "register"
       });
 
+      const isCompanyRegister = profile === "company" && mode === "register";
+
       const returnedUser = await login(
         email.trim(),
         profile === "company" ? (ownerName.trim() || name.trim()) : (name.trim() || "Usuário"),
@@ -279,7 +392,23 @@ export default function AuthScreen() {
         loginCnpj,
         state.trim(),
         city.trim(),
-        profile === "company" ? name.trim() : undefined
+        profile === "company" ? name.trim() : undefined,
+        // Address
+        isCompanyRegister ? (postalCode.replace(/\D/g, "") || undefined) : undefined,
+        isCompanyRegister ? (addressStreet.trim() || undefined) : undefined,
+        isCompanyRegister ? (addressNumber.trim() || undefined) : undefined,
+        isCompanyRegister ? (neighborhood.trim() || undefined) : undefined,
+        // Payment method
+        isCompanyRegister && paymentMethod === "pix" ? pixKeyType : undefined,
+        isCompanyRegister && paymentMethod === "pix" ? pixKey.trim() : undefined,
+        isCompanyRegister && paymentMethod === "pix" ? (pixHolderName || undefined) : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankCode.trim() : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankAgency.trim() : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankAccount.trim() : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankAccountDigit.trim() : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankAccountType : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankOwnerName.trim() : undefined,
+        isCompanyRegister && paymentMethod === "ted" ? bankCpfCnpj.replace(/\D/g, "") : undefined,
       );
 
       const actualProfile = returnedUser?.profile || profile;
@@ -412,8 +541,173 @@ export default function AuthScreen() {
                     placeholder="Nome do proprietario / responsável"
                     editable={validateCNPJ(cnpj.replace(/\D/g, ""))}
                   />
-                  <Input label="Estado (UF)" value={state} onChangeText={setState} placeholder="Ex: SP" />
-                  <Input label="Cidade" value={city} onChangeText={setCity} placeholder="Ex: Campinas" />
+
+                  {/* ── Endereço ── */}
+                  <SectionHeader label="Endereço da Empresa" />
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>CEP</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <TextInput
+                        value={postalCode}
+                        onChangeText={handleCepChange}
+                        placeholder="00000-000"
+                        keyboardType="number-pad"
+                        placeholderTextColor={colors.muted}
+                        returnKeyType="done"
+                        style={{ flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: colors.foreground, fontSize: 15 }}
+                      />
+                      {cepLoading && <ActivityIndicator size="small" color={colors.primary} />}
+                    </View>
+                  </View>
+
+                  <Input label="Rua / Logradouro" value={addressStreet} onChangeText={setAddressStreet} placeholder="Preenchido pelo CEP" />
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Input label="Número" value={addressNumber} onChangeText={setAddressNumber} placeholder="Ex: 123" keyboardType="number-pad" />
+                    </View>
+                    <View style={{ flex: 2 }}>
+                      <Input label="Bairro" value={neighborhood} onChangeText={setNeighborhood} placeholder="Preenchido pelo CEP" />
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <View style={{ width: 70 }}>
+                      <Input label="UF" value={state} onChangeText={setState} placeholder="SP" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Input label="Cidade" value={city} onChangeText={setCity} placeholder="Ex: Campinas" />
+                    </View>
+                  </View>
+
+                  {/* ── Forma de Recebimento ── */}
+                  <SectionHeader label="Forma de Recebimento" />
+
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {(["pix", "ted"] as PaymentMethod[]).map((m) => (
+                      <Pressable
+                        key={m}
+                        onPress={() => setPaymentMethod(m)}
+                        style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", backgroundColor: paymentMethod === m ? colors.primary : colors.surface, borderWidth: 1, borderColor: paymentMethod === m ? colors.primary : colors.border }}
+                      >
+                        <Text style={{ fontWeight: "700", fontSize: 13, color: paymentMethod === m ? "#fff" : colors.foreground }}>
+                          {m === "pix" ? "Pix" : "TED / Conta"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  {paymentMethod === "pix" ? (
+                    <>
+                      <View style={{ gap: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Tipo da Chave Pix</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }}>
+                          {([
+                            { value: "EMAIL" as PixKeyType, label: "E-mail" },
+                            { value: "CPF" as PixKeyType, label: "CPF" },
+                            { value: "CNPJ" as PixKeyType, label: "CNPJ" },
+                            { value: "PHONE" as PixKeyType, label: "Telefone" },
+                            { value: "EVP" as PixKeyType, label: "Aleatória" },
+                          ]).map((t) => (
+                            <Pressable
+                              key={t.value}
+                              onPress={() => { setPixKeyType(t.value); setPixKey(""); setPixValidated(false); setPixHolderName(""); setPixError(""); }}
+                              style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: pixKeyType === t.value ? colors.primary : colors.surface, borderWidth: 1, borderColor: pixKeyType === t.value ? colors.primary : colors.border }}
+                            >
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: pixKeyType === t.value ? "#fff" : colors.foreground }}>{t.label}</Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+
+                      <View style={{ gap: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Chave Pix</Text>
+
+                        {/* Input com spinner inline à direita */}
+                        <View style={{ position: "relative", justifyContent: "center" }}>
+                          <TextInput
+                            value={pixKey}
+                            onChangeText={handlePixKeyChange}
+                            placeholder={
+                              pixKeyType === "EMAIL" ? "email@empresa.com" :
+                              pixKeyType === "CPF" ? "000.000.000-00" :
+                              pixKeyType === "CNPJ" ? "00.000.000/0000-00" :
+                              pixKeyType === "PHONE" ? "+55 (00) 00000-0000" :
+                              "Cole aqui a chave aleatória"
+                            }
+                            keyboardType={pixKeyType === "EMAIL" ? "email-address" : "default"}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            placeholderTextColor={colors.muted}
+                            returnKeyType="done"
+                            style={{
+                              backgroundColor: pixValidated ? "#16a34a18" : pixError ? "#dc262610" : colors.surface,
+                              borderWidth: 1.5,
+                              borderColor: pixValidated ? "#16a34a" : pixError ? "#dc2626" : pixValidating ? colors.primary : colors.border,
+                              borderRadius: 12,
+                              paddingHorizontal: 14,
+                              paddingVertical: 13,
+                              paddingRight: 44,
+                              color: colors.foreground,
+                              fontSize: 15,
+                            }}
+                          />
+                          {/* Ícone de status à direita do campo */}
+                          <View style={{ position: "absolute", right: 12, alignItems: "center", justifyContent: "center" }}>
+                            {pixValidating ? (
+                              <ActivityIndicator size="small" color={colors.primary} />
+                            ) : pixValidated ? (
+                              <IconSymbol name="checkmark.circle.fill" size={20} color="#16a34a" />
+                            ) : pixError ? (
+                              <IconSymbol name="xmark.circle.fill" size={20} color="#dc2626" />
+                            ) : null}
+                          </View>
+                        </View>
+
+                        {/* Status abaixo do campo */}
+                        {pixValidated && pixHolderName ? (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#16a34a12", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 }}>
+                            <IconSymbol name="person.fill.checkmark" size={14} color="#16a34a" />
+                            <Text style={{ fontSize: 13, color: "#16a34a", fontWeight: "700", flex: 1 }}>
+                              Titular confirmado: {pixHolderName}
+                            </Text>
+                          </View>
+                        ) : pixValidating ? (
+                          <Text style={{ fontSize: 12, color: colors.primary }}>Verificando chave no Banco Central...</Text>
+                        ) : pixError ? (
+                          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+                            <IconSymbol name="exclamationmark.circle.fill" size={14} color="#dc2626" />
+                            <Text style={{ fontSize: 12, color: "#dc2626", flex: 1 }}>{pixError}</Text>
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 12, color: colors.muted }}>
+                            A chave será validada automaticamente via Banco Central
+                          </Text>
+                        )}
+                      </View>
+
+                    </>
+                  ) : (
+                    <>
+                      <Input label="Código do Banco (001=BB, 341=Itaú, 033=Santander...)" value={bankCode} onChangeText={setBankCode} placeholder="000" keyboardType="number-pad" />
+                      <View style={{ flexDirection: "row", gap: 10 }}>
+                        <View style={{ flex: 1 }}><Input label="Agência" value={bankAgency} onChangeText={setBankAgency} placeholder="0000" keyboardType="number-pad" /></View>
+                        <View style={{ flex: 2 }}><Input label="Conta" value={bankAccount} onChangeText={setBankAccount} placeholder="00000000" keyboardType="number-pad" /></View>
+                        <View style={{ width: 60 }}><Input label="Dígito" value={bankAccountDigit} onChangeText={setBankAccountDigit} placeholder="0" keyboardType="number-pad" /></View>
+                      </View>
+                      <View style={{ gap: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>Tipo da Conta</Text>
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          {(["CONTA_CORRENTE", "CONTA_POUPANCA"] as const).map((type) => (
+                            <Pressable key={type} onPress={() => setBankAccountType(type)} style={{ flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center", backgroundColor: bankAccountType === type ? colors.primary : colors.surface, borderWidth: 1, borderColor: bankAccountType === type ? colors.primary : colors.border }}>
+                              <Text style={{ fontSize: 12, fontWeight: "700", color: bankAccountType === type ? "#fff" : colors.foreground }}>{type === "CONTA_CORRENTE" ? "Corrente" : "Poupança"}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                      <Input label="Nome do titular da conta" value={bankOwnerName} onChangeText={setBankOwnerName} placeholder="Nome completo ou razão social" />
+                      <Input label="CPF/CNPJ do titular" value={bankCpfCnpj} onChangeText={setBankCpfCnpj} placeholder="000.000.000-00 ou CNPJ" keyboardType="number-pad" />
+                    </>
+                  )}
                 </>
               )}
               <Input label="Telefone WhatsAPP" value={phone} onChangeText={handlePhoneChange} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
@@ -437,6 +731,7 @@ export default function AuthScreen() {
             <Input label="Confirmar Senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="••••••••" secureTextEntry />
           )}
         </View>
+
 
         <Pressable
           onPress={submit}
@@ -530,6 +825,19 @@ function Input({
           fontSize: 15,
         }}
       />
+    </View>
+  );
+}
+
+function SectionHeader({ label }: { label: string }) {
+  const colors = useColors();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8 }}>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+      <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary, textTransform: "uppercase", letterSpacing: 0.8 }}>
+        {label}
+      </Text>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
     </View>
   );
 }

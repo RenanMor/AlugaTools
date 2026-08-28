@@ -7,7 +7,15 @@ const router = Router();
 
 router.post("/signup", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, profile, cpf, cnpj, phone, state, city } = req.body;
+    const {
+      email, password, name, profile, cpf, cnpj, phone, state, city,
+      // Address fields (company)
+      postal_code, address_street, address_number, neighborhood,
+      // Payment method (company)
+      pix_key_type, pix_key,
+      bank_code, bank_agency, bank_account, bank_account_digit, bank_account_type,
+      bank_owner_name, bank_cpf_cnpj,
+    } = req.body;
 
     if (profile === "company") {
       if (!email || !password || !name || !cnpj || !phone) {
@@ -90,20 +98,62 @@ router.post("/signup", async (req: Request, res: Response, next: NextFunction) =
     if (profile === "company") {
       const rawCompName = req.body.companyName || name;
       const cleanName = rawCompName.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
+
+      // Validate Pix key via Asaas DICT if provided during signup
+      let resolvedOwnerName = bank_owner_name || null;
+      let resolvedCpfCnpj = bank_cpf_cnpj || null;
+      if (pix_key && pix_key_type) {
+        try {
+          const { validateAsaasPixKey } = await import("../utils/asaas");
+          const pixResult = await validateAsaasPixKey(pix_key_type, pix_key);
+          if (!pixResult.valid) {
+            // Cleanup auth user on invalid Pix
+            await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
+            return res.status(400).json({
+              error: `Chave Pix inválida: ${pixResult.errorMessage || "Não encontrada no Banco Central"}`,
+            });
+          }
+          // Use holder name/doc from DICT if not manually provided
+          if (!resolvedOwnerName && pixResult.name) resolvedOwnerName = pixResult.name;
+          if (!resolvedCpfCnpj && pixResult.cpfCnpj) resolvedCpfCnpj = pixResult.cpfCnpj;
+          console.log(`[Signup] ✅ Pix validated for new company: ${pix_key_type} ${pix_key} → ${pixResult.name}`);
+        } catch (pixErr: any) {
+          // Don't block signup if Asaas is unreachable (sandbox may be off)
+          console.warn(`[Signup] Pix validation skipped (Asaas unavailable):`, pixErr.message);
+        }
+      }
+
+      const companyInsert: any = {
+        owner_id: userData.user.id,
+        name: cleanName,
+        logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
+        description: " ",
+        category_id: "c1",
+        location: `${city || "São Paulo"}, ${state || "SP"}`,
+        state: state || "SP",
+        city: city || "São Paulo",
+        cnpj: cnpj ? cnpj.replace(/\D/g, "") : null,
+        phone: phone || null,
+        // Address
+        postal_code: postal_code || null,
+        address_street: address_street || null,
+        address_number: address_number || null,
+        neighborhood: neighborhood || null,
+        // Payment method
+        pix_key_type: pix_key_type || null,
+        pix_key: pix_key || null,
+        bank_code: bank_code || null,
+        bank_agency: bank_agency || null,
+        bank_account: bank_account || null,
+        bank_account_digit: bank_account_digit || null,
+        bank_account_type: bank_account_type || null,
+        bank_owner_name: resolvedOwnerName,
+        bank_cpf_cnpj: resolvedCpfCnpj,
+      };
+
       const { data: companyData, error: companyError } = await supabaseAdmin
         .from("companies")
-        .insert({
-          owner_id: userData.user.id,
-          name: cleanName,
-          logo: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&q=80",
-          description: " ",
-          category_id: "c1",
-          location: `${city || "São Paulo"}, ${state || "SP"}`,
-          state: state || "SP",
-          city: city || "São Paulo",
-          cnpj: cnpj ? cnpj.replace(/\D/g, "") : null,
-          phone: phone || null,
-        })
+        .insert(companyInsert)
         .select()
         .single();
 

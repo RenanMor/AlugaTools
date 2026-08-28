@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { AddressModal } from "@/components/address-modal";
+import { PaymentInfoModal } from "@/components/payment-info-modal";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
@@ -18,6 +19,7 @@ export default function ProfileScreen() {
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [urlInput, setUrlInput] = useState(user?.avatarUrl || "");
 
   const myCompany = user?.profile === "company" && user.companyId 
@@ -122,6 +124,22 @@ export default function ProfileScreen() {
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </View>
           </Card>
+
+          {/* Company payment methods card */}
+          {myCompany && (
+            <Card
+              onPress={() => setShowPaymentModal(true)}
+              style={{ padding: spacing.lg }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <IconSymbol name="creditcard.fill" size={22} color={colors.primary} />
+                <Text style={{ flex: 1, fontSize: fontSize.md + 1, color: colors.foreground, fontWeight: fontWeight.semibold }}>
+                  Formas de Receber
+                </Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </View>
+            </Card>
+          )}
 
           {/* Admin panel link */}
           {user.isOwner && (
@@ -230,6 +248,13 @@ export default function ProfileScreen() {
       <AddressModal
         visible={showAddressModal}
         onClose={() => setShowAddressModal(false)}
+      />
+
+      {/* Modal: Formas de Receber (read-only) */}
+      <PaymentInfoModal
+        visible={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        company={myCompany || null}
       />
     </ScreenContainer>
   );
