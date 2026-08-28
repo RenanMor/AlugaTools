@@ -46,6 +46,7 @@ export interface AsaasSubaccountInput {
   province?: string;
   postalCode?: string;
   companyType?: "MEI" | "LIMITED" | "INDIVIDUAL" | "ASSOCIATION";
+  incomeValue?: number;
 }
 
 export interface AsaasSubaccountResult {
@@ -56,11 +57,54 @@ export interface AsaasSubaccountResult {
 
 // ---------- API Client ----------
 
-function createAsaasClient(): AxiosInstance {
+/**
+ * Normalizes the Asaas Base URL.
+ * Automatically fixes common configuration mistakes:
+ * - Omitting /v3 (e.g. https://api-sandbox.asaas.com -> https://api-sandbox.asaas.com/v3)
+ * - Trailing slashes
+ * - Using dashboard hostname (sandbox.asaas.com -> api-sandbox.asaas.com)
+ * - Defaults according to NODE_ENV
+ */
+export function getAsaasBaseUrl(): string {
+  let url = (env.asaasBaseUrl || "").trim();
+
+  if (!url) {
+    url = env.nodeEnv === "production"
+      ? "https://api.asaas.com/v3"
+      : "https://api-sandbox.asaas.com/v3";
+  }
+
+  // Remove trailing slashes
+  url = url.replace(/\/+$/, "");
+
+  // If Sandbox is detected in the URL
+  if (url.includes("sandbox")) {
+    // Normalizes all sandbox variations:
+    // "https://sandbox.asaas.com", "https://sandbox.asaas.com/api", "https://sandbox.asaas.com/api/v3", "https://api-sandbox.asaas.com"
+    return "https://api-sandbox.asaas.com/v3";
+  }
+
+  // If Production is detected
+  if (url.includes("asaas.com")) {
+    return "https://api.asaas.com/v3";
+  }
+
+  // Custom proxy / self-hosted gateway fallback
+  if (!url.endsWith("/v3")) {
+    url = `${url}/v3`;
+  }
+
+  return url;
+}
+
+function createAsaasClient(accountApiKey?: string): AxiosInstance {
+  const baseURL = getAsaasBaseUrl();
+  const token = (accountApiKey || env.asaasApiKey || "").trim();
+
   return axios.create({
-    baseURL: env.asaasBaseUrl || "https://api-sandbox.asaas.com/v3",
+    baseURL,
     headers: {
-      access_token: env.asaasApiKey,
+      access_token: token,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
@@ -96,9 +140,11 @@ export async function createAsaasSubaccount(
     province: input.province || undefined,
     postalCode: input.postalCode ? input.postalCode.replace(/\D/g, "") : undefined,
     companyType: input.companyType || (cleanDoc.length === 14 ? "LIMITED" : "MEI"),
+    incomeValue: input.incomeValue || 5000,
   };
 
   try {
+    console.log(`[Asaas] Creating subaccount via POST ${getAsaasBaseUrl()}/accounts for doc: ${cleanDoc.slice(0, 4)}***`);
     const response = await api.post("/accounts", payload);
     const account = response.data;
 
@@ -112,12 +158,20 @@ export async function createAsaasSubaccount(
       apiKey: account.apiKey || "",
     };
   } catch (error: any) {
+    const requestedUrl = `${error.config?.baseURL || ""}${error.config?.url || ""}`;
+    const status = error.response?.status;
+    const responseData = error.response?.data;
+
     console.error(
-      "[Asaas] createSubaccount error:",
-      JSON.stringify(error.response?.data || error.message, null, 2)
+      `[Asaas] createSubaccount error [${status}] on ${requestedUrl}:`,
+      JSON.stringify(responseData || error.message, null, 2)
     );
+
     const errorMsg =
-      error.response?.data?.errors?.[0]?.description ||
+      responseData?.errors?.[0]?.description ||
+      (status === 404
+        ? `Endpoint Asaas não encontrado (404 em ${requestedUrl}). Verifique se a variável ASAAS_BASE_URL no Render está configurada como 'https://api-sandbox.asaas.com/v3'`
+        : null) ||
       error.message ||
       "Erro ao criar subconta Asaas para a empresa";
     throw new Error(errorMsg);
@@ -132,19 +186,7 @@ export async function createAsaasSubaccount(
  */
 export async function getAsaasWalletId(accountApiKey: string): Promise<string> {
   try {
-    const api = axios.create({
-      baseURL: env.asaasBaseUrl || "https://api-sandbox.asaas.com/v3",
-      headers: {
-        access_token: accountApiKey,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const response = await api.get("/finance/getCurrentBalance");
-    // The walletId can also be retrieved from /myAccount
-    const balanceData = response.data;
-    
-    // Alternative: use /wallets endpoint
+    const api = createAsaasClient(accountApiKey);
     const walletResponse = await api.get("/myAccount");
     return walletResponse.data.walletId || "";
   } catch (error: any) {
@@ -570,13 +612,7 @@ export async function transferSubaccountFunds(
     throw new Error("API Key da subconta não fornecida para transferência");
   }
 
-  const api = axios.create({
-    baseURL: env.asaasBaseUrl || "https://api-sandbox.asaas.com/v3",
-    headers: {
-      access_token: subaccountApiKey,
-      "Content-Type": "application/json",
-    },
-  });
+  const api = createAsaasClient(subaccountApiKey);
 
   const payload: any = {
     value: input.value,
@@ -639,13 +675,7 @@ export async function getSubaccountBalance(
     throw new Error("API Key da subconta não fornecida para consulta de saldo");
   }
 
-  const api = axios.create({
-    baseURL: env.asaasBaseUrl || "https://api-sandbox.asaas.com/v3",
-    headers: {
-      access_token: subaccountApiKey,
-      "Content-Type": "application/json",
-    },
-  });
+  const api = createAsaasClient(subaccountApiKey);
 
   try {
     const response = await api.get("/finance/getCurrentBalance");

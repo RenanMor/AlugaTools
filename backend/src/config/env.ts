@@ -10,8 +10,8 @@ export const env = {
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 
   // Asaas (Primary Gateway — Split de Pagamentos)
-  asaasApiKey: process.env.ASAAS_API_KEY || "",
-  asaasBaseUrl: process.env.ASAAS_BASE_URL || (process.env.NODE_ENV === "production" ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3"),
+  asaasApiKey: (process.env.ASAAS_API_KEY || "").trim(),
+  asaasBaseUrl: (process.env.ASAAS_BASE_URL || "").trim(),
   platformFeePercent: Number(process.env.PLATFORM_FEE_PERCENT) || 20, // % retido pela plataforma (default 20%)
 
   // Inactive / Fallback Gateways
