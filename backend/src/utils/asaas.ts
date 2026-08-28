@@ -608,9 +608,41 @@ export async function validateAsaasPixKey(
     });
 
     const data = response.data || {};
-    const holderName = data.name || data.ownerName || data.holderName || data.accountHolderName || data.accountHolder?.name || "Titular Confirmado";
-    const ispb = data.ispb || data.accountHolder?.ispb;
-    const bankName = data.participantName || data.bankName || (ispb ? ISPB_BANK_MAP[ispb] : null) || "Banco Participante";
+    console.log("[Asaas DICT] Full response:", JSON.stringify(data));
+
+    // Asaas can return the holder name in many different structures
+    // depending on API version and key type. We cover all known variants:
+    const holderName =
+      data.name ||
+      data.ownerName ||
+      data.holderName ||
+      data.accountHolderName ||
+      data.accountHolder?.name ||
+      data.holder?.name ||
+      data.pixHolder?.name ||
+      data.account?.name ||
+      data.owner?.name ||
+      // Sometimes the name comes wrapped in a "customer" object
+      data.customer?.name ||
+      // Some versions return as "naturalPerson.name" or "legalPerson.tradeName"
+      data.naturalPerson?.name ||
+      data.legalPerson?.tradeName ||
+      data.legalPerson?.companyName ||
+      // Fallback to ownerName passed by the caller (from the registration form)
+      fallback?.ownerName?.trim() ||
+      fallback?.companyName?.trim() ||
+      "Titular Confirmado";
+
+    const ispb = data.ispb || data.accountHolder?.ispb || data.holder?.ispb;
+    const bankName =
+      data.participantName ||
+      data.bankName ||
+      data.institution ||
+      data.institutionName ||
+      (ispb ? ISPB_BANK_MAP[ispb] : null) ||
+      "Banco Participante";
+
+    console.log(`[Asaas DICT] Resolved -> name: "${holderName}", bank: "${bankName}"`);
 
     return {
       valid: true,
