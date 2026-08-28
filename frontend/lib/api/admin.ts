@@ -96,3 +96,17 @@ export async function cancelCompanyRental(companyId: string, rentalId: string): 
   });
   return mapRental(response.data);
 }
+
+/**
+ * Manually link an existing Asaas walletId / apiKey to a company.
+ */
+export async function linkCompanyWallet(
+  companyId: string,
+  params: { walletId: string; apiKey?: string; accountId?: string }
+): Promise<any> {
+  const response = await apiCall<{ data: any }>(`/api/admin/companies/${companyId}/link-wallet`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return response.data;
+}

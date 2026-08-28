@@ -264,4 +264,36 @@ router.get("/companies/:id/balance", async (req: Request, res: Response, next: N
   }
 });
 
+// 8. Manually link an existing Asaas walletId / apiKey to a company
+router.post("/companies/:id/link-wallet", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { walletId, apiKey, accountId } = req.body;
+
+    if (!walletId || typeof walletId !== "string" || !walletId.trim()) {
+      return res.status(400).json({ error: "walletId é obrigatório" });
+    }
+
+    await CompanyModel.updateAsaasData(id, {
+      asaas_wallet_id: walletId.trim(),
+      asaas_account_id: (accountId || "").trim() || undefined,
+      asaas_api_key: (apiKey || "").trim() || undefined,
+      asaas_status: "active",
+    });
+
+    console.log(`[Admin] Manually linked walletId ${walletId.trim()} to company ${id}`);
+
+    res.json({
+      success: true,
+      message: "Carteira Asaas vinculada com sucesso à empresa!",
+      data: {
+        walletId: walletId.trim(),
+        status: "active",
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

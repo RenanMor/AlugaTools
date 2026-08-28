@@ -10,6 +10,7 @@ export interface AsaasCustomerInput {
   phone?: string;
   mobilePhone?: string;
   externalReference?: string;
+  notificationDisabled?: boolean;
 }
 
 export interface AsaasCardData {
@@ -169,6 +170,7 @@ export async function createAsaasSubaccount(
 
     const errorMsg =
       responseData?.errors?.[0]?.description ||
+      responseData?.message ||
       (status === 404
         ? `Endpoint Asaas não encontrado (404 em ${requestedUrl}). Verifique se a variável ASAAS_BASE_URL no Render está configurada como 'https://api-sandbox.asaas.com/v3'`
         : null) ||
@@ -196,12 +198,15 @@ export async function getAsaasWalletId(accountApiKey: string): Promise<string> {
 }
 
 // ============================================================
-// Customer Management
+// Customer Management (Docs: https://docs.asaas.com/docs/criando-um-cliente)
 // ============================================================
 
 /**
- * Find an existing Asaas customer by CPF/CNPJ, or create a new one.
- * Asaas requires a customer to be created before creating charges.
+ * Find an existing Asaas customer by CPF/CNPJ or externalReference, or create a new one.
+ * Follows the official Asaas guidelines to prevent duplicate customer records.
+ *
+ * Docs: https://docs.asaas.com/docs/criando-um-cliente
+ * Endpoint: POST /v3/customers
  */
 export async function findOrCreateAsaasCustomer(
   input: AsaasCustomerInput
@@ -210,26 +215,42 @@ export async function findOrCreateAsaasCustomer(
   const cleanDoc = input.cpfCnpj.replace(/\D/g, "");
 
   try {
-    // First, try to find existing customer by CPF/CNPJ
-    const searchResponse = await api.get("/customers", {
-      params: { cpfCnpj: cleanDoc },
-    });
+    // 1. Try to find existing customer by CPF/CNPJ
+    if (cleanDoc) {
+      const searchResponse = await api.get("/customers", {
+        params: { cpfCnpj: cleanDoc },
+      });
 
-    const existingCustomers = searchResponse.data?.data || [];
-    if (existingCustomers.length > 0) {
-      return existingCustomers[0].id;
+      const existingCustomers = searchResponse.data?.data || [];
+      if (existingCustomers.length > 0) {
+        return existingCustomers[0].id;
+      }
     }
 
-    // Create new customer
-    const createResponse = await api.post("/customers", {
+    // 2. Try to find by externalReference (app user ID) as recommended by Asaas
+    if (input.externalReference) {
+      const refSearch = await api.get("/customers", {
+        params: { externalReference: input.externalReference },
+      });
+
+      const existingByRef = refSearch.data?.data || [];
+      if (existingByRef.length > 0) {
+        return existingByRef[0].id;
+      }
+    }
+
+    // 3. Create new customer if not found
+    const payload: any = {
       name: input.name,
       email: input.email,
       cpfCnpj: cleanDoc,
       phone: input.phone || undefined,
       mobilePhone: input.mobilePhone || undefined,
       externalReference: input.externalReference || undefined,
-    });
+      notificationDisabled: input.notificationDisabled ?? false,
+    };
 
+    const createResponse = await api.post("/customers", payload);
     return createResponse.data.id;
   } catch (error: any) {
     console.error(
@@ -238,6 +259,7 @@ export async function findOrCreateAsaasCustomer(
     );
     const errorMsg =
       error.response?.data?.errors?.[0]?.description ||
+      error.response?.data?.message ||
       error.message ||
       "Erro ao criar/buscar cliente no Asaas";
     throw new Error(errorMsg);
