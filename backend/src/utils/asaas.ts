@@ -577,6 +577,8 @@ export async function validateAsaasPixKey(
     ? key.replace(/\D/g, "") 
     : key.trim();
 
+  const isSandbox = getAsaasBaseUrl().includes("sandbox");
+
   try {
     const response = await api.get("/pix/addressKeys/external", {
       params: { type, key: cleanKey },
@@ -585,14 +587,37 @@ export async function validateAsaasPixKey(
     const data = response.data;
     return {
       valid: true,
-      name: data.name || data.ownerName,
+      name: data.name || data.ownerName || "Titular Confirmado",
       cpfCnpj: data.cpfCnpj,
       ispb: data.ispb,
       endToEndId: data.endToEndId,
     };
   } catch (error: any) {
     console.warn("[Asaas] validatePixKey warning:", error.response?.data || error.message);
-    const desc = error.response?.data?.errors?.[0]?.description || error.message || "Chave Pix não encontrada no Banco Central";
+
+    // No Sandbox do Asaas, apenas a chave mock 47996515839 existe no DICT de teste.
+    // Qualquer outra chave real gera 404 no Sandbox porque o Sandbox não conecta ao Banco Central real.
+    // Em Sandbox, quando der 404, simulamos o retorno do DICT com o nome para permitir testes de qualquer chave.
+    if (isSandbox && error.response?.status === 404) {
+      console.log(`[Asaas Sandbox] Simulando validação DICT para chave teste (${type}: ${cleanKey})`);
+      const mockName = type === "EMAIL"
+        ? `Empresa ${cleanKey.split("@")[0].toUpperCase()}`
+        : type === "CPF" || type === "CNPJ"
+        ? `Titular Registrado (${cleanKey.slice(0, 3)}***)`
+        : `Titular Pix Teste`;
+
+      return {
+        valid: true,
+        name: mockName,
+        cpfCnpj: cleanKey,
+      };
+    }
+
+    const desc = error.response?.data?.errors?.[0]?.description 
+      || (error.response?.status === 404 ? "Chave Pix não encontrada no Banco Central" : null)
+      || error.message 
+      || "Chave Pix não encontrada no Banco Central";
+
     return {
       valid: false,
       errorMessage: desc,
