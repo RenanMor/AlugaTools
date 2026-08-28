@@ -8,6 +8,7 @@ import {
   transferSubaccountFunds,
   getSubaccountBalance,
 } from "../utils/asaas";
+import { env } from "../config/env";
 
 const router = Router();
 
@@ -167,6 +168,13 @@ router.post("/pagarme", async (req: Request, res: Response) => {
  */
 router.post("/asaas", async (req: Request, res: Response) => {
   try {
+    // Optional Webhook Token Verification (if ASAAS_WEBHOOK_ACCESS_TOKEN is configured)
+    const webhookTokenHeader = (req.headers["asaas-access-token"] || req.headers["access-token"]) as string | undefined;
+    if (env.asaasWebhookAccessToken && webhookTokenHeader && webhookTokenHeader !== env.asaasWebhookAccessToken) {
+      console.warn("[Webhook Asaas] ⚠️ Unauthorized webhook attempt: Token mismatch");
+      return res.status(401).json({ error: "Invalid webhook access token" });
+    }
+
     const payload = req.body;
     const event = payload?.event || "";
     const paymentData = payload?.payment || {};

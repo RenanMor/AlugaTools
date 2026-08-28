@@ -12,6 +12,7 @@ export const env = {
   // Asaas (Primary Gateway — Split de Pagamentos)
   asaasApiKey: (process.env.ASAAS_API_KEY || "").trim(),
   asaasBaseUrl: (process.env.ASAAS_BASE_URL || "").trim(),
+  asaasWebhookAccessToken: (process.env.ASAAS_WEBHOOK_ACCESS_TOKEN || "").trim(),
   platformFeePercent: Number(process.env.PLATFORM_FEE_PERCENT) || 20, // % retido pela plataforma (default 20%)
 
   // Inactive / Fallback Gateways
