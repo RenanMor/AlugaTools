@@ -40,16 +40,7 @@ function isGrayish(r: number, g: number, b: number): boolean {
   const chroma = max - min;
   const luminance = (max + min) / 2;
   const saturation = luminance === 0 || luminance === 255 ? 0 : chroma / (255 - Math.abs(2 * luminance - 255));
-  return saturation < 0.18;
-}
-
-/** Returns true when the color is too close to green or red (to keep those semantic) */
-function isForbiddenHue(r: number, g: number, b: number): boolean {
-  // Green hue: green channel dominates strongly
-  const isGreen = g > r * 1.4 && g > b * 1.4;
-  // Red hue: red channel dominates strongly
-  const isRed = r > g * 1.4 && r > b * 1.4;
-  return isGreen || isRed;
+  return saturation < 0.12;
 }
 
 function sanitizeColor(hex: string): string | null {
@@ -58,9 +49,77 @@ function sanitizeColor(hex: string): string | null {
   const r = parseInt(h.substring(0, 2), 16);
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);
-  if (isGrayish(r, g, b)) return "#FFFFFF"; // gray → white
-  if (isForbiddenHue(r, g, b)) return null; // green/red → skip
+  if (isGrayish(r, g, b)) return null; // skip grays for brand color
   return hex;
+}
+
+/**
+ * Resizes and compresses an image (File or base64/URL) using an offscreen canvas.
+ * Prevents bloated storage and avoids localStorage quota limits.
+ */
+export async function compressImage(
+  input: any,
+  maxWidth = 512,
+  maxHeight = 512,
+  quality = 0.85
+): Promise<string> {
+  if (Platform.OS !== "web") {
+    if (typeof input === "string") return input;
+    return "";
+  }
+
+  return new Promise((resolve, reject) => {
+    const processImg = (imgSrc: string) => {
+      const img = new Image();
+      if (!imgSrc.startsWith("data:")) {
+        img.crossOrigin = "Anonymous";
+      }
+      img.onload = () => {
+        try {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width / height > maxWidth / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(imgSrc);
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressed);
+        } catch (e) {
+          console.warn("[compressImage] Failed to compress on canvas:", e);
+          resolve(imgSrc);
+        }
+      };
+      img.onerror = () => resolve(imgSrc);
+      img.src = imgSrc;
+    };
+
+    if (typeof input === "string") {
+      processImg(input);
+    } else if (input instanceof Blob || (typeof File !== "undefined" && input instanceof File)) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        processImg(reader.result as string);
+      };
+      reader.onerror = () => reject(new Error("Erro ao ler arquivo de imagem"));
+      reader.readAsDataURL(input);
+    } else {
+      resolve("");
+    }
+  });
 }
 
 /** Module-level cache for extracted palettes to avoid redundant processing */
@@ -79,16 +138,18 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
   if (Platform.OS === 'web') {
     return new Promise((resolve) => {
       const img = new Image();
-      img.crossOrigin = "Anonymous";
+      if (!imageUrl.startsWith("data:")) {
+        img.crossOrigin = "Anonymous";
+      }
       img.onload = () => {
         try {
           const canvas = document.createElement("canvas");
-          canvas.width = 10;
-          canvas.height = 10;
+          canvas.width = 24;
+          canvas.height = 24;
           const ctx = canvas.getContext("2d");
           if (!ctx) return resolve(defaultColors);
-          ctx.drawImage(img, 0, 0, 10, 10);
-          const data = ctx.getImageData(0, 0, 10, 10).data;
+          ctx.drawImage(img, 0, 0, 24, 24);
+          const data = ctx.getImageData(0, 0, 24, 24).data;
           
           const colorCount: Record<string, number> = {};
           for (let i = 0; i < data.length; i += 4) {
@@ -99,7 +160,7 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
             if (a < 50) continue; // ignore transparent
             
             const brightness = (r + g + b) / 3;
-            if (brightness > 240 || brightness < 15) continue; // skip pure white/black
+            if (brightness > 245 || brightness < 15) continue; // skip pure white/black
             
             const hex = "#" + [r, g, b].map(x => {
               const h = Math.round(x).toString(16);
@@ -111,28 +172,27 @@ export async function extractPalette(imageUrl: string): Promise<{ primary: strin
           
           const sortedColors = Object.entries(colorCount).sort((a, b) => b[1] - a[1]);
           
-          // Find primary: first non-forbidden color (or sanitized to white if gray)
           let primary = defaultColors.primary;
           let secondary = defaultColors.secondary;
           let primarySet = false;
           
           for (const [hex] of sortedColors) {
-            const h = hex.replace("#", "");
-            const r = parseInt(h.substring(0, 2), 16);
-            const g = parseInt(h.substring(2, 4), 16);
-            const b = parseInt(h.substring(4, 6), 16);
             const sanitized = sanitizeColor(hex);
-            if (!primarySet) {
-              if (sanitized) {
+            if (sanitized) {
+              if (!primarySet) {
                 primary = sanitized;
                 primarySet = true;
-              }
-            } else {
-              if (sanitized && sanitized !== primary) {
+              } else if (sanitized !== primary) {
                 secondary = sanitized;
                 break;
               }
             }
+          }
+
+          // If no saturated color was found, fallback to first non-black/white color or default
+          if (!primarySet && sortedColors.length > 0) {
+            primary = sortedColors[0][0];
+            secondary = sortedColors[1] ? sortedColors[1][0] : defaultColors.secondary;
           }
           
           const result = { primary, secondary };

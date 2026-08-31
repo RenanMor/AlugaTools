@@ -12,6 +12,7 @@ import { PaymentInfoModal } from "@/components/payment-info-modal";
 import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
+import { compressImage, extractPalette } from "@/lib/utils";
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -31,15 +32,10 @@ export default function ProfileScreen() {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/*";
-      input.onchange = (e: any) => {
+      input.onchange = async (e: any) => {
         const file = e.target.files?.[0];
         if (file) {
-          const reader = new FileReader();
-          reader.onload = async () => {
-            const base64 = reader.result as string;
-            await uploadAvatar(base64);
-          };
-          reader.readAsDataURL(file);
+          await uploadAvatar(file);
         }
       };
       input.click();
@@ -49,11 +45,19 @@ export default function ProfileScreen() {
     }
   };
 
-  const uploadAvatar = async (urlOrBase64: string) => {
+  const uploadAvatar = async (fileOrUrl: any) => {
     if (isUpdatingAvatar) return;
     setIsUpdatingAvatar(true);
     try {
-      await updateAvatar(urlOrBase64);
+      // 1. Resize and compress to avoid huge base64 strings in DB/storage
+      const compressed = await compressImage(fileOrUrl, 512, 512, 0.85);
+      const finalImage = compressed || fileOrUrl;
+
+      // 2. Extract brand color palette from the image
+      const palette = await extractPalette(finalImage);
+
+      // 3. Update avatar and brand colors
+      await updateAvatar(finalImage, palette.primary, palette.secondary);
       Alert.alert("Sucesso", "Foto de perfil atualizada!");
     } catch (err: any) {
       Alert.alert("Erro", err.message || "Erro ao atualizar foto.");

@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { Alert } from "react-native";
 import { useThemeContext } from "./theme-provider";
 import { CartItem, Company, ProfileType, Rental, RentalStatus, SessionUser, Tool, Deliverer, UserAddress } from "./types";
+import { extractPalette } from "./utils";
 import * as Auth from "./_core/auth";
 import { apiCall } from "./_core/api";
 import {
@@ -230,14 +231,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [savedAddresses, setDefaultAddress, addAddress]);
 
   useEffect(() => {
+    let active = true;
     if (user && (user.profile === "company" || user.profile === "deliverer")) {
-      setPrimaryColor(user.primaryColor || null);
-      setSecondaryColor(user.secondaryColor || null);
+      const myCompany = companies.find((c) => c.id === user.companyId || (user.id && (c as any).owner_id === user.id));
+      const prim = user.primaryColor || myCompany?.primaryColor || null;
+      const sec = user.secondaryColor || myCompany?.secondaryColor || null;
+
+      if (prim) {
+        setPrimaryColor(prim);
+        setSecondaryColor(sec || prim);
+      } else {
+        const logo = user.avatarUrl || myCompany?.logo;
+        if (logo) {
+          extractPalette(logo).then((palette) => {
+            if (active) {
+              setPrimaryColor(palette.primary);
+              setSecondaryColor(palette.secondary);
+            }
+          }).catch(() => {});
+        } else {
+          setPrimaryColor(null);
+          setSecondaryColor(null);
+        }
+      }
     } else {
       setPrimaryColor(null);
       setSecondaryColor(null);
     }
-  }, [user, setPrimaryColor, setSecondaryColor]);
+    return () => { active = false; };
+  }, [user, companies, setPrimaryColor, setSecondaryColor]);
 
   // 1. Hydrate cart and user session from storage on load
   useEffect(() => {
@@ -258,10 +280,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.error("Erro ao hidratar estado local:", err);
+      } finally {
+        setHydrated(true);
       }
-      setHydrated(true);
     })();
   }, []);
+
+  // 1b. Verify and refresh latest session data from API on mount
+  useEffect(() => {
+    if (!hydrated) return;
+    (async () => {
+      try {
+        const token = await Auth.getSessionToken();
+        if (token) {
+          const res = await apiCall<{ user: SessionUser }>("/api/auth/me");
+          if (res && res.user) {
+            setUser(res.user);
+          }
+        }
+      } catch (err) {
+        console.warn("Verificação de sessão em background:", err);
+      }
+    })();
+  }, [hydrated]);
 
   // 2. Persist cart and user session to storage
   useEffect(() => {
@@ -537,25 +578,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateAvatar = useCallback(async (avatarUrl: string, primaryColor?: string, secondaryColor?: string) => {
     try {
+      let finalPrimary = primaryColor;
+      let finalSecondary = secondaryColor;
+
+      if (!finalPrimary && avatarUrl) {
+        try {
+          const palette = await extractPalette(avatarUrl);
+          finalPrimary = palette.primary;
+          finalSecondary = palette.secondary;
+        } catch (e) {
+          console.warn("Palette extraction fallback error:", e);
+        }
+      }
+
       const res = await apiCall<{ user: any }>("/api/auth/avatar", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarUrl, primaryColor, secondaryColor }),
+        body: JSON.stringify({
+          avatarUrl,
+          primaryColor: finalPrimary,
+          secondaryColor: finalSecondary,
+        }),
       });
+
       if (res.user) {
+        const updatedPrimary = res.user.primaryColor || res.user.primary_color || finalPrimary || null;
+        const updatedSecondary = res.user.secondaryColor || res.user.secondary_color || finalSecondary || null;
+
         setUser((prev) => prev ? { 
           ...prev, 
-          avatarUrl: res.user.avatarUrl || res.user.avatar_url,
-          primaryColor: res.user.primaryColor || res.user.primary_color,
-          secondaryColor: res.user.secondaryColor || res.user.secondary_color,
+          avatarUrl: res.user.avatarUrl || res.user.avatar_url || avatarUrl,
+          primaryColor: updatedPrimary,
+          secondaryColor: updatedSecondary,
+          companyId: res.user.companyId || prev.companyId,
+          companyStatus: res.user.companyStatus || prev.companyStatus,
         } : null);
+
+        if (updatedPrimary) {
+          setPrimaryColor(updatedPrimary);
+          setSecondaryColor(updatedSecondary || updatedPrimary);
+        }
+
         await loadCatalog();
       }
     } catch (err) {
       console.error("Erro ao atualizar avatar:", err);
       throw err;
     }
-  }, [loadCatalog]);
+  }, [loadCatalog, setPrimaryColor, setSecondaryColor]);
 
   const updateCompanyStatus = useCallback(async (isOpen: boolean) => {
     if (!user?.companyId) return;

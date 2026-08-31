@@ -102,6 +102,8 @@ router.put("/:id", verifySupabaseToken, async (req: Request, res: Response, next
     if (bank_account_type !== undefined) updates.bank_account_type = bank_account_type;
     if (bank_owner_name !== undefined) updates.bank_owner_name = bank_owner_name;
     if (bank_cpf_cnpj !== undefined) updates.bank_cpf_cnpj = bank_cpf_cnpj;
+    if (req.body.primary_color !== undefined) updates.primary_color = req.body.primary_color;
+    if (req.body.secondary_color !== undefined) updates.secondary_color = req.body.secondary_color;
 
     // Validate Pix key via DICT (Banco Central) when pix_key is being set
     if (pix_key && pix_key_type) {

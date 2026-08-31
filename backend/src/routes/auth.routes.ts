@@ -530,13 +530,13 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
     const userId = (req as any).userId;
     const { avatarUrl, primaryColor, secondaryColor } = req.body;
 
+    const userUpdates: any = { avatar_url: avatarUrl };
+    if (primaryColor !== undefined) userUpdates.primary_color = primaryColor;
+    if (secondaryColor !== undefined) userUpdates.secondary_color = secondaryColor;
+
     const { data: dbUser, error: dbError } = await supabaseAdmin
       .from("users")
-      .update({
-        avatar_url: avatarUrl,
-        primary_color: primaryColor || null,
-        secondary_color: secondaryColor || null
-      })
+      .update(userUpdates)
       .eq("id", userId)
       .select()
       .single();
@@ -545,15 +545,25 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
       return res.status(400).json({ error: dbError.message });
     }
 
+    let companyId: string | undefined;
+    let companyStatus: string | undefined;
+
     if (dbUser.profile === "company") {
-      await supabaseAdmin
+      const companyUpdates: any = { logo: avatarUrl };
+      if (primaryColor !== undefined) companyUpdates.primary_color = primaryColor;
+      if (secondaryColor !== undefined) companyUpdates.secondary_color = secondaryColor;
+
+      const { data: updatedCompany } = await supabaseAdmin
         .from("companies")
-        .update({
-          logo: avatarUrl,
-          primary_color: primaryColor || null,
-          secondary_color: secondaryColor || null
-        })
-        .eq("owner_id", userId);
+        .update(companyUpdates)
+        .eq("owner_id", userId)
+        .select("id, status, primary_color, secondary_color")
+        .maybeSingle();
+
+      if (updatedCompany) {
+        companyId = updatedCompany.id;
+        companyStatus = updatedCompany.status;
+      }
     }
 
     res.json({
@@ -563,6 +573,9 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
         email: dbUser.email,
         profile: dbUser.profile,
         role: dbUser.role || "user",
+        isOwner: dbUser.is_owner || false,
+        companyId,
+        companyStatus,
         avatarUrl: dbUser.avatar_url,
         primaryColor: dbUser.primary_color,
         secondaryColor: dbUser.secondary_color,
