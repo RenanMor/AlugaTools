@@ -646,7 +646,7 @@ export default function ToolScreen() {
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
-              backgroundColor: canAddToCart ? colors.primary : "rgba(255, 255, 255, 0.1)",
+              backgroundColor: canAddToCart ? "#F97316" : "rgba(255, 255, 255, 0.1)",
               borderRadius: 16,
               paddingVertical: 14,
               paddingHorizontal: 16,
