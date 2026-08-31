@@ -16,11 +16,14 @@ import { compressImage, extractPalette } from "@/lib/utils";
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const { user, logout, companies, updateAvatar, updateCompanyStatus, refreshCatalog } = useApp();
+  const { user, logout, companies, updateAvatar, updateCompanyStatus, updateCompanyDescription, refreshCatalog } = useApp();
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [descriptionInput, setDescriptionInput] = useState("");
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
   const [urlInput, setUrlInput] = useState(user?.avatarUrl || "");
 
   const isClient = user?.profile === "customer";
@@ -146,19 +149,48 @@ export default function ProfileScreen() {
             </View>
           </Card>
 
-          {/* User saved addresses card (Customer / User) */}
-          <Card
-            onPress={() => setShowAddressModal(true)}
-            style={{ padding: spacing.lg }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-              <IconSymbol name="mappin.and.ellipse" size={22} color={colors.primary} />
-              <Text style={{ flex: 1, fontSize: fontSize.md + 1, color: colors.foreground, fontWeight: fontWeight.semibold }}>
-                Meus Endereços Salvos
-              </Text>
-              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-            </View>
-          </Card>
+          {/* User saved addresses card — hidden for company profiles */}
+          {!myCompany && (
+            <Card
+              onPress={() => setShowAddressModal(true)}
+              style={{ padding: spacing.lg }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <IconSymbol name="mappin.and.ellipse" size={22} color={colors.primary} />
+                <Text style={{ flex: 1, fontSize: fontSize.md + 1, color: colors.foreground, fontWeight: fontWeight.semibold }}>
+                  Meus Endereços Salvos
+                </Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </View>
+            </Card>
+          )}
+
+          {/* Company description card */}
+          {myCompany && (
+            <Card
+              onPress={() => {
+                setDescriptionInput(myCompany.description || "");
+                setShowDescriptionModal(true);
+              }}
+              style={{ padding: spacing.lg }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <IconSymbol name="text.alignleft" size={22} color={colors.primary} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ fontSize: fontSize.md + 1, color: colors.foreground, fontWeight: fontWeight.semibold }}>
+                    Descrição da Empresa
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: fontSize.xs + 1, color: colors.muted }}
+                  >
+                    {myCompany.description?.trim() || "Toque para adicionar uma descrição..."}
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </View>
+            </Card>
+          )}
 
           {/* Company payment methods card */}
           {myCompany && (
@@ -291,6 +323,77 @@ export default function ProfileScreen() {
         onClose={() => setShowPaymentModal(false)}
         company={myCompany || null}
       />
+
+      {/* Modal: Descrição da Empresa */}
+      <Modal
+        visible={showDescriptionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDescriptionModal(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: radius.xl,
+              borderTopRightRadius: radius.xl,
+              padding: spacing.xl,
+              gap: spacing.lg,
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 18, fontWeight: fontWeight.black, color: colors.foreground }}>
+                Descrição da Empresa
+              </Text>
+              <Pressable onPress={() => setShowDescriptionModal(false)}>
+                <IconSymbol name="xmark" size={24} color={colors.foreground} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              value={descriptionInput}
+              onChangeText={setDescriptionInput}
+              placeholder="Descreva sua empresa, serviços e diferenciais..."
+              placeholderTextColor={colors.muted}
+              multiline
+              numberOfLines={5}
+              maxLength={500}
+              style={{
+                backgroundColor: colors.background,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.lg - 2,
+                paddingVertical: spacing.md,
+                color: colors.foreground,
+                minHeight: 110,
+                textAlignVertical: "top",
+              }}
+            />
+            <Text style={{ fontSize: fontSize.xs, color: colors.muted, textAlign: "right", marginTop: -spacing.sm }}>
+              {descriptionInput.length}/500
+            </Text>
+
+            <Button
+              onPress={async () => {
+                if (isSavingDescription) return;
+                setIsSavingDescription(true);
+                try {
+                  await updateCompanyDescription(descriptionInput.trim());
+                  setShowDescriptionModal(false);
+                  Alert.alert("Sucesso", "Descrição atualizada!");
+                } catch (err: any) {
+                  Alert.alert("Erro", err.message || "Não foi possível salvar a descrição.");
+                } finally {
+                  setIsSavingDescription(false);
+                }
+              }}
+            >
+              {isSavingDescription ? "Salvando..." : "Salvar Descrição"}
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

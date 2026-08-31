@@ -90,6 +90,7 @@ interface AppState {
   refreshDeliverers: () => Promise<void>;
   updateAvatar: (avatarUrl: string, primaryColor?: string, secondaryColor?: string) => Promise<void>;
   updateCompanyStatus: (isOpen: boolean) => Promise<void>;
+  updateCompanyDescription: (description: string) => Promise<void>;
   checkSession: () => Promise<void>;
   isHydrated: boolean;
 }
@@ -642,6 +643,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, loadCatalog]);
 
+  const updateCompanyDescription = useCallback(async (description: string) => {
+    if (!user?.companyId) return;
+    try {
+      await apiCall<{ data: any }>(`/api/companies/${user.companyId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      });
+      await loadCatalog();
+    } catch (err) {
+      console.error("Erro ao atualizar descrição da empresa:", err);
+      throw err;
+    }
+  }, [user, loadCatalog]);
+
   // Rental operations (Legacy context helper - actual checkout happens on the checkout screen)
   const checkout = useCallback(async () => {
     if (cart.length === 0 || !user) return;
@@ -780,6 +796,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshDeliverers,
       updateAvatar,
       updateCompanyStatus,
+      updateCompanyDescription,
       checkSession,
       isHydrated: hydrated,
     }),
@@ -819,6 +836,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshDeliverers,
       updateAvatar,
       updateCompanyStatus,
+      updateCompanyDescription,
       checkSession,
       hydrated,
     ],
