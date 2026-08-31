@@ -23,11 +23,14 @@ export default function ProfileScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [urlInput, setUrlInput] = useState(user?.avatarUrl || "");
 
+  const isClient = user?.profile === "customer";
+
   const myCompany = user?.profile === "company" && user.companyId 
     ? companies.find((c) => c.id === user.companyId) 
     : null;
 
   const handleUploadImage = () => {
+    if (isClient) return;
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
@@ -46,7 +49,7 @@ export default function ProfileScreen() {
   };
 
   const uploadAvatar = async (fileOrUrl: any) => {
-    if (isUpdatingAvatar) return;
+    if (isClient || isUpdatingAvatar) return;
     setIsUpdatingAvatar(true);
     try {
       // 1. Resize and compress to avoid huge base64 strings in DB/storage
@@ -58,7 +61,7 @@ export default function ProfileScreen() {
 
       // 3. Update avatar and brand colors
       await updateAvatar(finalImage, palette.primary, palette.secondary);
-      Alert.alert("Sucesso", "Foto de perfil atualizada!");
+      Alert.alert("Sucesso", "Foto da empresa atualizada!");
     } catch (err: any) {
       Alert.alert("Erro", err.message || "Erro ao atualizar foto.");
     } finally {
@@ -79,27 +82,55 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg - 2 }}>
               <Pressable
                 onPress={handleUploadImage}
+                disabled={isClient || isUpdatingAvatar}
                 style={({ pressed }) => [
                   {
                     width: 56,
                     height: 56,
                     borderRadius: 28,
-                    backgroundColor: colors.primary,
+                    backgroundColor: colors.surface,
                     alignItems: "center",
                     justifyContent: "center",
                     overflow: "hidden",
-                    opacity: pressed || isUpdatingAvatar ? 0.8 : 1,
-                    borderWidth: 0.5,
+                    opacity: isClient ? 1 : pressed || isUpdatingAvatar ? 0.8 : 1,
+                    borderWidth: 1,
                     borderColor: colors.border,
+                    position: "relative",
                   },
                 ]}
               >
-                {user.avatarUrl || myCompany?.logo ? (
-                  <Image source={{ uri: user.avatarUrl || myCompany?.logo }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
+                {isClient ? (
+                  <Image
+                    source={require("@/assets/images/default-avatar-client.png")}
+                    style={{ width: "100%", height: "100%" }}
+                    resizeMode="cover"
+                  />
+                ) : user.avatarUrl || myCompany?.logo ? (
+                  <Image
+                    source={{ uri: user.avatarUrl || myCompany?.logo }}
+                    style={{ width: "100%", height: "100%" }}
+                    resizeMode="contain"
+                  />
                 ) : (
                   <Text style={{ color: "#fff", fontSize: 22, fontWeight: fontWeight.black }}>
                     {user.name.charAt(0).toUpperCase()}
                   </Text>
+                )}
+                {!isClient && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      backgroundColor: "rgba(0, 0, 0, 0.55)",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <IconSymbol name="camera.fill" size={10} color="#fff" />
+                  </View>
                 )}
               </Pressable>
               <View style={{ flex: 1 }}>

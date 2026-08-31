@@ -530,6 +530,16 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
     const userId = (req as any).userId;
     const { avatarUrl, primaryColor, secondaryColor } = req.body;
 
+    const { data: existingUser } = await supabaseAdmin
+      .from("users")
+      .select("profile")
+      .eq("id", userId)
+      .single();
+
+    if (existingUser?.profile === "customer") {
+      return res.status(403).json({ error: "Clientes não podem alterar a foto de perfil" });
+    }
+
     const userUpdates: any = { avatar_url: avatarUrl };
     if (primaryColor !== undefined) userUpdates.primary_color = primaryColor;
     if (secondaryColor !== undefined) userUpdates.secondary_color = secondaryColor;
