@@ -53,16 +53,24 @@ export function ScreenContainer({
     // Silent fallback if outside provider
   }
 
+  const myCompany = user && (user.profile === "company" || user.profile === "deliverer")
+    ? companies.find((c) => c.id === (user.companyId || user.delivererCompanyId) || (user.id && (c as any).owner_id === user.id))
+    : null;
+
+  // Fallback to logged-in company's brand colors when returning to general app screens
+  if (!primaryColor && user && (user.profile === "company" || user.profile === "deliverer")) {
+    primaryColor = user.primaryColor || myCompany?.primaryColor || null;
+    secondaryColor = user.secondaryColor || myCompany?.secondaryColor || null;
+  }
+
   // ─── Watermark source resolution ───
   let watermarkSource: string | null = null;
   if (watermarkUri) {
     watermarkSource = watermarkUri;
   } else if (user) {
     if (user.profile === "company") {
-      const myCompany = companies.find((c) => c.id === user.companyId);
       watermarkSource = user.avatarUrl || myCompany?.logo || null;
     } else if (user.profile === "deliverer") {
-      const myCompany = companies.find((c) => c.id === user.delivererCompanyId);
       watermarkSource = myCompany?.logo || null;
     }
   }
