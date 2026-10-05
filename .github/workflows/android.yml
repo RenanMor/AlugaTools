@@ -78,13 +78,21 @@ jobs:
             store="$RUNNER_TEMP/release.keystore"
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 --decode > "$store"
             store_pass=$(trim "$ANDROID_KEYSTORE_PASSWORD")
+            store_open() { keytool -list -keystore "$store" -storepass "$1" > "$RUNNER_TEMP/keytool.log" 2>&1; }
+            # Keep the password exactly as typed if only the untrimmed value opens the store.
+            if ! store_open "$store_pass" && store_open "$ANDROID_KEYSTORE_PASSWORD"; then
+              store_pass="$ANDROID_KEYSTORE_PASSWORD"
+            fi
+            key_pass="$store_pass"
+            if [ -n "$ANDROID_KEY_PASSWORD" ]; then key_pass=$(trim "$ANDROID_KEY_PASSWORD"); fi
             key_alias=$(trim "$ANDROID_KEY_ALIAS")
-            key_pass=$(trim "${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}")
             echo "::add-mask::$store_pass"; echo "::add-mask::$key_pass"
 
             # Fail fast (instead of after a 10-minute Gradle build) with a clear message.
-            if ! keytool -list -keystore "$store" -storepass "$store_pass" > /dev/null 2>&1; then
-              echo "::error title=Keystore inválido::Não foi possível abrir o keystore: confira ANDROID_KEYSTORE_BASE64 (arquivo inteiro em base64) e ANDROID_KEYSTORE_PASSWORD."
+            if ! store_open "$store_pass"; then
+              echo "Keystore decodificado: $(stat -c %s "$store") bytes, sha256 $(sha256sum "$store" | cut -c1-16)…, tipo: $(file -b "$store")"
+              echo "Erro do keytool: $(grep -v '^Picked up' "$RUNNER_TEMP/keytool.log" | head -3)"
+              echo "::error title=Keystore inválido::Não foi possível abrir o keystore: confira ANDROID_KEYSTORE_BASE64 (arquivo inteiro em base64) e ANDROID_KEYSTORE_PASSWORD. Detalhes no log do passo."
               exit 1
             fi
             if ! keytool -list -keystore "$store" -storepass "$store_pass" -alias "$key_alias" > /dev/null 2>&1; then
