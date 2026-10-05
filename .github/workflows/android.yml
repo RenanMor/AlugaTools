@@ -1,0 +1,164 @@
+name: Android
+
+# Builds the Android app (frontend/ — Expo / React Native) on GitHub's runners,
+# without EAS: `expo prebuild` generates the native project and Gradle compiles it.
+#
+# - Every push that touches frontend/ produces an installable APK (artifact of the run).
+# - Pushing a tag `v*` (e.g. v1.0.0) also publishes a GitHub Release with the files.
+# - With the signing secrets configured (see README), the APK/AAB are signed with
+#   the release key and the AAB is ready for Google Play. Without them, the APK is
+#   signed with the debug key (fine for testing, not accepted by Google Play).
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK / AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # needed only to publish the GitHub Release on tags
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # Inlined into the JS bundle. Override with the repository variable of the same name.
+      EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL || 'https://alugatools-api.onrender.com' }}
+      # Read by app.config.ts — Google Play requires a higher versionCode on every upload.
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native Android project (expo prebuild)
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Prepare signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            {
+              echo "SIGNING_KIND=release"
+              echo "SIGNING_STORE_FILE=$RUNNER_TEMP/release.keystore"
+              echo "SIGNING_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+              echo "SIGNING_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+              echo "SIGNING_KEY_PASSWORD=${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning title=APK assinado com chave de debug::Configure os secrets ANDROID_KEYSTORE_* para gerar builds de release (Google Play)."
+            # Fixed debug keystore shipped with the Expo template: builds stay update-compatible with each other.
+            {
+              echo "SIGNING_KIND=debug"
+              echo "SIGNING_STORE_FILE=$PWD/android/app/debug.keystore"
+              echo "SIGNING_STORE_PASSWORD=android"
+              echo "SIGNING_KEY_ALIAS=androiddebugkey"
+              echo "SIGNING_KEY_PASSWORD=android"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Build with Gradle
+        working-directory: frontend/android
+        run: |
+          tasks=":app:assembleRelease"
+          # The AAB is only useful for Google Play, which rejects debug-signed bundles.
+          if [ "$SIGNING_KIND" = "release" ]; then
+            tasks="$tasks :app:bundleRelease"
+          fi
+          ./gradlew $tasks \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" \
+            -Pandroid.injected.signing.store.file="$SIGNING_STORE_FILE" \
+            -Pandroid.injected.signing.store.password="$SIGNING_STORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$SIGNING_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$SIGNING_KEY_PASSWORD"
+
+      - name: Verify signature and collect outputs
+        run: |
+          expected=$(keytool -list -v -keystore "$SIGNING_STORE_FILE" -storepass "$SIGNING_STORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" \
+            | grep -m1 'SHA256:' | awk '{print $2}' | tr -d ':' | tr 'A-F' 'a-f')
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+
+          version=$(node -p "require('expo/config').getConfig('.', { skipSDKVersionRequirement: true }).exp.version")
+          name="AlugaTools-v${version}-${ANDROID_VERSION_CODE}"
+          if [ "$SIGNING_KIND" = "debug" ]; then name="${name}-debug"; fi
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          actual=$("$apksigner" verify --print-certs "$apk" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::APK signed with an unexpected certificate ($actual, expected $expected)"; exit 1
+          fi
+          cp "$apk" "$GITHUB_WORKSPACE/dist/${name}.apk"
+
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          if [ -f "$aab" ]; then
+            actual=$(keytool -printcert -jarfile "$aab" | grep -m1 'SHA256:' | awk '{print $2}' | tr -d ':' | tr 'A-F' 'a-f')
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::AAB signed with an unexpected certificate ($actual, expected $expected)"; exit 1
+            fi
+            cp "$aab" "$GITHUB_WORKSPACE/dist/${name}.aab"
+          fi
+
+          echo "ARTIFACT_NAME=${name}" >> "$GITHUB_ENV"
+          {
+            echo "### AlugaTools Android"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Versão | ${version} (versionCode ${ANDROID_VERSION_CODE}) |"
+            echo "| Assinatura | ${SIGNING_KIND} — SHA-256 \`${expected}\` |"
+            echo "| API | ${EXPO_PUBLIC_API_BASE_URL} |"
+            echo ""
+            echo "Arquivos:"
+            ls -lh "$GITHUB_WORKSPACE/dist" | awk 'NR>1 {print "- `" $NF "` (" $5 ")"}'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
