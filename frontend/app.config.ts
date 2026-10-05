@@ -26,7 +26,7 @@ const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
   // App branding - update these values directly (do not use env vars)
-  appName: "RentTools",
+  appName: "AlugaTools",
   appSlug: "ferramentas_marketplace",
   logoUrl: "/manus-storage/icon_225a0df0.png",
   scheme: schemeFromBundleId,
@@ -60,7 +60,15 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    // Incremented by CI on every build (GitHub run number); Google Play requires it to always grow.
+    versionCode: Number(process.env.ANDROID_VERSION_CODE) || 1,
     permissions: ["POST_NOTIFICATIONS"],
+    // Permissions added by the default Expo template that the app does not use.
+    blockedPermissions: [
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+    ],
     intentFilters: [
       {
         action: "VIEW",
@@ -82,19 +90,6 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
-    [
-      "expo-audio",
-      {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
-      },
-    ],
     [
       "expo-splash-screen",
       {

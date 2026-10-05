@@ -51,8 +51,9 @@ export function getApiBaseUrl(): string {
     return "https://alugatools-api.onrender.com";
   }
 
-  // Native simulators / emulators fallback (or physical device default)
-  if (ReactNative.Platform.OS === "android") {
+  // Android emulator fallback in development (10.0.2.2 = host machine).
+  // Release builds (APK/AAB) must never point to it, so they fall through to production.
+  if (ReactNative.Platform.OS === "android" && __DEV__) {
     // If we're on a real device, it won't connect to 10.0.2.2, but for emulator it's fine.
     // For safety, you should always define the env var for physical devices.
     return "http://10.0.2.2:4000";
