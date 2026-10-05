@@ -73,13 +73,55 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            # Secrets pasted with a trailing newline/space are a common cause of "wrong password".
+            trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+            store="$RUNNER_TEMP/release.keystore"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 --decode > "$store"
+            store_pass=$(trim "$ANDROID_KEYSTORE_PASSWORD")
+            key_alias=$(trim "$ANDROID_KEY_ALIAS")
+            key_pass=$(trim "${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}")
+            echo "::add-mask::$store_pass"; echo "::add-mask::$key_pass"
+
+            # Fail fast (instead of after a 10-minute Gradle build) with a clear message.
+            if ! keytool -list -keystore "$store" -storepass "$store_pass" > /dev/null 2>&1; then
+              echo "::error title=Keystore inválido::Não foi possível abrir o keystore: confira ANDROID_KEYSTORE_BASE64 (arquivo inteiro em base64) e ANDROID_KEYSTORE_PASSWORD."
+              exit 1
+            fi
+            if ! keytool -list -keystore "$store" -storepass "$store_pass" -alias "$key_alias" > /dev/null 2>&1; then
+              echo "::error title=Alias não encontrado::ANDROID_KEY_ALIAS não existe no keystore. Aliases disponíveis:"
+              keytool -list -keystore "$store" -storepass "$store_pass" | grep -i 'PrivateKeyEntry' | cut -d, -f1
+              exit 1
+            fi
+            # Read the private key the same way the Android Gradle plugin does (keytool ignores -keypass on PKCS12).
+            cat > "$RUNNER_TEMP/KeyCheck.java" <<'JAVA'
+          import java.io.FileInputStream;
+          import java.security.KeyStore;
+          public class KeyCheck {
+            public static void main(String[] a) throws Exception {
+              KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+              try (FileInputStream in = new FileInputStream(a[0])) { ks.load(in, a[1].toCharArray()); }
+              ks.getEntry(a[2], new KeyStore.PasswordProtection(a[3].toCharArray()));
+            }
+          }
+          JAVA
+            key_ok() { java "$RUNNER_TEMP/KeyCheck.java" "$store" "$store_pass" "$key_alias" "$1" > /dev/null 2>&1; }
+            if ! key_ok "$key_pass"; then
+              if key_ok "$store_pass"; then
+                # PKCS12 keystores (keytool default) use the store password for the key.
+                echo "::warning title=ANDROID_KEY_PASSWORD ignorado::A senha da chave não confere; usando a senha do keystore (padrão do formato PKCS12). Você pode apagar o secret ANDROID_KEY_PASSWORD."
+                key_pass="$store_pass"
+              else
+                echo "::error title=Senha da chave incorreta::ANDROID_KEY_PASSWORD não abre a chave '$key_alias' (nem a senha do keystore)."
+                exit 1
+              fi
+            fi
+
             {
               echo "SIGNING_KIND=release"
-              echo "SIGNING_STORE_FILE=$RUNNER_TEMP/release.keystore"
-              echo "SIGNING_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
-              echo "SIGNING_KEY_ALIAS=$ANDROID_KEY_ALIAS"
-              echo "SIGNING_KEY_PASSWORD=${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+              echo "SIGNING_STORE_FILE=$store"
+              echo "SIGNING_STORE_PASSWORD=$store_pass"
+              echo "SIGNING_KEY_ALIAS=$key_alias"
+              echo "SIGNING_KEY_PASSWORD=$key_pass"
             } >> "$GITHUB_ENV"
           else
             echo "::warning title=APK assinado com chave de debug::Configure os secrets ANDROID_KEYSTORE_* para gerar builds de release (Google Play)."
