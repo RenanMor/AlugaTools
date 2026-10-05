@@ -92,6 +92,15 @@ jobs:
             if ! store_open "$store_pass"; then
               echo "Keystore decodificado: $(stat -c %s "$store") bytes, sha256 $(sha256sum "$store" | cut -c1-16)…, tipo: $(file -b "$store")"
               echo "Erro do keytool: $(grep -v '^Picked up' "$RUNNER_TEMP/keytool.log" | head -3)"
+              echo "Secret ANDROID_KEYSTORE_BASE64: $(printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d ' \r\n' | wc -c) caracteres de base64"
+              # PKCS12 files start with a DER SEQUENCE whose header carries the full file size.
+              read -r b0 b1 b2 b3 b4 < <(od -An -tu1 -N5 "$store")
+              expected_size=""
+              if [ "$b0" = 48 ] && [ "$b1" = 130 ]; then expected_size=$((b2 * 256 + b3 + 4)); fi
+              if [ "$b0" = 48 ] && [ "$b1" = 131 ]; then expected_size=$((b2 * 65536 + b3 * 256 + b4 + 5)); fi
+              if [ -n "$expected_size" ] && [ "$expected_size" -gt "$(stat -c %s "$store")" ]; then
+                echo "::error title=Keystore incompleto::O cabeçalho do keystore indica $expected_size bytes, mas o secret só tem $(stat -c %s "$store"). O base64 colado em ANDROID_KEYSTORE_BASE64 está cortado: gere de novo a partir do arquivo (veja o README) sem copiar pelo terminal."
+              fi
               echo "::error title=Keystore inválido::Não foi possível abrir o keystore: confira ANDROID_KEYSTORE_BASE64 (arquivo inteiro em base64) e ANDROID_KEYSTORE_PASSWORD. Detalhes no log do passo."
               exit 1
             fi
