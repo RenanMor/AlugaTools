@@ -44,6 +44,18 @@ Google Play não aceita). Para builds de release:
    | `ANDROID_KEY_ALIAS` | alias da chave (no exemplo: `alugatools`) |
    | `ANDROID_KEY_PASSWORD` | senha da chave (opcional; no formato PKCS12 é a mesma do keystore) |
 
+   O base64 precisa entrar **inteiro** (uma linha só, sem cortes). Copiar do terminal costuma
+   perder pedaços; prefira enviar direto do arquivo:
+
+   ```bash
+   gh secret set ANDROID_KEYSTORE_BASE64 --repo RenanMor/AlugaTools < keystore.b64
+   # Windows (PowerShell): copia o base64 do arquivo para a área de transferência
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("alugatools-upload.keystore")) | Set-Clipboard
+   ```
+
+   Para conferir: `wc -c < keystore.b64` deve bater com o número de caracteres que o workflow
+   mostra quando o keystore não abre.
+
 Com os secrets configurados, o workflow assina o APK com essa chave e também gera o **AAB**
 (`.aab`), que é o formato enviado para a Google Play. O resumo de cada execução mostra o tipo de
 assinatura e a impressão digital SHA-256 do certificado.
