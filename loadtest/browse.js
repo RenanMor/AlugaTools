@@ -81,7 +81,9 @@ export default function () {
     let m;
     while ((m = re.exec(String(page.body || ""))) && bundles.length < 3) bundles.push(m[1]);
   }
-  for (const src of bundles) {
+  // Browsers cache the JS bundle (2.6 MB): download it only on the user's first visit,
+  // otherwise the test measures (and spends) Vercel bandwidth no real user would.
+  for (const src of __ITER === 0 ? bundles : []) {
     const url = src.startsWith("http") ? src : `${SITE}${src.startsWith("/") ? "" : "/"}${src}`;
     const res = http.get(url, params("GET bundle.js (site)", "site", "none"));
     track(res, "GET bundle.js (site)");

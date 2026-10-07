@@ -136,6 +136,39 @@ def report(directory, out_path):
     buckets = defaultdict(list)
     for r in reqs:
         buckets[int(r[0] // BUCKET_S)].append(r)
+    # Degraded = >1% errors or API p95 > 1 s. Two windows in a row, so a single spike doesn't count.
+    healthy, broken, peak_rps, pending = None, None, 0.0, None
+    for b in sorted(buckets):
+        api = [r for r in buckets[b] if r[2] == "api"]
+        if not api:
+            continue
+        api_ok = [r[4] for r in api if ok(r[3])]
+        errors = sum(1 for r in api if not ok(r[3]) and r[3] != "429")
+        users = sum(v.get(b, 0) for v in vus.values())
+        degraded = errors / len(api) > 0.01 or pct(api_ok, 95) > 1000
+        if broken is not None:
+            continue
+        if degraded and users > 0:
+            if pending is not None:
+                broken = pending
+            else:
+                pending = (users, errors / len(api), pct(api_ok, 95))
+        else:
+            pending = None
+            healthy = users
+            peak_rps = max(peak_rps, len(api) / BUCKET_S)
+    summary = ["", "## Limite", ""]
+    if broken:
+        summary.append(
+            f"- Funcionou bem (95% das respostas da API em até 1 s e menos de 1% de erros) até **~{healthy or 0:.0f} usuários** simultâneos, "
+            f"atendendo até **{peak_rps:.0f} req/s**."
+        )
+        summary.append(
+            f"- Começou a degradar com **~{broken[0]:.0f} usuários**: {broken[1] * 100:.0f}% de erros, API p95 {fmt_ms(broken[2])}."
+        )
+    else:
+        summary.append(f"- Não degradou: aguentou o máximo testado (~{healthy or 0:.0f} usuários, até {peak_rps:.0f} req/s).")
+    lines[lines.index("## Por funcionalidade"):lines.index("## Por funcionalidade")] = summary[1:] + [""]
     for b in sorted(buckets):
         rows = buckets[b]
         api = [r for r in rows if r[2] == "api"]
