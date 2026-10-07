@@ -15,6 +15,8 @@ import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-t
 import { compressImage, extractPalette } from "@/lib/utils";
 import { pickPhoto } from "@/lib/permissions";
 import { PermissionsCard } from "@/components/permissions-card";
+import { getCompanyById } from "@/lib/api/companies";
+import type { Company } from "@/lib/types";
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -23,6 +25,7 @@ export default function ProfileScreen() {
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentCompany, setPaymentCompany] = useState<Company | null>(null);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [descriptionInput, setDescriptionInput] = useState("");
   const [isSavingDescription, setIsSavingDescription] = useState(false);
@@ -214,7 +217,16 @@ export default function ProfileScreen() {
           {/* Company payment methods card */}
           {myCompany && (
             <Card
-              onPress={() => setShowPaymentModal(true)}
+              onPress={async () => {
+                // Banking/Pix data is private: fetched with the owner's login, not part of the public catalog.
+                try {
+                  setPaymentCompany(await getCompanyById(myCompany.id, { includePrivate: true }));
+                } catch (err) {
+                  console.warn("[Profile] could not load payment details:", err);
+                  setPaymentCompany(null);
+                }
+                setShowPaymentModal(true);
+              }}
               style={{ padding: spacing.lg }}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
@@ -342,7 +354,7 @@ export default function ProfileScreen() {
       <PaymentInfoModal
         visible={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        company={myCompany || null}
+        company={paymentCompany || myCompany || null}
       />
 
       {/* Modal: Descrição da Empresa */}
