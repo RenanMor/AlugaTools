@@ -62,7 +62,13 @@ const config: ExpoConfig = {
     package: env.androidPackage,
     // Incremented by CI on every build (GitHub run number); Google Play requires it to always grow.
     versionCode: Number(process.env.ANDROID_VERSION_CODE) || 1,
-    permissions: ["POST_NOTIFICATIONS"],
+    // Runtime permissions the app asks for (see lib/permissions.ts).
+    permissions: [
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.CAMERA",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION",
+    ],
     // Permissions added by the default Expo template that the app does not use.
     blockedPermissions: [
       "android.permission.SYSTEM_ALERT_WINDOW",
@@ -90,6 +96,26 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-image-picker",
+      {
+        cameraPermission: "O AlugaTools usa a câmera para fotografar as ferramentas na entrega e nos anúncios.",
+        photosPermission: "O AlugaTools acessa suas fotos para você escolher imagens das ferramentas e da loja.",
+        microphonePermission: false,
+      },
+    ],
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission: "O AlugaTools usa sua localização para preencher o endereço de entrega.",
+      },
+    ],
+    [
+      "expo-notifications",
+      {
+        color: "#F97316",
+      },
+    ],
     [
       "expo-splash-screen",
       {

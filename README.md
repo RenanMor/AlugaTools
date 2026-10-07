@@ -69,6 +69,18 @@ assinatura e a impressão digital SHA-256 do certificado.
 - **Pacote**: `com.app.ferramentas.marketplace` (definido em `frontend/app.config.ts`). Depois do
   primeiro envio à Google Play ele não pode mais ser alterado.
 
+### Permissões do app
+
+| Permissão | Quando é pedida | Uso |
+|---|---|---|
+| Notificações | na primeira abertura | avisos de pedidos e entregas |
+| Localização (uso em primeiro plano) | na primeira abertura | botão "Usar minha localização" no cadastro de endereço |
+| Câmera | ao tirar a primeira foto | fotos da entrega, dos anúncios e da loja |
+
+Em **Perfil → Permissões do app** o usuário vê o status de cada uma e pode permitir depois. Se
+tiver negado antes, o botão abre as configurações do Android. As permissões e os textos ficam
+em `frontend/app.config.ts`, e a lógica em `frontend/lib/permissions.ts`.
+
 ### Build local
 
 Com Android Studio (SDK + JDK 17) instalado:

@@ -9,6 +9,7 @@ import { CATEGORIES } from "@/lib/data";
 import { Rental, Tool, Deliverer } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
 import { formatOrderId, getShortOrderId } from "@/lib/utils";
+import { choosePhoto } from "@/lib/permissions";
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -588,8 +589,9 @@ function ToolFormModal({
       };
       input.click();
     } else {
-      const url = prompt("Cole a URL da foto de Capa / Logo:");
-      if (url) setCoverImage(url);
+      choosePhoto("Foto de Capa / Logo").then((photo) => {
+        if (photo) setCoverImage(photo);
+      });
     }
   };
 
@@ -614,14 +616,15 @@ function ToolFormModal({
       };
       input.click();
     } else {
-      const url = prompt(`Cole a URL da foto adicional ${index + 1}:`);
-      if (url) {
-        setOptionalImages((prev) => {
-          const next = [...prev];
-          next[index] = url;
-          return next;
-        });
-      }
+      choosePhoto(`Foto adicional ${index + 1}`).then((photo) => {
+        if (photo) {
+          setOptionalImages((prev) => {
+            const next = [...prev];
+            next[index] = photo;
+            return next;
+          });
+        }
+      });
     }
   };
 

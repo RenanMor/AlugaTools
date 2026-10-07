@@ -25,6 +25,7 @@ import { cancelRental, getRentalById, payRental } from "@/lib/api/rentals";
 import { cancelCompanyRental } from "@/lib/api/admin";
 import { RentalTimer } from "@/components/rental-timer";
 import { formatOrderId } from "@/lib/utils";
+import { choosePhoto } from "@/lib/permissions";
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -391,14 +392,15 @@ export default function OrderDetailsScreen() {
       };
       input.click();
     } else {
-      const url = prompt(`Cole a URL da foto ${index + 1}:`);
-      if (url) {
-        setDeliveryPhotos((prev: string[]) => {
-          const next = [...prev];
-          next[index] = url;
-          return next;
-        });
-      }
+      choosePhoto(`Foto ${index + 1} da entrega`).then((photo) => {
+        if (photo) {
+          setDeliveryPhotos((prev: string[]) => {
+            const next = [...prev];
+            next[index] = photo;
+            return next;
+          });
+        }
+      });
     }
   };
 
