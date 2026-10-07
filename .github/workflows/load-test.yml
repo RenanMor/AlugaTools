@@ -5,10 +5,6 @@ name: Load test
 # 10 runners (different IPs); the report is in the run summary.
 
 on:
-  # TEMP: run once from the working branch (workflow_dispatch only works from main)
-  push:
-    branches: [claude/peaceful-goodall-ha5qqs]
-    paths: [".github/workflows/load-test.yml", "loadtest/**"]
   workflow_dispatch:
     inputs:
       users:
@@ -142,9 +138,10 @@ jobs:
             cat results/warmup/warmup.md 2>/dev/null || true
             cat report.md | tail -n +2
             echo ""
-            echo "IPs dos runners: $(cat results/shard-*/ip.txt 2>/dev/null | sort -u | tr '\n' ' ')"
+            echo "IPs dos runners: $(for f in results/shard-*/ip.txt; do cat "$f"; echo; done 2>/dev/null | sort -u | paste -sd ' ')"
           } > full-report.md
           cat full-report.md >> "$GITHUB_STEP_SUMMARY"
+          cat full-report.md
 
       - uses: actions/upload-artifact@v6
         with:
