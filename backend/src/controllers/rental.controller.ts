@@ -4,6 +4,8 @@ import { CompanyModel } from "../models/company.model";
 import { DelivererModel } from "../models/deliverer.model";
 import { ToolModel } from "../models/tool.model";
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, invalidate } from "../utils/cache";
+import { storeImageList } from "../utils/image-storage";
 import {
   processPayment,
   selectGateway,
@@ -413,7 +415,7 @@ export const RentalController = {
       if (delivererId) extras.deliverer_id = delivererId;
       if (receiver_name) extras.receiver_name = receiver_name;
       if (receiver_cpf) extras.receiver_cpf = receiver_cpf;
-      if (delivery_photos && Array.isArray(delivery_photos)) extras.delivery_photos = delivery_photos;
+      if (delivery_photos && Array.isArray(delivery_photos)) extras.delivery_photos = (await storeImageList(delivery_photos, "deliveries")) as string[];
 
       const updatedRental = await RentalModel.updateStatus(req.params.id, status, extras);
       res.json({ data: updatedRental });
@@ -447,6 +449,7 @@ export const RentalController = {
 
       const rental = await RentalModel.setRating(req.params.id, numRating, safeComment);
       await CompanyModel.recalcRating(rental.company_id);
+      invalidate(CacheKeys.tools, CacheKeys.companies); // ratings shown in the catalog
       res.json({ data: rental });
     } catch (err) {
       next(err);

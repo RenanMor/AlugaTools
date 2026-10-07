@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, invalidate } from "../utils/cache";
 
 export type RentalStatus = "awaiting_payment" | "pending" | "accepted" | "rejected" | "delivering" | "delivered" | "active" | "completed" | "cancelled" | "return_expired";
 
@@ -129,6 +130,7 @@ export const RentalModel = {
       .eq("quantity", originalQuantity) // Optimistic lock: only update if quantity hasn't changed
       .select("quantity")
       .single();
+    invalidate(CacheKeys.tools);
 
     if (stockUpdateError || !stockUpdate) {
       // Another request modified the stock between our read and write
@@ -168,6 +170,7 @@ export const RentalModel = {
         .from("tools")
         .update({ quantity: originalQuantity, available: true })
         .eq("id", rental.tool_id);
+      invalidate(CacheKeys.tools);
       throw new Error(`Erro ao criar pedido: ${error.message} (code: ${error.code})`);
     }
 
@@ -295,6 +298,7 @@ export const RentalModel = {
           .from("tools")
           .update({ quantity: newQty, available: true })
           .eq("id", rental.tool_id);
+        invalidate(CacheKeys.tools);
         console.log(`[Stock] Restored 1 unit for tool ${rental.tool_id} (Rental ${rental.id} completed).`);
       }
     }
@@ -373,6 +377,7 @@ export const RentalModel = {
           .from("tools")
           .update({ quantity: newQty, available: true })
           .eq("id", toolId);
+        invalidate(CacheKeys.tools);
       }
     }
 
@@ -449,6 +454,7 @@ export const RentalModel = {
           .from("tools")
           .update({ quantity: newQty, available: true })
           .eq("id", rental.tool_id);
+        invalidate(CacheKeys.tools);
       }
     }
 

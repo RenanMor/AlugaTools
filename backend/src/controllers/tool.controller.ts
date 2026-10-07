@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ToolModel } from "../models/tool.model";
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, CATALOG_TTL_MS, cached } from "../utils/cache";
 
 /**
  * Helper: verify that the authenticated user owns the company that owns the tool.
@@ -35,9 +36,10 @@ async function verifyCompanyOwnership(userId: string, companyId: string): Promis
 }
 
 export const ToolController = {
-  async listAll(_req: Request, res: Response, next: NextFunction) {
+  async listAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const tools = await ToolModel.findAll();
+      // ?view=list → light catalog cards (current app). Without it: every field, for older app versions.
+      const tools = req.query.view === "list" ? await ToolModel.findAllForList() : await ToolModel.findAll();
       res.json({ data: tools });
     } catch (err) {
       next(err);
@@ -46,7 +48,8 @@ export const ToolController = {
 
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      const tool = await ToolModel.findById(req.params.id);
+      const { id } = req.params;
+      const tool = await cached(`${CacheKeys.tools}id:${id}`, CATALOG_TTL_MS, () => ToolModel.findById(id));
       if (!tool) return res.status(404).json({ error: "Ferramenta não encontrada" });
       res.json({ data: tool });
     } catch (err) {
@@ -116,33 +119,36 @@ export const ToolController = {
   async getReviews(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { data, error } = await supabaseAdmin
-        .from("rentals")
-        .select("id, rating, rating_comment, created_at, customer_id")
-        .eq("tool_id", id)
-        .not("rating", "is", null)
-        .order("created_at", { ascending: false });
-
-      if (error) throw new Error(error.message);
-
-      const customerIds = Array.from(new Set((data || []).map((r: any) => r.customer_id).filter(Boolean)));
-      let userMap: Record<string, string> = {};
-      if (customerIds.length > 0) {
-        const { data: users } = await supabaseAdmin.from("users").select("id, name").in("id", customerIds);
-        (users || []).forEach((u: any) => { userMap[u.id] = u.name; });
-      }
-
-      const reviews = (data || []).map((r: any) => ({
-        id: r.id,
-        rating: r.rating,
-        comment: r.rating_comment || "",
-        createdAt: new Date(r.created_at).getTime(),
-        customerName: userMap[r.customer_id] || "Cliente Anônimo",
-      }));
-
+      const reviews = await cached(`${CacheKeys.tools}reviews:${id}`, CATALOG_TTL_MS, () => loadReviews(id));
       res.json({ data: reviews });
     } catch (err) {
       next(err);
     }
   },
 };
+
+async function loadReviews(id: string) {
+  const { data, error } = await supabaseAdmin
+    .from("rentals")
+    .select("id, rating, rating_comment, created_at, customer_id")
+    .eq("tool_id", id)
+    .not("rating", "is", null)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const customerIds = Array.from(new Set((data || []).map((r: any) => r.customer_id).filter(Boolean)));
+  let userMap: Record<string, string> = {};
+  if (customerIds.length > 0) {
+    const { data: users } = await supabaseAdmin.from("users").select("id, name").in("id", customerIds);
+    (users || []).forEach((u: any) => { userMap[u.id] = u.name; });
+  }
+
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    rating: r.rating,
+    comment: r.rating_comment || "",
+    createdAt: new Date(r.created_at).getTime(),
+    customerName: userMap[r.customer_id] || "Cliente Anônimo",
+  }));
+}

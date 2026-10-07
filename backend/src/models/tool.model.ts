@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, CATALOG_TTL_MS, cached, invalidate } from "../utils/cache";
+import { storeImage, storeImageList } from "../utils/image-storage";
 
 export interface Tool {
   id: string;
@@ -233,39 +235,59 @@ function triggerBackgroundResolution(tool: Tool) {
   }
 }
 
+const LIST_COLUMNS = ["id", "company_id", "name", "category_id", "image", "price_per_day", "available", "quantity", "min_days", "max_days"];
+
+/** Average rating per tool, computed from rated rentals. */
+async function attachRatings(tools: Tool[]): Promise<void> {
+  const { data: ratings } = await supabaseAdmin
+    .from("rentals")
+    .select("tool_id, rating")
+    .not("rating", "is", null);
+
+  const toolRatings: Record<string, { sum: number; count: number }> = {};
+  for (const r of ratings || []) {
+    if (!toolRatings[r.tool_id]) toolRatings[r.tool_id] = { sum: 0, count: 0 };
+    toolRatings[r.tool_id].sum += Number(r.rating);
+    toolRatings[r.tool_id].count += 1;
+  }
+  for (const t of tools) {
+    const info = toolRatings[t.id];
+    t.rating = info ? Math.round((info.sum / info.count) * 10) / 10 : 0;
+    t.rating_count = info ? info.count : 0;
+  }
+}
+
 export const ToolModel = {
+  /** Every tool with all fields (old app versions still use this for the catalog). */
   async findAll(): Promise<Tool[]> {
-    const { data, error } = await supabaseAdmin
-      .from("tools")
-      .select("*");
-    if (error) throw new Error(error.message);
-    const mapped = (data || []).map(mapRow);
-
-    // Add ratings
-    const { data: ratings } = await supabaseAdmin
-      .from("rentals")
-      .select("tool_id, rating")
-      .not("rating", "is", null);
-      
-    const toolRatings: Record<string, { sum: number; count: number }> = {};
-    if (ratings) {
-      for (const r of ratings) {
-        if (!toolRatings[r.tool_id]) {
-          toolRatings[r.tool_id] = { sum: 0, count: 0 };
-        }
-        toolRatings[r.tool_id].sum += Number(r.rating);
-        toolRatings[r.tool_id].count += 1;
-      }
-    }
-
-    mapped.forEach((t: Tool) => {
-      const info = toolRatings[t.id];
-      t.rating = info ? Math.round((info.sum / info.count) * 10) / 10 : 0;
-      t.rating_count = info ? info.count : 0;
+    return cached(`${CacheKeys.tools}full`, CATALOG_TTL_MS, async () => {
+      const { data, error } = await supabaseAdmin.from("tools").select("*");
+      if (error) throw new Error(error.message);
+      const mapped = (data || []).map(mapRow);
+      await attachRatings(mapped);
+      mapped.forEach(triggerBackgroundResolution);
+      return mapped;
     });
+  },
 
-    mapped.forEach(triggerBackgroundResolution);
-    return mapped;
+  /**
+   * Catalog cards: only what the home/search/company screens show. The description
+   * and extra photos are loaded on the tool page (findById).
+   */
+  async findAllForList(): Promise<Partial<Tool>[]> {
+    return cached(`${CacheKeys.tools}list`, CATALOG_TTL_MS, async () => {
+      const columns = await getToolColumns();
+      const wanted = LIST_COLUMNS.filter((c) => columns.includes(c));
+      if (!wanted.includes("image") && columns.includes("image_url")) wanted.push("image_url");
+      const { data, error } = await supabaseAdmin.from("tools").select(wanted.join(","));
+      if (error) throw new Error(error.message);
+      const mapped = ((data || []) as any[]).map((row) => {
+        const { image_url, ...rest } = row;
+        return { ...rest, image: row.image || image_url || "", min_days: row.min_days ?? 1, max_days: row.max_days ?? 30 } as Tool;
+      });
+      await attachRatings(mapped);
+      return mapped;
+    });
   },
 
   async findById(id: string): Promise<Tool | null> {
@@ -330,6 +352,7 @@ export const ToolModel = {
   },
 
   async create(tool: Omit<Tool, "id">): Promise<Tool> {
+    tool = { ...tool, image: await storeImage(tool.image, "tools"), images: (await storeImageList(tool.images, "tools")) as string[] | undefined };
     const resolvedImage = await resolveImageUrl(tool.image);
     
     // Adapt payload to match the database columns dynamically
@@ -354,10 +377,14 @@ export const ToolModel = {
       .select()
       .single();
     if (error) throw new Error(error.message);
+    invalidate(CacheKeys.tools);
     return mapRow(data);
   },
 
   async update(id: string, patch: Partial<Tool>): Promise<Tool> {
+    patch = { ...patch };
+    if (typeof patch.image === "string") patch.image = await storeImage(patch.image, "tools");
+    if (patch.images !== undefined) patch.images = (await storeImageList(patch.images, "tools")) as string[];
     const resolvedImage = patch.image !== undefined ? await resolveImageUrl(patch.image) : undefined;
     
     // Adapt payload to match the database columns dynamically
@@ -385,11 +412,13 @@ export const ToolModel = {
       .select()
       .single();
     if (error) throw new Error(error.message);
+    invalidate(CacheKeys.tools);
     return mapRow(data);
   },
 
   async remove(id: string): Promise<void> {
     const { error } = await supabaseAdmin.from("tools").delete().eq("id", id);
     if (error) throw new Error(error.message);
+    invalidate(CacheKeys.tools);
   },
 };

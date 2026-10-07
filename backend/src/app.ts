@@ -1,6 +1,7 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
+import compression from "compression";
 import path from "path";
 import routes from "./routes";
 import { apiRateLimiter } from "./middlewares/rateLimit.middleware";
@@ -51,6 +52,8 @@ export function createApp() {
       credentials: true,
     })
   );
+  // gzip JSON responses (the catalog compresses ~5-10x)
+  app.use(compression());
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(apiRateLimiter);
@@ -58,7 +61,8 @@ export function createApp() {
   // Serve uploaded images statically
   app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-  app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  // `commit` shows which version is deployed (Render sets RENDER_GIT_COMMIT).
+  app.get("/health", (_req, res) => res.json({ status: "ok", commit: (process.env.RENDER_GIT_COMMIT || "").slice(0, 7) || undefined }));
   app.use("/api", routes);
 
   app.use(notFound);

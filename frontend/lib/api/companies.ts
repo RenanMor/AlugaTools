@@ -42,8 +42,13 @@ export async function getFeaturedCompanies(): Promise<Company[]> {
   return (response.data || []).map(mapCompany);
 }
 
-export async function getCompanyById(id: string): Promise<Company | null> {
-  const response = await apiCall<{ data: any }>(`/api/companies/${id}`);
+/**
+ * Public company data. With `includePrivate` (only for the company owner or an
+ * admin, logged in) it also returns the Pix/banking details.
+ */
+export async function getCompanyById(id: string, options: { includePrivate?: boolean } = {}): Promise<Company | null> {
+  const query = options.includePrivate ? "?private=1" : "";
+  const response = await apiCall<{ data: any }>(`/api/companies/${id}${query}`);
   return response.data ? mapCompany(response.data) : null;
 }
 

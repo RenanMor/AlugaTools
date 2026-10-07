@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from "express";
 import { CompanyController } from "../controllers/company.controller";
 import { verifySupabaseToken } from "../middlewares/auth.middleware";
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, invalidate } from "../utils/cache";
+import { storeOptionalImage } from "../utils/image-storage";
 
 const router = Router();
 
@@ -78,7 +80,7 @@ router.put("/:id", verifySupabaseToken, async (req: Request, res: Response, next
 
     const updates: any = {};
     if (name !== undefined) updates.name = name.replace(/^ \s+/i, "").replace(/\s+ $/i, "");
-    if (logo !== undefined) updates.logo = logo;
+    if (logo !== undefined) updates.logo = await storeOptionalImage(logo, "companies");
     if (description !== undefined) updates.description = description;
     if (category_id !== undefined) updates.category_id = category_id;
     if (location !== undefined) updates.location = location;
@@ -141,7 +143,9 @@ router.put("/:id", verifySupabaseToken, async (req: Request, res: Response, next
       return res.status(400).json({ error: updateError.message });
     }
 
-    res.json({ data: updated });
+    invalidate(CacheKeys.companies);
+    const { asaas_api_key, ...safeCompany } = updated || {};
+    res.json({ data: safeCompany });
   } catch (err) {
     next(err);
   }

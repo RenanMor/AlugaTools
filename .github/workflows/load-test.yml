@@ -1,0 +1,169 @@
+name: Load test
+
+# Simulates people browsing the site (read-only: no login, orders or payments).
+# Run it from Actions → Load test → Run workflow. The load is split across
+# 10 runners (different IPs); the report is in the run summary.
+
+on:
+  workflow_dispatch:
+    inputs:
+      users:
+        description: Simultaneous users (total, split across 10 runners)
+        default: "500"
+      ramp:
+        description: Time to ramp up to all users (k6 duration)
+        default: "2m"
+      hold:
+        description: Time at full load (k6 duration)
+        default: "3m"
+      site_url:
+        description: Frontend URL
+        default: https://aluga-tools.vercel.app
+      api_url:
+        description: API URL
+        default: https://alugatools-api.onrender.com
+      expect_commit:
+        description: Wait until the API /health reports this commit (deploy finished) before testing
+        default: ""
+      allow_rate_limit:
+        description: Run even if the API still limits each IP to a few requests/min (most calls will be 429)
+        type: boolean
+        default: false
+
+concurrency:
+  group: load-test
+  cancel-in-progress: false
+
+env:
+  USERS: ${{ inputs.users || '500' }}
+  RAMP: ${{ inputs.ramp || '2m' }}
+  HOLD: ${{ inputs.hold || '3m' }}
+  SITE_URL: ${{ inputs.site_url || 'https://aluga-tools.vercel.app' }}
+  API_URL: ${{ inputs.api_url || 'https://alugatools-api.onrender.com' }}
+
+jobs:
+  warmup:
+    name: Cold start / single user
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Wait for the expected deploy
+        if: inputs.expect_commit != ''
+        env:
+          EXPECT: ${{ inputs.expect_commit }}
+        run: |
+          for i in $(seq 1 40); do
+            commit=$(curl -sS --max-time 60 "$API_URL/health" | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit') or '')" 2>/dev/null || true)
+            echo "API commit: ${commit:-?} (esperado ${EXPECT:0:7})"
+            if [ -n "$commit" ] && [ "${EXPECT:0:7}" = "${commit:0:7}" ]; then
+              sleep 60 # let the background image migration finish
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::A API não chegou ao commit ${EXPECT:0:7} em 20 min (deploy no Render pendente?)"
+          exit 1
+
+      - name: Measure the first request (server may be asleep) and a single user
+        run: |
+          probe() { curl -sS -o /dev/null --max-time 120 -w '%{http_code} %{time_total} %{size_download}' "$1" || echo "000 120 0"; }
+          read -r c1 t1 _ <<< "$(probe "$API_URL/health")"
+          sleep 2
+          read -r c2 t2 _ <<< "$(probe "$API_URL/health")"
+          read -r c3 t3 s3 <<< "$(probe "$API_URL/api/tools")"
+          read -r c4 t4 s4 <<< "$(probe "$API_URL/api/companies/featured")"
+          read -r c5 t5 s5 <<< "$(probe "$SITE_URL/")"
+          {
+            echo "## 1 usuário, antes da carga"
+            echo ""
+            echo "| Chamada | Status | Tempo | Tamanho |"
+            echo "|---|---:|---:|---:|"
+            echo "| API \`/health\` (1ª chamada — servidor pode estar dormindo) | $c1 | ${t1}s | |"
+            echo "| API \`/health\` (servidor acordado) | $c2 | ${t2}s | |"
+            echo "| API \`/api/tools\` | $c3 | ${t3}s | $((s3 / 1024)) KB |"
+            echo "| API \`/api/companies/featured\` | $c4 | ${t4}s | $((s4 / 1024)) KB |"
+            echo "| Site \`/\` | $c5 | ${t5}s | $((s5 / 1024)) KB |"
+            echo ""
+          } | tee warmup.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the API rate limit
+        env:
+          ALLOW_RATE_LIMIT: ${{ inputs.allow_rate_limit || false }}
+        run: |
+          # express-rate-limit sends the per-IP limit in the RateLimit-Limit header.
+          limit=$(curl -sS -D - -o /dev/null --max-time 60 "$API_URL/health" | tr -d '\r' | awk -F': ' 'tolower($1)=="ratelimit-limit" {print $2}')
+          echo "Limite atual da API: ${limit:-desconhecido} requisições/min por IP"
+          echo "Limite de requisições da API: **${limit:-desconhecido}/min por IP**" >> warmup.md
+          # Each runner sends roughly 18 API requests/min per simulated user.
+          needed=$(( (USERS + 9) / 10 * 18 ))
+          if [ -n "$limit" ] && [ "$limit" -lt "$needed" ] && [ "$ALLOW_RATE_LIMIT" != "true" ]; then
+            echo "::error title=Limite de requisições baixo::A API aceita $limit req/min por IP e cada runner vai enviar ~$needed. Suba RATE_LIMIT_MAX no Render (ex.: 100000) durante o teste, ou rode com allow_rate_limit."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: warmup
+          path: warmup.md
+
+  load:
+    name: Load (runner ${{ matrix.shard }}/10)
+    needs: warmup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Run k6
+        run: |
+          mkdir -p out
+          curl -sS --max-time 10 https://api.ipify.org > out/ip.txt || echo "?" > out/ip.txt
+          VUS=$(( (USERS + 9) / 10 ))
+          echo "Runner ${{ matrix.shard }}: $VUS usuários, IP $(cat out/ip.txt)"
+          k6 run --quiet --out json=raw.json \
+            -e VUS="$VUS" -e RAMP="$RAMP" -e HOLD="$HOLD" -e SITE_URL="$SITE_URL" -e API_URL="$API_URL" \
+            loadtest/browse.js 2>&1 | tee out/k6.txt || echo "k6 terminou com código $?" | tee -a out/k6.txt
+          python3 loadtest/report.py reduce raw.json out/metrics.csv
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: shard-${{ matrix.shard }}
+          path: out/
+
+  report:
+    name: Report
+    needs: load
+    if: always() && needs.load.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          path: results
+
+      - name: Build report
+        run: |
+          python3 loadtest/report.py report results report.md
+          {
+            echo "Configuração: **$USERS usuários** simultâneos (10 runners), subida em $RAMP, $HOLD com carga total."
+            echo ""
+            cat results/warmup/warmup.md 2>/dev/null || true
+            cat report.md | tail -n +2
+            echo ""
+            echo "IPs dos runners: $(for f in results/shard-*/ip.txt; do cat "$f"; echo; done 2>/dev/null | sort -u | paste -sd ' ')"
+          } > full-report.md
+          cat full-report.md >> "$GITHUB_STEP_SUMMARY"
+          cat full-report.md
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: report
+          path: full-report.md

@@ -47,9 +47,19 @@ export function mapToolToDb(tool: Partial<Tool>): any {
   return data;
 }
 
+/**
+ * Catalog cards (light): no description or extra photos — those come from
+ * getToolById on the tool page and when editing.
+ */
 export async function getAllTools(): Promise<Tool[]> {
-  const response = await apiCall<{ data: any[] }>("/api/tools");
+  const response = await apiCall<{ data: any[] }>("/api/tools?view=list");
   return (response.data || []).map(mapTool);
+}
+
+/** Full tool, with description and every photo. */
+export async function getToolById(id: string): Promise<Tool | null> {
+  const response = await apiCall<{ data: any }>(`/api/tools/${id}`);
+  return response.data ? mapTool(response.data) : null;
 }
 
 export async function getToolsByCompany(companyId: string): Promise<Tool[]> {

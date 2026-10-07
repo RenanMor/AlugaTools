@@ -10,6 +10,7 @@ import { Rental, Tool, Deliverer } from "@/lib/types";
 import { RentalTimer } from "@/components/rental-timer";
 import { formatOrderId, getShortOrderId } from "@/lib/utils";
 import { choosePhoto } from "@/lib/permissions";
+import { getToolById } from "@/lib/api/tools";
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -129,9 +130,15 @@ export default function DashboardScreen() {
     setEditingTool(null);
     setShowToolForm(true);
   };
-  const openEditTool = (t: Tool) => {
-    setEditingTool(t);
-    setShowToolForm(true);
+  const openEditTool = async (t: Tool) => {
+    // The catalog list has no description/extra photos: load the full tool so saving keeps them.
+    try {
+      const full = await getToolById(t.id);
+      setEditingTool(full ? { ...t, ...full } : t);
+      setShowToolForm(true);
+    } catch (err: any) {
+      Alert.alert("Erro", err?.message || "Não foi possível carregar a ferramenta para edição.");
+    }
   };
 
   const openNewDeliverer = () => {
