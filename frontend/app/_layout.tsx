@@ -18,6 +18,7 @@ import {
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
+import { requestInitialPermissions } from "@/lib/permissions";
 import { AppProvider } from "@/lib/app-context";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -30,6 +31,11 @@ export const unstable_settings = {
 function NavigationWrapper() {
   const { isHydrated } = useApp();
   const colors = useColors();
+
+  // Ask for notifications/location once the app is on screen (first launch only).
+  useEffect(() => {
+    if (isHydrated) requestInitialPermissions();
+  }, [isHydrated]);
 
   if (!isHydrated) {
     return (

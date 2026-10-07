@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -14,6 +15,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { UserAddress } from "@/lib/types";
 import { lookupCep } from "@/lib/api/rentals";
+import { getCurrentAddress } from "@/lib/permissions";
 
 interface AddressModalProps {
   visible: boolean;
@@ -40,6 +42,7 @@ export function AddressModal({ visible, onClose, onSelectAddress }: AddressModal
   const [isDefault, setIsDefault] = useState(false);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const openNewForm = () => {
     setEditingAddress(null);
@@ -88,6 +91,34 @@ export function AddressModal({ visible, onClose, onSelectAddress }: AddressModal
       } finally {
         setIsLoadingCep(false);
       }
+    }
+  };
+
+  const handleUseLocation = async () => {
+    setIsLocating(true);
+    try {
+      const current = await getCurrentAddress();
+      if (!current) return;
+      setStreet(current.street);
+      setNumber(current.number);
+      setNeighborhood(current.neighborhood);
+      setCity(current.city);
+      setState(current.state);
+      setCep(current.cep);
+      // The CEP lookup returns the official street/neighborhood names when available.
+      if (current.cep.length === 8) {
+        const addressData = await lookupCep(current.cep).catch(() => null);
+        if (addressData) {
+          if (addressData.street) setStreet(addressData.street);
+          if (addressData.neighborhood) setNeighborhood(addressData.neighborhood);
+          if (addressData.city) setCity(addressData.city);
+          if (addressData.state) setState(addressData.state);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert("Erro", "Não foi possível obter sua localização. Preencha o endereço manualmente.");
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -298,6 +329,36 @@ export function AddressModal({ visible, onClose, onSelectAddress }: AddressModal
             </View>
 
             <ScrollView contentContainerStyle={{ gap: 12 }} showsVerticalScrollIndicator={false}>
+              {Platform.OS !== "web" && (
+                <Pressable
+                  onPress={handleUseLocation}
+                  disabled={isLocating}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      paddingVertical: 12,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: colors.primary,
+                      backgroundColor: colors.primary + "12",
+                      opacity: pressed || isLocating ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  {isLocating ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <IconSymbol name="location.fill" size={18} color={colors.primary} />
+                  )}
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>
+                    {isLocating ? "Buscando sua localização..." : "Usar minha localização"}
+                  </Text>
+                </Pressable>
+              )}
+
               <View>
                 <Text style={{ fontSize: 12, fontWeight: "600", color: colors.muted, marginBottom: 4 }}>Nome do Endereço (ex: Casa, Trabalho)</Text>
                 <TextInput

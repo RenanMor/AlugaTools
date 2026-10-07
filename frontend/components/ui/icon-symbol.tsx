@@ -31,6 +31,7 @@ const MAPPING = {
   "gearshape.fill": "settings",
   "wrench.fill": "build",
   "location.fill": "location-on",
+  "bell.fill": "notifications",
   "tag.fill": "local-offer",
   "trending.up": "trending-up",
 } as IconMapping;

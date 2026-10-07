@@ -13,6 +13,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useApp } from "@/lib/app-context";
 import { spacing, fontSize, fontWeight, radius, pageTitle } from "@/lib/design-tokens";
 import { compressImage, extractPalette } from "@/lib/utils";
+import { pickPhoto } from "@/lib/permissions";
+import { PermissionsCard } from "@/components/permissions-card";
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -46,8 +48,25 @@ export default function ProfileScreen() {
       };
       input.click();
     } else {
-      setUrlInput(user?.avatarUrl || "");
-      setShowUrlModal(true);
+      const pick = (source: "camera" | "gallery") => async () => {
+        try {
+          const photo = await pickPhoto(source, 512, 0.85);
+          if (photo) await uploadAvatar(photo);
+        } catch (err: any) {
+          Alert.alert("Erro", err?.message || "Não foi possível obter a foto.");
+        }
+      };
+      Alert.alert("Foto da empresa", undefined, [
+        { text: "Câmera", onPress: pick("camera") },
+        { text: "Galeria", onPress: pick("gallery") },
+        {
+          text: "Colar URL",
+          onPress: () => {
+            setUrlInput(user?.avatarUrl || "");
+            setShowUrlModal(true);
+          },
+        },
+      ], { cancelable: true });
     }
   };
 
@@ -248,6 +267,8 @@ export default function ProfileScreen() {
               </View>
             </Card>
           )}
+
+          <PermissionsCard />
 
           {/* Logout button */}
           <Button
