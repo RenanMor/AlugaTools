@@ -2,9 +2,9 @@
 //
 // Each virtual user repeats a browsing session like a real visitor:
 //   1. opens the site (HTML + JS bundle from Vercel) and loads the catalog
-//      (GET /api/companies/featured + GET /api/tools, in parallel, as the app does)
+//      (GET /api/companies/featured + GET /api/tools?view=list, in parallel, as the app does)
 //   2. opens a company page          (GET /api/companies/:id)
-//   3. opens a tool page             (GET /api/tools/:id/reviews)
+//   3. opens a tool page             (GET /api/tools/:id + GET /api/tools/:id/reviews)
 // with 2–6 s of "reading time" between actions. Search runs on the device, so it
 // makes no request. CEP lookup is left out on purpose: the backend forwards it to a
 // free third-party service that could block the server for real users.
@@ -89,10 +89,10 @@ export default function () {
 
   const [featured, tools] = http.batch([
     ["GET", `${API}/api/companies/featured`, null, params("GET /api/companies/featured", "api")],
-    ["GET", `${API}/api/tools`, null, params("GET /api/tools", "api")],
+    ["GET", `${API}/api/tools?view=list`, null, params("GET /api/tools (catálogo)", "api")],
   ]);
   track(featured, "GET /api/companies/featured");
-  track(tools, "GET /api/tools");
+  track(tools, "GET /api/tools (catálogo)");
   check(featured, { "featured 200": (r) => r.status === 200 });
   check(tools, { "tools 200": (r) => r.status === 200 });
   const companyList = json(featured);
@@ -108,12 +108,17 @@ export default function () {
     think();
   }
 
-  // 3. Tool page (details come from the catalog; reviews are fetched)
+  // 3. Tool page: full tool (description, photos) + reviews, in parallel as the app does
   const tool = pick(toolList);
   if (tool && tool.id) {
-    const res = http.get(`${API}/api/tools/${tool.id}/reviews`, params("GET /api/tools/:id/reviews", "api"));
-    track(res, "GET /api/tools/:id/reviews");
-    check(res, { "reviews 200": (r) => r.status === 200 });
+    const [detail, reviews] = http.batch([
+      ["GET", `${API}/api/tools/${tool.id}`, null, params("GET /api/tools/:id", "api")],
+      ["GET", `${API}/api/tools/${tool.id}/reviews`, null, params("GET /api/tools/:id/reviews", "api")],
+    ]);
+    track(detail, "GET /api/tools/:id");
+    track(reviews, "GET /api/tools/:id/reviews");
+    check(detail, { "tool 200": (r) => r.status === 200 });
+    check(reviews, { "reviews 200": (r) => r.status === 200 });
     think();
   }
 }

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, invalidate } from "../utils/cache";
 
 export interface Company {
   id: string;
@@ -112,6 +113,7 @@ export const CompanyModel = {
       .select()
       .single();
     if (error) throw new Error(error.message);
+    invalidate(CacheKeys.companies);
     return data as Company;
   },
 
@@ -165,6 +167,7 @@ export const CompanyModel = {
         rating_count: totalRatingsCount 
       })
       .eq("id", companyId);
+    invalidate(CacheKeys.companies);
   },
 
   /**

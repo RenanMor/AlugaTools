@@ -11,7 +11,7 @@ import {
   Modal,
 } from "react-native";
 import { StarRating } from "@/components/star-rating";
-import { getToolReviews } from "@/lib/api/tools";
+import { getToolById, getToolReviews } from "@/lib/api/tools";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -23,7 +23,10 @@ export default function ToolScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { tools, companies, cart, addToCart, user } = useApp();
-  const tool = tools.find((t) => t.id === id);
+  const listTool = tools.find((t) => t.id === id);
+  // The catalog only has the card fields; description and extra photos come from the API.
+  const [fullTool, setFullTool] = useState<import("@/lib/types").Tool | null>(null);
+  const tool = fullTool ?? listTool;
   const company = companies.find((c) => c.id === tool?.companyId);
   const cartItem = cart.find((i) => i.tool.id === id);
   const quantityInCart = cartItem ? cartItem.quantity || 1 : 0;
@@ -75,6 +78,7 @@ export default function ToolScreen() {
   useEffect(() => {
     if (id) {
       getToolReviews(id).then(setReviews).catch((err) => console.error(err));
+      getToolById(id).then(setFullTool).catch((err) => console.error(err));
     }
   }, [id]);
 

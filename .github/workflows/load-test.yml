@@ -74,8 +74,8 @@ jobs:
           limit=$(curl -sS -D - -o /dev/null --max-time 60 "$API_URL/health" | tr -d '\r' | awk -F': ' 'tolower($1)=="ratelimit-limit" {print $2}')
           echo "Limite atual da API: ${limit:-desconhecido} requisições/min por IP"
           echo "Limite de requisições da API: **${limit:-desconhecido}/min por IP**" >> warmup.md
-          # Each runner sends roughly 12 API requests/min per simulated user.
-          needed=$(( (USERS + 9) / 10 * 12 ))
+          # Each runner sends roughly 18 API requests/min per simulated user.
+          needed=$(( (USERS + 9) / 10 * 18 ))
           if [ -n "$limit" ] && [ "$limit" -lt "$needed" ] && [ "$ALLOW_RATE_LIMIT" != "true" ]; then
             echo "::error title=Limite de requisições baixo::A API aceita $limit req/min por IP e cada runner vai enviar ~$needed. Suba RATE_LIMIT_MAX no Render (ex.: 100000) durante o teste, ou rode com allow_rate_limit."
             exit 1

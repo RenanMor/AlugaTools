@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "../config/supabase";
+import { CacheKeys, invalidate } from "../utils/cache";
+import { storeOptionalImage } from "../utils/image-storage";
 import { verifySupabaseToken } from "../middlewares/auth.middleware";
 
 const router = Router();
@@ -528,7 +530,8 @@ router.get("/me", verifySupabaseToken, async (req: Request, res: Response, next:
 router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).userId;
-    const { avatarUrl, primaryColor, secondaryColor } = req.body;
+    const { primaryColor, secondaryColor } = req.body;
+    const avatarUrl = await storeOptionalImage(req.body.avatarUrl, "companies");
 
     const { data: existingUser } = await supabaseAdmin
       .from("users")
@@ -573,6 +576,7 @@ router.patch("/avatar", verifySupabaseToken, async (req: Request, res: Response,
       if (updatedCompany) {
         companyId = updatedCompany.id;
         companyStatus = updatedCompany.status;
+        invalidate(CacheKeys.companies);
       }
     }
 
