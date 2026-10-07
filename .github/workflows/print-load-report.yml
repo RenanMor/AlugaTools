@@ -1,0 +1,25 @@
+name: Print load test report (temp)
+on:
+  push:
+    branches: [claude/peaceful-goodall-ha5qqs]
+    paths: [".github/workflows/print-load-report.yml"]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  print:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          run-id: 37621452908
+          github-token: ${{ github.token }}
+          path: results
+      - run: |
+          cat results/warmup/warmup.md
+          echo "=================="
+          cat results/report/full-report.md
+          echo "=================="
+          for f in results/shard-*/ip.txt; do echo "$f: $(cat $f)"; done
+          wc -l results/shard-*/metrics.csv
