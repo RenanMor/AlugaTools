@@ -22,6 +22,9 @@ on:
       api_url:
         description: API URL
         default: https://alugatools-api.onrender.com
+      expect_commit:
+        description: Wait until the API /health reports this commit (deploy finished) before testing
+        default: ""
       allow_rate_limit:
         description: Run even if the API still limits each IP to a few requests/min (most calls will be 429)
         type: boolean
@@ -42,8 +45,25 @@ jobs:
   warmup:
     name: Cold start / single user
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
+      - name: Wait for the expected deploy
+        if: inputs.expect_commit != ''
+        env:
+          EXPECT: ${{ inputs.expect_commit }}
+        run: |
+          for i in $(seq 1 40); do
+            commit=$(curl -sS --max-time 60 "$API_URL/health" | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit') or '')" 2>/dev/null || true)
+            echo "API commit: ${commit:-?} (esperado ${EXPECT:0:7})"
+            if [ -n "$commit" ] && [ "${EXPECT:0:7}" = "${commit:0:7}" ]; then
+              sleep 60 # let the background image migration finish
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::A API não chegou ao commit ${EXPECT:0:7} em 20 min (deploy no Render pendente?)"
+          exit 1
+
       - name: Measure the first request (server may be asleep) and a single user
         run: |
           probe() { curl -sS -o /dev/null --max-time 120 -w '%{http_code} %{time_total} %{size_download}' "$1" || echo "000 120 0"; }
