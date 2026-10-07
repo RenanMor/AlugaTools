@@ -100,6 +100,9 @@ export default function () {
   const companyList = json(featured);
   const toolList = json(tools);
   think();
+  // A person whose catalog failed to load waits and tries again; without this pause
+  // the virtual users would retry in a tight loop and inflate the load after errors.
+  if (!companyList.length && !toolList.length) return;
 
   // 2. Company page
   const company = pick(companyList);
